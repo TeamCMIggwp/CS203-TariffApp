@@ -6,8 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "export": "next build && next export"
   },
+
+
   "dependencies": {
     "@geist-ui/react": "^2.2.5",
     "@radix-ui/react-label": "^2.1.7",
