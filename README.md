@@ -28,3 +28,17 @@ git commit
 Credits / Authors / Acknowledgment
 
 Contributors, Libraries, or References
+
+# Things to note
+If connecting to server, use command below so that when you close the terminal, service will not be stopped
+nohup java -jar <jarFile>
+
+If you wanna stop the service, use 
+# Find the process ID (PID)
+ps aux | grep java
+
+# Or more specific for Spring Boot
+ps aux | grep "your-app.jar"
+
+# Kill the process (replace XXXX with the actual PID)
+kill XXXX
