@@ -39,6 +39,6 @@ jobs:
         key: ${{ secrets.AWS_PRIVATE_KEY }}
         script: |
           cd backend/app/target
-          pkill -f api-server
+          killall java || true
           sleep 3
           nohup java -jar api-server-1.0.jar > app.log 2>&1 &
