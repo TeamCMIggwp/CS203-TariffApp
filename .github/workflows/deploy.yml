@@ -1,0 +1,44 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      
+    - uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        
+    - name: Build
+      run: |
+        cd backend/app
+        mvn clean package -DskipTests
+        
+    - name: Deploy
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.AWS_HOST }}
+        username: ${{ secrets.AWS_USERNAME }}
+        key: ${{ secrets.AWS_PRIVATE_KEY }}
+        source: "backend/app/target/api-server-1.0.jar"
+        target: "backend/app/target/"
+        strip_components: 3
+        
+    - name: Restart
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.AWS_HOST }}
+        username: ${{ secrets.AWS_USERNAME }}
+        key: ${{ secrets.AWS_PRIVATE_KEY }}
+        script: |
+          cd backend/app/target
+          pkill -f "api-server" || true
+          sleep 3
+          nohup java -jar api-server-1.0.jar > app.log 2>&1 &
