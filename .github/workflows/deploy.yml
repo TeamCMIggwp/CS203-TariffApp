@@ -28,7 +28,7 @@ jobs:
         username: ${{ secrets.AWS_USERNAME }}
         key: ${{ secrets.AWS_PRIVATE_KEY }}
         source: "backend/app/target/api-server-1.0.jar"
-        target: "app/"
+        target: "backend/app/target/"
         
     - name: Restart
       uses: appleboy/ssh-action@v1.0.0
@@ -37,7 +37,7 @@ jobs:
         username: ${{ secrets.AWS_USERNAME }}
         key: ${{ secrets.AWS_PRIVATE_KEY }}
         script: |
-          cd app
+          cd backend/app/target
           pkill -f "api-server" || true
           sleep 3
           nohup java -jar api-server-1.0.jar > app.log 2>&1 &
