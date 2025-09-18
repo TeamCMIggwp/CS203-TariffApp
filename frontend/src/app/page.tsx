@@ -1,16 +1,21 @@
-"use client"
+"use client";
 
-import { motion } from "framer-motion"
+import { motion } from "framer-motion";
 
-export default function LandingSection() {
+export default function HomePage() {
   return (
-    <section className="landing-section">
-      <div className="text-center relative z-10">
+    <section className="home-section">
+      <motion.div
+        initial={{ opacity: 0, y: 50 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1, delay: 0.5 }}
+        className="text-center relative z-10"
+      >
         <motion.h1
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 0.5 }}
-          className="landing-title"
+          className="home-title"
         >
           Tariff Calculator
         </motion.h1>
@@ -18,11 +23,11 @@ export default function LandingSection() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 0.8 }}
-          className="landing-subtitle"
+          className="home-subtitle"
         >
           Calculate import tariffs and fees for agricultural products between countries
         </motion.p>
-      </div>
+      </motion.div>
     </section>
-  )
+  );
 }

@@ -131,28 +131,23 @@
     scroll-behavior: smooth;
   }
 
-  /* World map background */
-  .world-map-background {
-    @apply fixed inset-0 z-0;
-  }
-
-  /* Landing section styles */
-  .landing-section {
+  /* Home section styles */
+  .home-section {
     @apply relative z-10 h-screen flex items-center justify-center;
   }
 
-  .landing-title {
+  .home-title {
     @apply text-6xl md:text-8xl font-bold text-white;
-    background: linear-gradient(to right, #60a5fa, #a855f7, #22d3ee);
+    background: linear-gradient(to right, #22d3ee, #ffffff, #22d3ee);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     color: white;
   }
 
-  .landing-subtitle {
+  .home-subtitle {
     @apply text-xl md:text-2xl mt-6 max-w-2xl mx-auto font-medium;
-    background: linear-gradient(to right, #60a5fa, #a855f7, #22d3ee);
+    background: linear-gradient(to right, #22d3ee, #ffffff, #22d3ee);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
