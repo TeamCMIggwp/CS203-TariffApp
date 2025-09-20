@@ -17,7 +17,7 @@ export default function HomePage() {
           transition={{ duration: 1, delay: 0.5 }}
           className="home-title"
         >
-          Tariff Calculator
+          TARIFF
         </motion.h1>
         <motion.p
           initial={{ opacity: 0, y: 30 }}
@@ -25,7 +25,7 @@ export default function HomePage() {
           transition={{ duration: 1, delay: 0.8 }}
           className="home-subtitle"
         >
-          Calculate import tariffs and fees for agricultural products between countries
+          Trade Agreements Regulating Imports and Foreign Fees
         </motion.p>
       </motion.div>
     </section>

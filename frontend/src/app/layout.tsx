@@ -5,12 +5,13 @@ import React from "react"
 import dynamic from "next/dynamic"
 import { FloatingDock } from "@/components/ui/floating-dock"
 import {
-  IconBrandGithub,
-  IconBrandX,
-  IconExchange,
+  IconFileInfo,
+  IconChartHistogram,
+  IconMap,
+  IconReceipt2,
   IconHome,
-  IconNewSection,
-  IconTerminal2,
+  IconHistory,
+  IconCalculator,
 } from "@tabler/icons-react"
 import "./globals.css"
 
@@ -414,40 +415,33 @@ const links = [
   },
   {
     title: "Calculator",
-    icon: <IconTerminal2 className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+    icon: <IconCalculator className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
     href: "/calculator",
   },
   {
-    title: "Components",
-    icon: <IconNewSection className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
-    href: "/components",
+    title: "History",
+    icon: <IconHistory className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+    href: "/history",
   },
   {
-    title: "Aceternity UI",
-    icon: (
-      <img
-        src="https://assets.aceternity.com/logo-dark.png"
-        width={20}
-        height={20}
-        alt="Aceternity Logo"
-      />
-    ),
-    href: "/aceternity-ui",
+    title: "Rates",
+    icon: <IconReceipt2 className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+    href: "/rates",
   },
   {
-    title: "Changelog",
-    icon: <IconExchange className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
-    href: "/changelog",
+    title: "Map",
+    icon: <IconMap className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+    href: "/map",
   },
   {
-    title: "Twitter",
-    icon: <IconBrandX className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
-    href: "https://twitter.com/yourhandle",
+    title: "Predictor",
+    icon: <IconChartHistogram className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+    href: "/predictor",
   },
   {
-    title: "GitHub",
-    icon: <IconBrandGithub className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
-    href: "https://github.com/yourrepo",
+    title: "About",
+    icon: <IconFileInfo className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+    href: "/about",
   },
 ]
 
