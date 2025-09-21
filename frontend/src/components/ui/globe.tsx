@@ -30,15 +30,15 @@ type Position = {
   color: string;
 };
 
-type Arc = {
-  startLat: number;
-  startLng: number;
-  endLat: number;
-  endLng: number;
-  color: string;
-  arcAlt: number;
-  order: number;
-};
+// type Arc = {
+//   startLat: number;
+//   startLng: number;
+//   endLat: number;
+//   endLng: number;
+//   color: string;
+//   arcAlt: number;
+//   order: number;
+// };
 
 export type GlobeConfig = {
   pointSize?: number;
