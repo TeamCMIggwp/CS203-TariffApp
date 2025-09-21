@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { motion, type MotionValue } from "framer-motion"
+import { motion, useMotionValue } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -9,11 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
 
-interface CalculatorSectionProps {
-  calculatorY: MotionValue<number>
-}
-
-export default function CalculatorSection({ calculatorY }: CalculatorSectionProps) {
+export default function CalculatorSection() {
+  const calculatorY = useMotionValue(0)
   const [fromCountry, setFromCountry] = useState("")
   const [toCountry, setToCountry] = useState("")
   const [product, setProduct] = useState("")
