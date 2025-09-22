@@ -1,4 +1,5 @@
-package com.example.app;
+package web;
+
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
