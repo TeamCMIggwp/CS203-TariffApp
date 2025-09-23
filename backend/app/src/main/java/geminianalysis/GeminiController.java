@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -64,11 +66,14 @@ public class GeminiController {
 
     /**
      * Analyzes the provided data using Gemini AI.
+     * Now accepts data as URL query parameters for easy web browser testing.
      */
     @GetMapping("/analyze")
     @Operation(
             summary = "Analyze data using Gemini AI",
-            description = "Submits data to Google's Gemini AI for analysis. Returns structured JSON analysis when possible, or raw text analysis otherwise."
+            description = "Submits data to Google's Gemini AI for analysis via URL query parameters. " +
+                         "Returns structured JSON analysis when possible, or raw text analysis otherwise. " +
+                         "Example: /gemini/analyze?data=china&prompt=analyze this country"
     )
     @ApiResponses({
             @ApiResponse(
@@ -86,13 +91,13 @@ public class GeminiController {
                           "timestamp": 1642778400000,
                           "analysisType": "structured",
                           "analysis": {
-                            "summary": "Data shows positive trend",
-                            "insights": ["Growth rate of 15%", "Peak activity in Q3"],
-                            "metrics": {"growth_rate": "15%", "peak_quarter": "Q3"},
-                            "recommendations": ["Continue current strategy", "Focus on Q3 optimization"],
+                            "summary": "China is the world's most populous country",
+                            "insights": ["Population over 1.4 billion", "Major economic power", "Rich cultural history"],
+                            "metrics": {"population": "1.4B", "gdp_rank": "2"},
+                            "recommendations": ["Focus on sustainable development", "Continue economic reforms"],
                             "confidence": "high"
                           },
-                          "summary": "Data shows positive trend",
+                          "summary": "China is the world's most populous country",
                           "confidence": "high"
                         }
                         """
@@ -102,13 +107,13 @@ public class GeminiController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid request - missing or empty data field",
+                    description = "Invalid request - missing or empty data parameter",
                     content = @Content(
                             mediaType = "application/json",
                             examples = @ExampleObject(value = """
                 {
                   "success": false,
-                  "error": "Data field is required and cannot be empty"
+                  "error": "Data parameter is required and cannot be empty"
                 }
                 """)
                     )
@@ -141,51 +146,41 @@ public class GeminiController {
             )
     })
     public ResponseEntity<Map<String, Object>> analyzeData(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Analysis request containing data and optional prompt",
-                    required = true,
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = AnalysisRequest.class),
-                            examples = {
-                                    @ExampleObject(
-                                            name = "Basic Analysis",
-                                            value = """
-                        {
-                          "data": "Sales data: Q1: $100k, Q2: $120k, Q3: $135k, Q4: $140k"
-                        }
-                        """
-                                    ),
-                                    @ExampleObject(
-                                            name = "Custom Prompt",
-                                            value = """
-                        {
-                          "data": "User feedback: 'Love the new features!' 'Great update' 'Could use more customization'",
-                          "prompt": "Analyze this customer feedback and identify key themes and sentiment"
-                        }
-                        """
-                                    )
-                            }
-                    )
+            @Parameter(
+                    description = "The data to be analyzed by Gemini AI",
+                    example = "china",
+                    required = true
             )
-            @RequestBody AnalysisRequest request) {
+            @RequestParam String data,
+            
+            @Parameter(
+                    description = "Optional custom prompt to guide the AI analysis",
+                    example = "Analyze this country and provide demographic and economic insights"
+            )
+            @RequestParam(required = false) String prompt) {
 
-        logger.info("Received analysis request for data type: {}",
-                request.getData() != null ? "provided" : "missing");
+        logger.info("Received GET analysis request for data: '{}'", 
+                data != null && data.length() > 50 ? data.substring(0, 50) + "..." : data);
 
         Map<String, Object> response = new HashMap<>();
 
         try {
-            if (request.getData() == null || request.getData().trim().isEmpty()) {
+            // URL decode the data parameter in case it contains special characters
+            String decodedData = URLDecoder.decode(data, StandardCharsets.UTF_8);
+            
+            if (decodedData == null || decodedData.trim().isEmpty()) {
                 response.put("success", false);
-                response.put("error", "Data field is required and cannot be empty");
+                response.put("error", "Data parameter is required and cannot be empty");
                 return ResponseEntity.badRequest().body(response);
             }
 
-            GeminiResponse geminiResponse = geminiAnalyzer.analyzeData(
-                    request.getData(),
-                    request.getPrompt()
-            );
+            // URL decode the prompt if provided
+            String decodedPrompt = null;
+            if (prompt != null && !prompt.trim().isEmpty()) {
+                decodedPrompt = URLDecoder.decode(prompt, StandardCharsets.UTF_8);
+            }
+
+            GeminiResponse geminiResponse = geminiAnalyzer.analyzeData(decodedData, decodedPrompt);
 
             if (geminiResponse.isSuccess()) {
                 response.put("success", true);
@@ -201,7 +196,8 @@ public class GeminiController {
                     response.put("analysis", geminiResponse.getRawResponse());
                 }
 
-                logger.info("Analysis completed successfully");
+                logger.info("Analysis completed successfully for data: '{}'", 
+                        decodedData.length() > 20 ? decodedData.substring(0, 20) + "..." : decodedData);
                 return ResponseEntity.ok(response);
 
             } else {
@@ -259,67 +255,6 @@ public class GeminiController {
     }
 
     /**
-     * Data Transfer Object for analysis requests.
-     */
-    @Schema(description = "Request object for data analysis")
-    public static class AnalysisRequest {
-
-        @Schema(
-                description = "The data to be analyzed by Gemini AI",
-                example = "Sales data: Q1: $100k, Q2: $120k, Q3: $135k, Q4: $140k",
-                required = true
-        )
-        private String data;
-
-        @Schema(
-                description = "Optional custom prompt to guide the AI analysis",
-                example = "Analyze this data and provide insights about growth trends"
-        )
-        private String prompt;
-
-        /**
-         * Default constructor for JSON deserialization.
-         */
-        public AnalysisRequest() {}
-
-        /**
-         * Constructs an analysis request with data and prompt.
-         */
-        public AnalysisRequest(String data, String prompt) {
-            this.data = data;
-            this.prompt = prompt;
-        }
-
-        /**
-         * Gets the data to be analyzed.
-         */
-        public String getData() {
-            return data;
-        }
-
-        /**
-         * Sets the data to be analyzed.
-         */
-        public void setData(String data) {
-            this.data = data;
-        }
-
-        /**
-         * Gets the analysis prompt.
-         */
-        public String getPrompt() {
-            return prompt;
-        }
-
-        /**
-         * Sets the analysis prompt.
-         */
-        public void setPrompt(String prompt) {
-            this.prompt = prompt;
-        }
-    }
-
-    /**
      * Response schema for analysis operations.
      */
     @Schema(description = "Response object for analysis operations")
@@ -337,7 +272,7 @@ public class GeminiController {
         @Schema(description = "The analysis result (JSON object for structured, string for text)")
         public Object analysis;
 
-        @Schema(description = "Brief summary of the analysis", example = "Data shows positive growth trend")
+        @Schema(description = "Brief summary of the analysis", example = "China is the world's most populous country")
         public String summary;
 
         @Schema(description = "Confidence level of the analysis", allowableValues = {"high", "medium", "low"}, example = "high")
