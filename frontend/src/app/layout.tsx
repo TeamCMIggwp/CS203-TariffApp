@@ -443,6 +443,12 @@ const links = [
     icon: <IconFileInfo className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
     href: "/about",
   },
+  {
+    title: "Login",
+    //icon: <IconFileInfo className="h-full w-full text-neutral-500 dark:text-neutral-300" />, //insert with a person icon
+    href: "/login",
+  }
+
 ]
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -450,7 +456,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const modifiedLinks = links.map(link => ({
     ...link,
     href: link.href === pathname ? "#" : link.href, // Disable navigation on active link
-  }));  
+  }));
 
   return (
     <html lang="en">
