@@ -31,4 +31,24 @@ public class WitsController {
     ) {
         return wits.getTariffData(reporter, partner, product, year, datatype);
     }
+
+    // NEW: hardcoded demo returning MIN_RATE
+    @GetMapping("/api/wits/tariffs/demo/min-rate")
+    public ResponseEntity<String> minRateDemo() {
+        return wits.getMinRateOnly();
+    }
+
+    // NEW: parameterized MIN_RATE
+    @GetMapping("/api/wits/tariffs/min-rate")
+    public ResponseEntity<String> getMinRate(
+            @RequestParam String reporter,
+            @RequestParam String partner,
+            @RequestParam String product,
+            @RequestParam String year,
+            @RequestParam(defaultValue = "reported") String datatype
+    ) {
+        return wits.getMinRateOnly(reporter, partner, product, year, datatype);
+    }
+
+    
 }

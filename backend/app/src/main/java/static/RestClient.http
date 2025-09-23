@@ -6,3 +6,6 @@ GET http://localhost:8080/api/wits/tariffs/demo
 
 ### GET method for WTO
 GET http://localhost:8080/api/wto/ricedata
+
+###
+GET http://localhost:8080/api/wits/tariffs/demo/min-rate
