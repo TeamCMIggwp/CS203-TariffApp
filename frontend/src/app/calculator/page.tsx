@@ -21,7 +21,7 @@ export default function CalculatorSection() {
   const [toCountry, setToCountry] = useState("")
   const [product, setProduct] = useState("")
   const [value, setValue] = useState("")
-  const [units, setUnits] = useState("")
+  const [year, setYear] = useState("")
   const [calculatedTariff, setCalculatedTariff] = useState<number | null>(null)
 
   // States for API Integration
@@ -88,7 +88,7 @@ export default function CalculatorSection() {
 
     setCalculatedTariff(tariffAmount)
 
-    const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Units: ${units || 'N/A'}`
+    const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`
     const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors"
 
     await callGeminiApi(apiData, prompt)
@@ -175,6 +175,25 @@ export default function CalculatorSection() {
                   onChange={(e) => setValue(e.target.value)}
                   className="calculator-input"
                 />
+              </div>
+
+              {/* Year */}
+              <div className="space-y-2">
+                <Label htmlFor="year" className="calculator-label">
+                  Year
+                </Label>
+                <Select value={year} onValueChange={setYear}>
+                  <SelectTrigger className="calculator-select">
+                    <SelectValue placeholder="Select year" />
+                  </SelectTrigger>
+                  <SelectContent className="calculator-select-content">
+                    {[2025, 2024, 2023, 2022, 2021, 2020].map((yr) => (
+                      <SelectItem key={yr} value={String(yr)} className="calculator-select-item">
+                        {yr}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
