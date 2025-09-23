@@ -55,7 +55,7 @@ public class TestController {
                     example = "123456",
                     required = true
             )
-            @RequestParam Integer productCode,
+            @RequestParam String productCode,
             
             @Parameter(
                     description = "Year (integer)",
