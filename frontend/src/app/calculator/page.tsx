@@ -9,6 +9,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
 
+type GeminiApiResponse = {
+  analysis?: string;
+  success?: boolean;
+  [key: string]: any;
+};
+
 export default function CalculatorSection() {
   const calculatorY = useMotionValue(0)
   const [fromCountry, setFromCountry] = useState("")
@@ -18,15 +24,74 @@ export default function CalculatorSection() {
   const [units, setUnits] = useState("")
   const [calculatedTariff, setCalculatedTariff] = useState<number | null>(null)
 
-  const calculateTariff = () => {
-    if (!fromCountry || !toCountry || !product || !value) return
+  // States for API Integration
+  const [apiResponse, setApiResponse] = useState<GeminiApiResponse | string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [inputError, setInputError] = useState<string | null>(null)
+  const [apiError, setApiError] = useState<string | null>(null)
 
-    // Simple tariff calculation logic
-    const baseRate = Math.random() * 0.25 + 0.05 // 5-30% tariff rate
+  // Function to call API
+  const callGeminiApi = async (data: string, prompt?: string) => {
+    try {
+      setIsLoading(true)
+      setApiError(null)
+
+      const baseUrl = 'http://3.106.20.106:8080/gemini/analyze'
+      const params = new URLSearchParams()
+      params.append('data', data)
+      if (prompt) params.append('prompt', prompt)
+
+      const url = `${baseUrl}?${params.toString()}`
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        }
+      })
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+
+      const result = await response.json()
+
+      // Save raw text or structured result to display
+      if (result?.success && result?.analysis) {
+        setApiResponse(
+          typeof result.analysis === 'string'
+            ? result.analysis
+            : JSON.stringify(result.analysis, null, 2)
+        )
+      } else {
+        setApiResponse("No analysis data returned from API.")
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
+      setApiError(errorMessage)
+      console.error('API Error:', errorMessage)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const calculateTariff = async () => {
+    if (!fromCountry || !toCountry || !product || !value) {
+      setInputError("Please fill in all required fields.")
+      return
+    }
+
+    setInputError(null)
+    setApiError(null)
+
+    const baseRate = Math.random() * 0.25 + 0.05
     const productMultiplier = agriculturalProducts.indexOf(product) * 0.01 + 1
     const tariffAmount = Number.parseFloat(value) * baseRate * productMultiplier
 
     setCalculatedTariff(tariffAmount)
+
+    const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Units: ${units || 'N/A'}`
+    const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors"
+
+    await callGeminiApi(apiData, prompt)
   }
 
   const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
@@ -111,33 +176,29 @@ export default function CalculatorSection() {
                   className="calculator-input"
                 />
               </div>
-
-              {/* Units */}
-              <div className="space-y-2">
-                <Label htmlFor="units" className="calculator-label">
-                  Units (kg/tons)
-                </Label>
-                <Input
-                  id="units"
-                  type="number"
-                  placeholder="Enter quantity"
-                  value={units}
-                  onChange={(e) => setUnits(e.target.value)}
-                  className="calculator-input"
-                />
-              </div>
             </div>
 
             {/* Calculate Button */}
             <div className="flex justify-center pt-6">
               <Button
                 onClick={calculateTariff}
-                disabled={!fromCountry || !toCountry || !product || !value}
+                disabled={!fromCountry || !toCountry || !product || !value || isLoading}
                 className="calculator-button"
               >
-                Calculate Tariff
+                {isLoading ? "Calculating..." : "Calculate Tariff"}
               </Button>
             </div>
+
+            {/* Input Error Message */}
+            {inputError && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-600 p-4 rounded-lg text-white"
+              >
+                <strong>Error:</strong> {inputError}
+              </motion.div>
+            )}
 
             {/* Results */}
             {calculatedTariff !== null && (
@@ -167,6 +228,29 @@ export default function CalculatorSection() {
                     </p>
                   </div>
                 </div>
+
+                {/* Gemini AI Analysis (Plain Text) */}
+                {apiResponse && (
+                  <div className="mt-8 bg-blue-600 p-4 rounded-lg">
+                    <h4 className="text-white font-semibold mb-2">Gemini AI Analysis</h4>
+                    <p className="text-white whitespace-pre-wrap">
+                      {typeof apiResponse === 'object' && apiResponse !== null && 'analysis' in apiResponse
+                        ? apiResponse.analysis
+                        : typeof apiResponse === 'string'
+                          ? apiResponse
+                          : 'No analysis available.'}
+                    </p>
+                  </div>
+                )}
+
+                {/* API Error Message */}
+                {apiError && (
+                  <div className="mt-6 bg-red-600 p-4 rounded-lg">
+                    <h4 className="text-white font-semibold mb-2">API Error</h4>
+                    <p className="text-white">{apiError}</p>
+                  </div>
+                )}
+
               </motion.div>
             )}
           </CardContent>
