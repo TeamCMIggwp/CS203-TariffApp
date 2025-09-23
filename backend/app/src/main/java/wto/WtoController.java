@@ -12,8 +12,8 @@ public class WtoController {
         this.wto = wto; 
     }
 
-    @GetMapping("/api/wto/indicators")
+    @GetMapping("/api/wto/ricedata")
     public ResponseEntity<String> indicators() {
-        return wto.getAllIndicators();
+        return wto.getAllRiceData();
     }
 }

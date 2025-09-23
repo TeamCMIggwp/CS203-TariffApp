@@ -1,5 +1,8 @@
+### Testing if Spring Boot is running
+GET http://localhost:8080/hello
+
+### GET method for WITs tariffs (demo version, hardcoded)
 GET http://localhost:8080/api/wits/tariffs/demo
 
-###
-
-GET http://localhost:8080/api/wto/indicators
+### GET method for WTO
+GET http://localhost:8080/api/wto/ricedata

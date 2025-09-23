@@ -13,7 +13,7 @@ public class WtoApiService {
     @Value("${wto.api.key}")
     private String apiKey;
 
-    public ResponseEntity<String> getAllIndicators() {
+    public ResponseEntity<String> getAllRiceData() {
         String url = "https://api.wto.org/timeseries/v1/data?i=HS_P_0070&r=all&p=default&ps=default&pc=100610,100620,100630,100640&spc=false&fmt=json&mode=full&dec=default&off=0&max=500&head=H&lang=1&meta=false";
 
         HttpHeaders headers = new HttpHeaders();
