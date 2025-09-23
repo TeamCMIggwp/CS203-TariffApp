@@ -23,13 +23,13 @@ public class TestController {
     private static final Logger logger = LoggerFactory.getLogger(TestController.class);
 
     /**
-     * Test endpoint that takes 4 integer parameters and returns a fixed message
+     * Test endpoint that takes 4 parameters and returns a fixed message
      */
     @GetMapping("/calculate")
     @Operation(
             summary = "Test trade data endpoint",
-            description = "Takes 4 integer parameters (reportingCountry, partnerCountry, productCode, year) and returns a test message. " +
-                         "Example: /tariff/calculate?reportingCountry=1&partnerCountry=2&productCode=3&year=2023"
+            description = "Takes 4 parameters (reportingCountry as string, partnerCountry as string, productCode as integer, year as integer) and returns a test message. " +
+                         "Example: /tariff/calculate?reportingCountry=China&partnerCountry=USA&productCode=123456&year=2023"
     )
     @ApiResponse(
             responseCode = "200",
@@ -37,18 +37,18 @@ public class TestController {
     )
     public ResponseEntity<Map<String, Object>> getTradeData(
             @Parameter(
-                    description = "Reporting country code (integer)",
-                    example = "156",
+                    description = "Reporting country code (string)",
+                    example = "China",
                     required = true
             )
-            @RequestParam Integer reportingCountry,
+            @RequestParam String reportingCountry,
             
             @Parameter(
-                    description = "Partner country code (integer)", 
-                    example = "840",
+                    description = "Partner country code (string)", 
+                    example = "USA",
                     required = true
             )
-            @RequestParam Integer partnerCountry,
+            @RequestParam String partnerCountry,
             
             @Parameter(
                     description = "Product code (integer)",
@@ -64,7 +64,7 @@ public class TestController {
             )
             @RequestParam Integer year) {
 
-        logger.info("Test endpoint called with parameters: reportingCountry={}, partnerCountry={}, productCode={}, year={}", 
+        logger.info("Test endpoint called with parameters: reportingCountry='{}', partnerCountry='{}', productCode={}, year={}", 
                     reportingCountry, partnerCountry, productCode, year);
 
         // Create response
