@@ -30,6 +30,8 @@ export default function CalculatorSection() {
   const [inputError, setInputError] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
 
+  const [dummyApiResponse, setDummyApiResponse] = useState<string | null>(null)
+
   // Function to call API
   const callGeminiApi = async (data: string, prompt?: string) => {
     try {
@@ -74,7 +76,7 @@ export default function CalculatorSection() {
   }
 
   const calculateTariff = async () => {
-    if (!fromCountry || !toCountry || !product || !value) {
+    if (!fromCountry || !toCountry || !product || !value || !year) {
       setInputError("Please fill in all required fields.")
       return
     }
@@ -87,6 +89,20 @@ export default function CalculatorSection() {
     const tariffAmount = Number.parseFloat(value) * baseRate * productMultiplier
 
     setCalculatedTariff(tariffAmount)
+
+    try {
+      const dummyApiUrl = `http://3.106.20.106:8080/tariff/calculate?reportingCountry=${fromCountry}&partnerCountry=${toCountry}&productCode=${product}&year=${year}`;
+      const dummyResponse = await fetch(dummyApiUrl);
+      
+      if (!dummyResponse.ok) {
+        throw new Error("Dummy API call failed");
+      }
+
+      const dummyText = await dummyResponse.text();
+      setDummyApiResponse(dummyText);
+    } catch (err) {
+      setDummyApiResponse("Error calling dummy API.");
+    }
 
     const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`
     const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors"
@@ -247,6 +263,14 @@ export default function CalculatorSection() {
                     </p>
                   </div>
                 </div>
+
+                {/* Dummy API Result */}
+                {dummyApiResponse && (
+                  <div className="mt-6 bg-yellow-600 p-4 rounded-lg">
+                    <h4 className="text-white font-semibold mb-2">Tariff Service API Result</h4>
+                    <p className="text-white">{dummyApiResponse}</p>
+                  </div>
+                )}
 
                 {/* Gemini AI Analysis (Plain Text) */}
                 {apiResponse && (
