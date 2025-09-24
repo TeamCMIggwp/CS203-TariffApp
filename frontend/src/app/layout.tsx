@@ -12,6 +12,7 @@ import {
   IconHome,
   IconHistory,
   IconCalculator,
+  IconUser,
 } from "@tabler/icons-react"
 import "./globals.css"
 
@@ -445,7 +446,7 @@ const links = [
   },
   {
     title: "Login",
-    //icon: <IconFileInfo className="h-full w-full text-neutral-500 dark:text-neutral-300" />, //insert with a person icon
+    icon: <IconUser className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
     href: "/login",
   }
 
