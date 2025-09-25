@@ -15,6 +15,7 @@ type GeminiApiResponse = {
   [key: string]: any;
 };
 
+//test
 export default function CalculatorSection() {
   const calculatorY = useMotionValue(0)
   const [fromCountry, setFromCountry] = useState("")
