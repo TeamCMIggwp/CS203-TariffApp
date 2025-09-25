@@ -12,6 +12,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * Service class for analyzing data using Google's Gemini AI API.
  */
+
+//test
 public class GeminiAnalyzer {
 
     private static final Logger logger = LoggerFactory.getLogger(GeminiAnalyzer.class);
