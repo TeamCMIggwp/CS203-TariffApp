@@ -28,6 +28,7 @@
     "dotted-map": "^2.2.3",
     "framer-motion": "^12.23.12",
     "geist": "^1.5.1",
+    "jose": "^6.1.0",
     "lucide-react": "^0.542.0",
     "motion": "^12.23.15",
     "mysql2": "^3.15.0",
