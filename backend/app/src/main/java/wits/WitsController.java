@@ -47,7 +47,7 @@ public class WitsController {
             @RequestParam String year,
             @RequestParam(defaultValue = "reported") String datatype
     ) {
-        return wits.getMinRateOnly(reporter, partner, product, year, datatype);
+        return wits.getMinRateOnly(reporter, partner, product, year);
     }
 
     
