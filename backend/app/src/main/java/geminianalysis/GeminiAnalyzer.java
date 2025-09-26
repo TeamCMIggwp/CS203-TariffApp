@@ -12,12 +12,11 @@ import java.util.concurrent.TimeUnit;
 /**
  * Service class for analyzing data using Google's Gemini AI API.
  */
-
-//test
 public class GeminiAnalyzer {
 
     private static final Logger logger = LoggerFactory.getLogger(GeminiAnalyzer.class);
-    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent";
+    // Updated to use the latest stable model
+    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
     private final OkHttpClient client;
@@ -48,15 +47,18 @@ public class GeminiAnalyzer {
         String prompt = buildAnalysisPrompt(data, analysisPrompt);
         String requestBody = buildRequestBody(prompt);
 
+        // Updated to use x-goog-api-key header instead of query parameter
         Request request = new Request.Builder()
-                .url(GEMINI_API_URL + "?key=" + apiKey)
+                .url(GEMINI_API_URL)
                 .post(RequestBody.create(requestBody, JSON))
                 .addHeader("Content-Type", "application/json")
+                .addHeader("x-goog-api-key", apiKey)
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
-                logger.error("Gemini API request failed with code: {}", response.code());
+                logger.error("Gemini API request failed with code: {} - Response: {}", 
+                    response.code(), response.body() != null ? response.body().string() : "No body");
                 throw new IOException("Unexpected response code: " + response.code());
             }
 
@@ -101,15 +103,28 @@ public class GeminiAnalyzer {
 
     /**
      * Builds the JSON request body for the Gemini API.
+     * Updated to use the new contents structure expected by Gemini API
      */
     private String buildRequestBody(String prompt) throws IOException {
+        // Escape the prompt text properly for JSON
+        String escapedPrompt = prompt.replace("\\", "\\\\")
+                                   .replace("\"", "\\\"")
+                                   .replace("\n", "\\n")
+                                   .replace("\r", "\\r")
+                                   .replace("\t", "\\t");
+
+        // Updated request structure to match current Gemini API format
         String requestJson = String.format("""
             {
-                "contents": [{
-                    "parts": [{
-                        "text": "%s"
-                    }]
-                }],
+                "contents": [
+                    {
+                        "parts": [
+                            {
+                                "text": "%s"
+                            }
+                        ]
+                    }
+                ],
                 "generationConfig": {
                     "temperature": 0.3,
                     "topK": 40,
@@ -117,7 +132,7 @@ public class GeminiAnalyzer {
                     "maxOutputTokens": 1024
                 }
             }
-            """, prompt.replace("\"", "\\\"").replace("\n", "\\n"));
+            """, escapedPrompt);
 
         return requestJson;
     }
@@ -143,10 +158,12 @@ public class GeminiAnalyzer {
                 }
             }
 
+            // Log the full response for debugging if parsing fails
+            logger.warn("Failed to parse response structure. Full response: {}", responseBody);
             return new GeminiResponse(false, null, null, "No valid response from Gemini");
 
         } catch (Exception e) {
-            logger.error("Error parsing Gemini response", e);
+            logger.error("Error parsing Gemini response: {}", responseBody, e);
             return new GeminiResponse(false, null, null, "Failed to parse response: " + e.getMessage());
         }
     }
@@ -158,8 +175,16 @@ public class GeminiAnalyzer {
         try {
             String jsonText = text.trim();
 
+            // Handle markdown code blocks
             if (jsonText.contains("```json")) {
                 int start = jsonText.indexOf("```json") + 7;
+                int end = jsonText.indexOf("```", start);
+                if (end > start) {
+                    jsonText = jsonText.substring(start, end).trim();
+                }
+            } else if (jsonText.contains("```")) {
+                // Handle generic code blocks
+                int start = jsonText.indexOf("```") + 3;
                 int end = jsonText.indexOf("```", start);
                 if (end > start) {
                     jsonText = jsonText.substring(start, end).trim();
