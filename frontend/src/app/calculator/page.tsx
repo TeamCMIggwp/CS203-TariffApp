@@ -32,6 +32,7 @@ export default function CalculatorSection() {
   const [apiError, setApiError] = useState<string | null>(null)
 
   const [dummyApiResponse, setDummyApiResponse] = useState<string | null>(null)
+  const [tariffPercentage, setTariffPercentage] = useState<string | null>(null)
 
   // Function to call API
   const callGeminiApi = async (data: string, prompt?: string) => {
@@ -84,12 +85,8 @@ export default function CalculatorSection() {
 
     setInputError(null)
     setApiError(null)
-
-    const baseRate = Math.random() * 0.25 + 0.05
-    const productMultiplier = agriculturalProducts.indexOf(product) * 0.01 + 1
-    const tariffAmount = Number.parseFloat(value) * baseRate * productMultiplier
-
-    setCalculatedTariff(tariffAmount)
+    setTariffPercentage(null)
+    setCalculatedTariff(null)
 
     try {
       const dummyApiUrl = `http://3.106.20.106:8080/api/wits/tariffs/min-rate?reporter=${toCountry}&partner=${fromCountry}&product=${product}&year=${year}&datatype=reported`;
@@ -101,9 +98,23 @@ export default function CalculatorSection() {
       }
 
       const dummyText = await dummyResponse.text();
-      setDummyApiResponse(dummyText);
+
+      const match = dummyText.match(/([\d.]+)%?/)
+      const parsedPercentage = match ? parseFloat(match[1]) : null
+
+      if (parsedPercentage !== null && !isNaN(parsedPercentage)) {
+        setTariffPercentage(`${parsedPercentage.toFixed(2)}%`)
+        const goodsValue = parseFloat(value)
+        const tariffAmount = (parsedPercentage / 100) * goodsValue
+        setCalculatedTariff(tariffAmount)
+      } else {
+        setTariffPercentage("MFN")
+        setCalculatedTariff(null)
+      }
+
     } catch (err) {
-      setDummyApiResponse("Error calling dummy API.");
+      setTariffPercentage("MFN")
+      setCalculatedTariff(null)
     }
 
     const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`
@@ -280,7 +291,7 @@ export default function CalculatorSection() {
             )}
 
             {/* Results */}
-            {calculatedTariff !== null && (
+            {tariffPercentage && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="calculator-results">
                 <h3 className="text-xl font-bold text-white mb-4">Tariff Calculation Results</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white">
@@ -301,20 +312,21 @@ export default function CalculatorSection() {
                     </p>
                   </div>
                   <div>
+                    <p className="text-gray-300">Tariff Percentage:</p>
+                    <p className="font-semibold text-green-400">
+                      {tariffPercentage}
+                    </p>
+                  </div>
+
+                  <div className="md:col-span-2">
                     <p className="text-gray-300">Estimated Tariff:</p>
                     <p className="font-semibold text-green-400">
-                      {selectedCurrency} {calculatedTariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      {calculatedTariff !== null
+                        ? `${selectedCurrency} ${calculatedTariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                        : "MFN"}
                     </p>
                   </div>
                 </div>
-
-                {/* Dummy API Result */}
-                {dummyApiResponse && (
-                  <div className="mt-6 bg-yellow-600 p-4 rounded-lg">
-                    <h4 className="text-white font-semibold mb-2">Tariff Service API Result</h4>
-                    <p className="text-white">{dummyApiResponse}</p>
-                  </div>
-                )}
 
                 {/* Gemini AI Analysis (Plain Text) */}
                 {apiResponse && (
