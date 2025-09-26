@@ -24,7 +24,8 @@ export async function POST(req: Request) {
 
     // Check for existing user
     const [existing] = await conn.execute("SELECT id FROM users WHERE email = ?", [email]);
-    if ((existing as any[]).length > 0) {
+    type ExistingUserRow = { id: string };
+    if ((existing as ExistingUserRow[]).length > 0) {
       await conn.end();
       return NextResponse.json({ message: "Email already registered" }, { status: 409 });
     }
@@ -48,8 +49,12 @@ export async function POST(req: Request) {
 
     console.log(`✅ User ${email} signed up successfully`);
     return NextResponse.json({ message: "Signup successful" });
-  } catch (err: any) {
-    console.error("❌ Signup error:", err);
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      console.error(" Signup error:", err.message);
+    } else {
+      console.error(" Signup error:", err);
+    }
     return NextResponse.json({ message: "Signup failed" }, { status: 500 });
   }
 }

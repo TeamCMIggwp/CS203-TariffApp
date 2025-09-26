@@ -19,7 +19,12 @@ export async function POST(req: Request) {
 
     await conn.end();
 
-    const user = (rows as any[])[0];
+    type UserRow = {
+      id: string;
+      password_hash: string;
+    };
+
+    const user = (rows as UserRow[])[0];
     if (!user) {
       return NextResponse.json({ message: "Invalid email or password" }, { status: 401 });
     }

@@ -12,7 +12,7 @@ import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
 type GeminiApiResponse = {
   analysis?: string;
   success?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 //test
