@@ -39,7 +39,7 @@ export default function CalculatorSection() {
       setIsLoading(true)
       setApiError(null)
 
-      const baseUrl = 'http://3.106.20.106:8080/gemini/analyze'
+      const baseUrl = 'https://3.106.20.106/gemini/analyze'
       const params = new URLSearchParams()
       params.append('data', data)
       if (prompt) params.append('prompt', prompt)
@@ -88,7 +88,7 @@ export default function CalculatorSection() {
     setCalculatedTariff(null)
 
     try {
-      const dummyApiUrl = `http://3.106.20.106:8080/api/wits/tariffs/min-rate?reporter=${toCountry}&partner=${fromCountry}&product=${product}&year=${year}`;
+      const dummyApiUrl = `https://3.106.20.106/api/wits/tariffs/min-rate?reporter=${toCountry}&partner=${fromCountry}&product=${product}&year=${year}`;
 
       const dummyResponse = await fetch(dummyApiUrl);
 
