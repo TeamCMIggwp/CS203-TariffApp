@@ -34,7 +34,7 @@ public class GeminiController {
     @PostConstruct
     public void init() {
         if (apiKey == null || apiKey.trim().isEmpty()) {
-            logger.error("Gemini API key not configured. Set gemini.api.key property or GEMINI_API_KEY environment variable");
+            logger.error("Gemini API key not configured. Set google.api.key property or GOOGLE_API_KEY environment variable");
             throw new IllegalStateException("Gemini API key is required");
         }
         this.geminiAnalyzer = new GeminiAnalyzer(apiKey);
@@ -55,20 +55,24 @@ public class GeminiController {
     /**
      * Analyzes the provided data using Gemini AI.
      */
-    @PostMapping("/analyze")
-    public ResponseEntity<Map<String, Object>> analyzeData(@RequestBody AnalysisRequest request) {
+    @GetMapping("/analyze")
+    public ResponseEntity<Map<String, Object>> analyzeData(
+            @RequestParam String data,
+            @RequestParam(required = false) String prompt) {
 
-        logger.info("Received analysis request for data type: {}",
-                request.getData() != null ? "provided" : "missing");
+        logger.info("Received analysis request for data: {}", data != null ? "provided" : "missing");
 
         Map<String, Object> response = new HashMap<>();
 
         try {
-            if (request.getData() == null || request.getData().trim().isEmpty()) {
+            if (data == null || data.trim().isEmpty()) {
                 response.put("success", false);
-                response.put("error", "Data field is required and cannot be empty");
+                response.put("error", "Data parameter is required and cannot be empty");
                 return ResponseEntity.badRequest().body(response);
             }
+
+            // Create AnalysisRequest object from parameters
+            AnalysisRequest request = new AnalysisRequest(data, prompt);
 
             GeminiResponse geminiResponse = geminiAnalyzer.analyzeData(
                     request.getData(),
@@ -102,7 +106,7 @@ public class GeminiController {
         } catch (Exception e) {
             response.put("success", false);
             response.put("error", "Failed to communicate with Gemini API: " + e.getMessage());
-            logger.error("IOException during analysis", e);
+            logger.error("Exception during analysis", e);
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
         }
     }
