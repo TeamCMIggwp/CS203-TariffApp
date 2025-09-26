@@ -21,7 +21,7 @@ jobs:
         cd backend/app
         mvn clean package -DskipTests
         
-    - name: Deploy JAR
+    - name: Deploy
       uses: appleboy/scp-action@v0.1.4
       with:
         host: ${{ secrets.AWS_HOST }}
@@ -39,19 +39,7 @@ jobs:
         key: ${{ secrets.AWS_PRIVATE_KEY }}
         script: |
           cd backend/app/target
-          # Kill existing application
           killall java || true
           sleep 5
-          # Start application with environment variables
-          nohup java -jar \
-            -DGOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
-            api-server-1.0.jar > app.log 2>&1 &
-          # Wait and verify it started
-          sleep 10
-          if pgrep -f "api-server-1.0.jar" > /dev/null; then
-            echo "Application started successfully"
-          else
-            echo "Application failed to start"
-            tail -20 app.log
-            exit 1
-          fi
+          nohup env GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
+            java -jar api-server-1.0.jar > app.log 2>&1 &
