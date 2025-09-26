@@ -31,7 +31,6 @@ export default function CalculatorSection() {
   const [inputError, setInputError] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
 
-  const [dummyApiResponse, setDummyApiResponse] = useState<string | null>(null)
   const [tariffPercentage, setTariffPercentage] = useState<string | null>(null)
 
   // Function to call API
