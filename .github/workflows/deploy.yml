@@ -37,8 +37,10 @@ jobs:
         host: ${{ secrets.AWS_HOST }}
         username: ${{ secrets.AWS_USERNAME }}
         key: ${{ secrets.AWS_PRIVATE_KEY }}
+        envs: WTO_API_KEY,GEMINI_API_KEY
         script: |
           cd backend/app/target
           killall java || true
           sleep 3
-          nohup java -jar api-server-1.0.jar > app.log 2>&1 &
+          nohup env WTO_API_KEY=${WTO_API_KEY} GEMINI_API_KEY=${GEMINI_API_KEY} \
+            java -jar api-server-1.0.jar > app.log 2>&1 &
