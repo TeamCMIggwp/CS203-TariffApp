@@ -33,22 +33,6 @@ public class WitsApiService {
         return ResponseEntity.ok(body);
     }
 
-    /**
-     * Parameterized version for dynamic queries
-     */
-    public ResponseEntity<String> getTariffData(String reporter, String partner, String product, String year, String datatype) {
-        String path = String.format("/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/%s?format=JSON", 
-                                    reporter, partner, product, year, datatype);
-
-        String body = webClient.get()
-                .uri(path)
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
-
-        return ResponseEntity.ok(body);
-    }
-
     /** Hardcoded demo that returns MIN_RATE only (as plain text). */
     public ResponseEntity<String> getMinRateOnly() {
         String path = "/datasource/TRN/reporter/840/partner/000/product/100630/year/2020/datatype/reported?format=JSON";
@@ -59,14 +43,30 @@ public class WitsApiService {
 
     /** Parameterized version that returns MIN_RATE only (as plain text). */
     public ResponseEntity<String> getMinRateOnly(String reporter, String partner, String product, String year) {
+    try {
         String path = String.format(
                 "/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/reported?format=JSON",
                 reporter, partner, product, year
         );
-        String body = webClient.get().uri(path).retrieve().bodyToMono(String.class).block();
+        String body = webClient.get()
+                .uri(path)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
         String minRate = extractObservationAttribute(body, "MIN_RATE");
-        return (minRate != null) ? ResponseEntity.ok(minRate) : ResponseEntity.noContent().build();
+
+        if (minRate == null) {
+            return ResponseEntity.ok("No result found in WITs");
+        }
+
+        return ResponseEntity.ok(minRate);
+
+    } catch (Exception e) {
+        // If any parsing or API errors happen, still return plain text
+        return ResponseEntity.status(404).body("API Error");
     }
+}
 
     /**
      * Extract an observation attribute (e.g., MIN_RATE, MAX_RATE) from SDMX-JSON v2.1.
