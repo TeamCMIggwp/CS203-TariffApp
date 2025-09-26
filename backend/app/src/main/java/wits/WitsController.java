@@ -32,14 +32,14 @@ public class WitsController {
     @GetMapping("/api/wits/tariffs/min-rate")
     public ResponseEntity<String> getMinRate(
             @Parameter(
-                    description = "Reporting country code (string)",
+                    description = "Reporting (Importing) country code (string)",
                     example = "China",
                     required = true
             ) 
             @RequestParam String reporter,
 
             @Parameter(
-                    description = "Partner country code (string)",
+                    description = "Partner (Exporting) country code (string)",
                     example = "USA",
                     required = true
             )

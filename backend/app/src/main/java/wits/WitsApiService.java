@@ -2,9 +2,13 @@ package wits;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import reactor.core.publisher.Mono;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 @Service
 public class WitsApiService {
@@ -45,26 +49,40 @@ public class WitsApiService {
     public ResponseEntity<String> getMinRateOnly(String reporter, String partner, String product, String year) {
     try {
         String path = String.format(
-                "/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/reported?format=JSON",
-                reporter, partner, product, year
+            "/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/reported?format=JSON",
+            reporter, partner, product, year
         );
+
+        // Do NOT let 204/4xx throw; treat them as "no result".
         String body = webClient.get()
-                .uri(path)
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
+            .uri(path)
+            .exchangeToMono(resp -> {
+                if (resp.statusCode().is2xxSuccessful()) {
+                    return resp.bodyToMono(String.class).defaultIfEmpty("");
+                }
+                if (resp.statusCode().value() == 204 || resp.statusCode().is4xxClientError()) {
+                    // WITS often uses 204/404 when there’s no data
+                    return Mono.just(""); // mark as "no result"
+                }
+                // For 5xx, bubble up as error
+                return resp.bodyToMono(String.class)
+                           .flatMap(b -> Mono.error(new RuntimeException("Upstream " + resp.statusCode())));
+            })
+            .block();
 
-        String minRate = extractObservationAttribute(body, "MIN_RATE");
-
-        if (minRate == null) {
-            return ResponseEntity.ok("No result found in WITs");
+        if (body == null || body.isBlank()) {
+            return ResponseEntity.ok("No result found in WITS");
         }
 
-        return ResponseEntity.ok(minRate);
+        String minRate = extractObservationAttribute(body, "MIN_RATE");
+        return ResponseEntity.ok(minRate != null ? minRate : "No result found in WITS");
 
+    } catch (WebClientResponseException e) {
+        // Network OK but server returned error not handled above (e.g., 5xx)
+        return ResponseEntity.ok("API Error");
     } catch (Exception e) {
-        // If any parsing or API errors happen, still return plain text
-        return ResponseEntity.status(404).body("API Error");
+        // Timeouts, deserialization failures, etc.
+        return ResponseEntity.ok("API Error");
     }
 }
 
