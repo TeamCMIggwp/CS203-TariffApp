@@ -13,7 +13,6 @@ export default function LoginPage() {
     password,
     setPassword,
     error,
-    success,
     loading,
     handleSubmit,
   } = useLogin();
