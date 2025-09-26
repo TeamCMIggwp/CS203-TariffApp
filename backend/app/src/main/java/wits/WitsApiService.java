@@ -58,10 +58,10 @@ public class WitsApiService {
     }
 
     /** Parameterized version that returns MIN_RATE only (as plain text). */
-    public ResponseEntity<String> getMinRateOnly(String reporter, String partner, String product, String year, String datatype) {
+    public ResponseEntity<String> getMinRateOnly(String reporter, String partner, String product, String year) {
         String path = String.format(
-                "/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/%s?format=JSON",
-                reporter, partner, product, year, datatype
+                "/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/reported?format=JSON",
+                reporter, partner, product, year
         );
         String body = webClient.get().uri(path).retrieve().bodyToMono(String.class).block();
         String minRate = extractObservationAttribute(body, "MIN_RATE");
