@@ -92,9 +92,10 @@ export default function CalculatorSection() {
     setCalculatedTariff(tariffAmount)
 
     try {
-      const dummyApiUrl = `http://3.106.20.106:8080/tariff/calculate?reportingCountry=${fromCountry}&partnerCountry=${toCountry}&productCode=${product}&year=${year}`;
-      const dummyResponse = await fetch(dummyApiUrl);
-      
+  const dummyApiUrl = `http://3.106.20.106:8080/api/wits/tariffs/min-rate?reporter=${fromCountry}&partner=${toCountry}&product=${product}&year=${year}&datatype=reported`;
+
+  const dummyResponse = await fetch(dummyApiUrl);
+  
       if (!dummyResponse.ok) {
         throw new Error("Dummy API call failed");
       }
@@ -122,62 +123,104 @@ export default function CalculatorSection() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
               {/* From Country */}
-              <div className="space-y-2">
-                <Label htmlFor="from-country" className="calculator-label">
-                  From Country (Exporter)
-                </Label>
-                <Select value={fromCountry} onValueChange={setFromCountry}>
-                  <SelectTrigger className="calculator-select">
-                    <SelectValue placeholder="Select exporting country" />
-                  </SelectTrigger>
-                  <SelectContent className="calculator-select-content">
-                    {countries.map((country) => (
-                      <SelectItem key={country} value={country} className="calculator-select-item">
-                        {country}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+<div className="space-y-2">
+  <Label htmlFor="from-country" className="calculator-label">
+    From Country (Exporter)
+  </Label>
+  <Select value={fromCountry} onValueChange={setFromCountry}>
+    <SelectTrigger className="calculator-select">
+      <SelectValue placeholder="Select exporting country">
+        {fromCountry
+          ? countries.find((c) => c.code === fromCountry)?.name
+          : "Select exporting country"}
+      </SelectValue>
+    </SelectTrigger>
+    <SelectContent className="calculator-select-content">
+      {countries.map((country) => (
+        <SelectItem
+          key={country.code}
+          value={country.code}
+          className="calculator-select-item"
+        >
+          <div className="flex flex-col">
+            <span className="font-medium">{country.name}</span>
+            <span className="text-xs text-gray-600 mt-0.5">
+              code: {country.code}
+            </span>
+          </div>
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
 
-              {/* To Country */}
-              <div className="space-y-2">
-                <Label htmlFor="to-country" className="calculator-label">
-                  To Country (Importer)
-                </Label>
-                <Select value={toCountry} onValueChange={setToCountry}>
-                  <SelectTrigger className="calculator-select">
-                    <SelectValue placeholder="Select importing country" />
-                  </SelectTrigger>
-                  <SelectContent className="calculator-select-content">
-                    {countries.map((country) => (
-                      <SelectItem key={country} value={country} className="calculator-select-item">
-                        {country}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+{/* To Country */}
+<div className="space-y-2">
+  <Label htmlFor="to-country" className="calculator-label">
+    To Country (Importer)
+  </Label>
+  <Select value={toCountry} onValueChange={setToCountry}>
+    <SelectTrigger className="calculator-select">
+      {/* Show ONLY the country name in the trigger */}
+      <SelectValue placeholder="Select importing country">
+        {toCountry
+          ? countries.find((c) => c.code === toCountry)?.name
+          : "Select importing country"}
+      </SelectValue>
+    </SelectTrigger>
+    <SelectContent className="calculator-select-content">
+      {countries.map((country) => (
+        <SelectItem
+          key={country.code}
+          value={country.code}
+          className="calculator-select-item"
+        >
+          <div className="flex flex-col">
+            <span className="font-medium">{country.name}</span>
+            <span className="text-xs text-gray-600 mt-0.5">
+              code: {country.code}
+            </span>
+          </div>
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
 
-              {/* Product Type */}
-              <div className="space-y-2">
-                <Label htmlFor="product" className="calculator-label">
-                  Agricultural Product
-                </Label>
-                <Select value={product} onValueChange={setProduct}>
-                  <SelectTrigger className="calculator-select">
-                    <SelectValue placeholder="Select product type" />
-                  </SelectTrigger>
-                  <SelectContent className="calculator-select-content">
-                    {agriculturalProducts.map((prod) => (
-                      <SelectItem key={prod} value={prod} className="calculator-select-item">
-                        {prod}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+{/* Product Type */}
+<div className="space-y-2">
+  <Label htmlFor="product" className="calculator-label">
+    Agricultural Product
+  </Label>
+  <Select value={product} onValueChange={setProduct}>
+    <SelectTrigger className="calculator-select">
+      {/* Show ONLY the product name in the trigger */}
+      <SelectValue placeholder="Select product type">
+        {product
+          ? agriculturalProducts.find((p) => p.hs_code === product)?.name
+          : "Select product type"}
+      </SelectValue>
+    </SelectTrigger>
+    <SelectContent className="calculator-select-content">
+      {agriculturalProducts.map((prod) => (
+        <SelectItem
+          key={prod.hs_code}
+          value={prod.hs_code}
+          className="calculator-select-item"
+        >
+          <div className="flex flex-col">
+            <span className="font-medium">{prod.name}</span>
+            <span className="text-xs text-gray-600 mt-0.5">
+              code: {prod.hs_code}
+            </span>
+          </div>
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
 
               {/* Value of Goods */}
               <div className="space-y-2">
