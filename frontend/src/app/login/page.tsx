@@ -61,7 +61,6 @@ export default function LoginPage() {
                 )}
               </div>
             )}
-            {success && <div className={styles.success}>{success}</div>}
 
             <div className={styles.options}>
               <label className={styles.checkbox}>
