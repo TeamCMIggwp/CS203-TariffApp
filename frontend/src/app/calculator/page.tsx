@@ -312,14 +312,14 @@ export default function CalculatorSection() {
                   </div>
                   <div>
                     <p className="text-gray-300">Tariff Percentage:</p>
-                    <p className="font-semibold text-green-400">
+                    <p className="font-semibold">
                       {tariffPercentage}
                     </p>
                   </div>
 
                   <div className="md:col-span-2">
                     <p className="text-gray-300">Estimated Tariff:</p>
-                    <p className="font-semibold text-green-400">
+                    <p className="font-semibold">
                       {calculatedTariff !== null
                         ? `${selectedCurrency} ${calculatedTariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
                         : "MFN"}
