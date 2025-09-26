@@ -88,7 +88,7 @@ export default function CalculatorSection() {
     setCalculatedTariff(null)
 
     try {
-      const dummyApiUrl = `http://3.106.20.106:8080/api/wits/tariffs/min-rate?reporter=${toCountry}&partner=${fromCountry}&product=${product}&year=${year}&datatype=reported`;
+      const dummyApiUrl = `http://3.106.20.106:8080/api/wits/tariffs/min-rate?reporter=${toCountry}&partner=${fromCountry}&product=${product}&year=${year}`;
 
       const dummyResponse = await fetch(dummyApiUrl);
 
