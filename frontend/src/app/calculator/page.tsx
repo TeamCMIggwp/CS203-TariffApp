@@ -9,10 +9,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
 
+type MetricValue = string | number;
+
 type GeminiApiResponse = {
   summary?: string;
   insights?: string[];
-  metrics?: Record<string, any>;
+  metrics?: Record<string, MetricValue>;
   recommendations?: string[];
   confidence?: string;
 } | string | null;
@@ -71,7 +73,7 @@ export default function CalculatorSection() {
       } else {
         setApiResponse("No analysis data returned from API.");
       }
-    } catch (err) {
+    } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
       setApiError(errorMessage)
       console.error('API Error:', errorMessage)
