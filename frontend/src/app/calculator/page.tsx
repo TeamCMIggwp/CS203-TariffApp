@@ -111,6 +111,7 @@ export default function CalculatorSection() {
         setCalculatedTariff(null)
       }
 
+      //reverting
     } catch (err) {
       setTariffPercentage("MFN")
       setCalculatedTariff(null)
