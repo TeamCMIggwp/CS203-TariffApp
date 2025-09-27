@@ -10,12 +10,14 @@ import { Label } from "@/components/ui/label"
 import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
 
 type GeminiApiResponse = {
-  analysis?: string;
-  success?: boolean;
-  [key: string]: unknown;
-};
+  summary?: string;
+  insights?: string[];
+  metrics?: Record<string, any>;
+  recommendations?: string[];
+  confidence?: string;
+} | string | null;
 
-//test
+
 export default function CalculatorSection() {
   const calculatorY = useMotionValue(0)
   const [fromCountry, setFromCountry] = useState("")
@@ -59,13 +61,15 @@ export default function CalculatorSection() {
 
       // Save raw text or structured result to display
       if (result?.success && result?.analysis) {
-        setApiResponse(
-          typeof result.analysis === 'string'
-            ? result.analysis
-            : JSON.stringify(result.analysis, null, 2)
-        )
+        if (result.analysisType === "structured") {
+          // store JSON object directly
+          setApiResponse(result.analysis);
+        } else {
+          // fallback to plain text
+          setApiResponse(result.analysis);
+        }
       } else {
-        setApiResponse("No analysis data returned from API.")
+        setApiResponse("No analysis data returned from API.");
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
@@ -330,17 +334,71 @@ export default function CalculatorSection() {
 
                 {/* Gemini AI Analysis (Plain Text) */}
                 {apiResponse && (
-                  <div className="mt-8 bg-blue-600 p-4 rounded-lg">
-                    <h4 className="text-white font-semibold mb-2">Gemini AI Analysis</h4>
-                    <p className="text-white whitespace-pre-wrap">
-                      {typeof apiResponse === 'object' && apiResponse !== null && 'analysis' in apiResponse
-                        ? apiResponse.analysis
-                        : typeof apiResponse === 'string'
-                          ? apiResponse
-                          : 'No analysis available.'}
-                    </p>
+                  <div className="mt-8 bg-blue-600 p-4 rounded-lg text-white">
+                    <h4 className="text-white font-semibold mb-4">Gemini AI Analysis</h4>
+
+                    {typeof apiResponse === "string" ? (
+                      <p className="whitespace-pre-wrap">{apiResponse}</p>
+                    ) : (
+                      <>
+                        {/* Metrics first */}
+                        {apiResponse.metrics && (
+                          <div className="mb-4">
+                            <h5 className="font-semibold">Metrics</h5>
+                            <ul className="list-disc list-inside">
+                              {Object.entries(apiResponse.metrics).map(([key, value]) => (
+                                <li key={key}>
+                                  <strong>{key}:</strong> {value}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Summary */}
+                        {apiResponse.summary && (
+                          <div className="mb-4">
+                            <h5 className="font-semibold">Summary</h5>
+                            <p>{apiResponse.summary}</p>
+                          </div>
+                        )}
+
+                        {/* Insights */}
+                        {apiResponse.insights && (
+                          <div className="mb-4">
+                            <h5 className="font-semibold">Insights</h5>
+                            <ul className="list-disc list-inside">
+                              {apiResponse.insights.map((insight, idx) => (
+                                <li key={idx}>{insight}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Recommendations */}
+                        {apiResponse.recommendations && (
+                          <div className="mb-4">
+                            <h5 className="font-semibold">Recommendations</h5>
+                            <ul className="list-disc list-inside">
+                              {apiResponse.recommendations.map((rec, idx) => (
+                                <li key={idx}>{rec}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Confidence */}
+                        {apiResponse.confidence && (
+                          <div>
+                            <h5 className="font-semibold">Confidence</h5>
+                            <p>{apiResponse.confidence}</p>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
+
 
                 {/* API Error Message */}
                 {apiError && (
