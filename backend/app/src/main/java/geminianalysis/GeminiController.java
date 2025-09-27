@@ -34,8 +34,7 @@ public class GeminiController {
     @PostConstruct
     public void init() {
         if (apiKey == null || apiKey.trim().isEmpty()) {
-            logger.error(
-                    "Gemini API key not configured. Set google.api.key property or GOOGLE_API_KEY environment variable");
+            logger.error("Gemini API key not configured. Set google.api.key property or GOOGLE_API_KEY environment variable");
             throw new IllegalStateException("Gemini API key is required");
         }
         this.geminiAnalyzer = new GeminiAnalyzer(apiKey);
@@ -77,21 +76,20 @@ public class GeminiController {
 
             GeminiResponse geminiResponse = geminiAnalyzer.analyzeData(
                     request.getData(),
-                    request.getPrompt());
+                    request.getPrompt()
+            );
 
             if (geminiResponse.isSuccess()) {
                 response.put("success", true);
                 response.put("timestamp", System.currentTimeMillis());
 
                 if (geminiResponse.hasJsonAnalysis()) {
-                    String prettyAnalysis = objectMapper
-                            .writerWithDefaultPrettyPrinter()
-                            .writeValueAsString(geminiResponse.getAnalysisJson());
-
-                    response.put("success", true);
-                    response.put("analysis", prettyAnalysis); // 👈 always return as string
+                    response.put("analysisType", "structured");
+                    response.put("analysis", geminiResponse.getAnalysisJson());
+                    response.put("summary", geminiResponse.getSummary());
+                    response.put("confidence", geminiResponse.getConfidence());
                 } else {
-                    response.put("success", true);
+                    response.put("analysisType", "text");
                     response.put("analysis", geminiResponse.getRawResponse());
                 }
 
@@ -133,8 +131,7 @@ public class GeminiController {
         private String data;
         private String prompt;
 
-        public AnalysisRequest() {
-        }
+        public AnalysisRequest() {}
 
         public AnalysisRequest(String data, String prompt) {
             this.data = data;

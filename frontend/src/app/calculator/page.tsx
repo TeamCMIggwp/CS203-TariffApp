@@ -10,14 +10,10 @@ import { Label } from "@/components/ui/label"
 import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
 
 type GeminiApiResponse = {
-  summary?: string;
-  insights?: string[];
-  metrics?: Record<string, any>;
-  recommendations?: string[];
-  confidence?: number;
+  analysis?: string;
   success?: boolean;
+  [key: string]: unknown;
 };
-
 
 //test
 export default function CalculatorSection() {
@@ -30,11 +26,10 @@ export default function CalculatorSection() {
   const [calculatedTariff, setCalculatedTariff] = useState<number | null>(null)
 
   // States for API Integration
-  const [apiResponse, setApiResponse] = useState<GeminiApiResponse | null>(null)
+  const [apiResponse, setApiResponse] = useState<GeminiApiResponse | string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [inputError, setInputError] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
-
 
   const [tariffPercentage, setTariffPercentage] = useState<string | null>(null)
 
@@ -64,14 +59,14 @@ export default function CalculatorSection() {
 
       // Save raw text or structured result to display
       if (result?.success && result?.analysis) {
-        // If the backend returns an object, just set it
-        setApiResponse(result.analysis)
+        setApiResponse(
+          typeof result.analysis === 'string'
+            ? result.analysis
+            : JSON.stringify(result.analysis, null, 2)
+        )
       } else {
-        setApiResponse({
-          summary: "No analysis data returned from API."
-        })
+        setApiResponse("No analysis data returned from API.")
       }
-
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
       setApiError(errorMessage)
@@ -334,60 +329,17 @@ export default function CalculatorSection() {
 
                 {/* Gemini AI Analysis (Plain Text) */}
                 {apiResponse && (
-                  <div className="mt-8 bg-blue-600 p-6 rounded-lg space-y-4">
-                    <h4 className="text-white font-bold text-lg mb-2">Gemini AI Analysis</h4>
-
-                    {/* Metrics first */}
-                    {apiResponse.metrics && (
-                      <div>
-                        <strong className="text-white">Metrics:</strong>
-                        <pre className="whitespace-pre-wrap bg-blue-700 p-3 rounded text-white">
-                          {JSON.stringify(apiResponse.metrics, null, 2)}
-                        </pre>
-                      </div>
-                    )}
-
-                    {/* Summary */}
-                    {apiResponse.summary && (
-                      <div>
-                        <strong className="text-white">Summary:</strong>
-                        <p className="text-white">{apiResponse.summary}</p>
-                      </div>
-                    )}
-
-                    {/* Insights */}
-                    {apiResponse.insights && apiResponse.insights.length > 0 && (
-                      <div>
-                        <strong className="text-white">Insights:</strong>
-                        <ul className="list-disc list-inside text-white">
-                          {apiResponse.insights.map((i, idx) => <li key={idx}>{i}</li>)}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Recommendations */}
-                    {apiResponse.recommendations && apiResponse.recommendations.length > 0 && (
-                      <div>
-                        <strong className="text-white">Recommendations:</strong>
-                        <ul className="list-disc list-inside text-white">
-                          {apiResponse.recommendations.map((r, idx) => <li key={idx}>{r}</li>)}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Confidence */}
-                    {apiResponse.confidence !== undefined && (
-                      <div>
-                        <strong className="text-white">Confidence:</strong>
-                        <p className="text-white">
-                          {apiResponse.confidence * 100}%
-                          <span className="text-gray-300 ml-2">(AI’s certainty in this analysis)</span>
-                        </p>
-                      </div>
-                    )}
+                  <div className="mt-8 bg-blue-600 p-4 rounded-lg">
+                    <h4 className="text-white font-semibold mb-2">Gemini AI Analysis</h4>
+                    <p className="text-white whitespace-pre-wrap">
+                      {typeof apiResponse === 'object' && apiResponse !== null && 'analysis' in apiResponse
+                        ? apiResponse.analysis
+                        : typeof apiResponse === 'string'
+                          ? apiResponse
+                          : 'No analysis available.'}
+                    </p>
                   </div>
                 )}
-
 
                 {/* API Error Message */}
                 {apiError && (
