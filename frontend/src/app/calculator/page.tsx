@@ -72,15 +72,11 @@ export default function CalculatorSection() {
         })
       }
 
-    } catch (err: unknown) {
-      let errorMessage = 'Unknown error occurred'
-      if (err instanceof Error) {
-        errorMessage = err.message
-      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
       setApiError(errorMessage)
       console.error('API Error:', errorMessage)
-    }
-    finally {
+    } finally {
       setIsLoading(false)
     }
   }
