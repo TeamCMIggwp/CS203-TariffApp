@@ -14,8 +14,33 @@ public class TariffRepository {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    public Integer getProductIdByHsCode(Integer hsCode) {
+        String sql = "SELECT product_id FROM Products WHERE hs_code = ?";
+        return jdbcTemplate.queryForObject(sql, Integer.class, hsCode);
+    }
+
+    public Integer getCountryIdByIsoNumeric(String isoNumeric) {
+        String sql = "SELECT country_id FROM Country WHERE iso_numeric = ?";
+        return jdbcTemplate.queryForObject(sql, Integer.class, isoNumeric);
+    }
+
     public void updateTariffRate(TariffRate tariffRate) throws DataAccessException {
         logger.debug("Checking existence of tariff rate: {}", tariffRate);
+
+        Integer countryId = tariffRate.getCountryId();
+        Integer partnerCountryId = tariffRate.getPartnerId();
+
+        if (countryId == null || partnerCountryId == null) {
+            throw new DataAccessException("Country or partner country ID is null") {};
+        }
+
+        Integer productId = getProductIdByHsCode(tariffRate.getProductHsCode());
+        if (productId == null) {
+            throw new DataAccessException("No product found with HS code: " + tariffRate.getProductHsCode()) {};
+        }
+
+        logger.info("Resolved IDs before DB operation - countryId: {}, partnerCountryId: {}, productId: {}, year: {}",
+                countryId, partnerCountryId, productId, tariffRate.getYear());
 
         String checkSql = """
             SELECT COUNT(*) FROM TariffRates
@@ -23,9 +48,9 @@ public class TariffRepository {
         """;
 
         Integer count = jdbcTemplate.queryForObject(checkSql, Integer.class,
-            tariffRate.getCountryId(),
-            tariffRate.getPartnerId(),
-            tariffRate.getProductHsCode(),
+            countryId,
+            partnerCountryId,
+            productId,
             tariffRate.getYear());
 
         if (count != null && count > 0) {
@@ -40,9 +65,9 @@ public class TariffRepository {
 
             int rowsUpdated = jdbcTemplate.update(updateSql,
                 tariffRate.getRate(),
-                tariffRate.getCountryId(),
-                tariffRate.getPartnerId(),
-                tariffRate.getProductHsCode(),
+                countryId,
+                partnerCountryId,
+                productId,
                 tariffRate.getYear());
 
             logger.info("Updated {} rows for tariff rate: {}", rowsUpdated, tariffRate);
@@ -58,18 +83,19 @@ public class TariffRepository {
             """;
 
             int rowsInserted = jdbcTemplate.update(insertSql,
-                tariffRate.getCountryId(),
-                tariffRate.getPartnerId(),
-                tariffRate.getProductHsCode(),
+                countryId,
+                partnerCountryId,
+                productId,
                 tariffRate.getYear(),
                 tariffRate.getRate(),
-                "percent",  // unit
-                1           // 1 for true
+                "percent",
+                1
             );
 
             logger.info("Inserted {} rows for tariff rate: {}", rowsInserted, tariffRate);
         }
     }
 }
+
 
 
