@@ -5,7 +5,7 @@ import React from "react"
 import dynamic from "next/dynamic"
 import { FloatingDock } from "@/components/ui/floating-dock"
 import {
-  IconFileInfo,
+  IconAdjustmentsCog,
   IconChartHistogram,
   IconMap,
   IconReceipt2,
@@ -441,7 +441,7 @@ const links = [
   },
   {
     title: "Admin",
-    icon: <IconFileInfo className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+    icon: <IconAdjustmentsCog className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
     href: "/admin",
   },
   {
