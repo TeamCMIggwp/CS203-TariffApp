@@ -19,42 +19,80 @@ export default function AdminPage() {
   const [successMessage, setSuccessMessage] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
 
+  const getCountryId = (countryCode: string): number | null => {
+    const country = countries.find(c => c.code === countryCode);
+    if (!country) return null;
+    
+    const id = parseInt(countryCode);
+    return !isNaN(id) ? id : null;
+  };
+
+  const getProductHsCode = (hsCode: string): number | null => {
+    return hsCode ? parseInt(hsCode) : null;
+  };
+
   const handleSubmit = async () => {
-    if (!fromCountry || !toCountry || !product || !year || !tariffRate) {
-      setErrorMessage("Please fill in all fields.")
-      return
-    }
-
-    setIsUpdating(true)
-    setErrorMessage("")
-    setSuccessMessage("")
-
     try {
-      const response = await fetch("https://teamcmiggwp.duckdns.org/api/admin/update-tariff", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          fromCountry,
-          toCountry,
-          product,
-          year,
-          tariffRate: parseFloat(tariffRate)
-        })
-      })
+        if (!fromCountry || !toCountry || !product || !year || !tariffRate) {
+            throw new Error("Please fill in all fields.");
+        }
 
-      if (!response.ok) {
-        throw new Error("Failed to update tariff rate.")
-      }
+        const fromCountryId = getCountryId(fromCountry);
+        const toCountryId = getCountryId(toCountry);
+        const hsCode = getProductHsCode(product);
 
-      setSuccessMessage("Tariff rate updated successfully.")
-    } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Unknown error")
+        if (fromCountryId === null || toCountryId === null) {
+            throw new Error("Invalid country selection");
+        }
+
+        if (!hsCode) {
+            throw new Error("Invalid product selection");
+        }
+
+        const rateValue = parseFloat(tariffRate);
+        if (isNaN(rateValue) || rateValue < 0) {
+            throw new Error("Please enter a valid tariff rate");
+        }
+
+        setIsUpdating(true);
+        setErrorMessage("");
+        setSuccessMessage("");
+
+        const response = await fetch("https://teamcmiggwp.duckdns.org/api/admin/update-tariff", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                partnerId: fromCountryId,    // INT (3 digits)
+                countryId: toCountryId,      // INT (3 digits)
+                productHsCode: hsCode,       // INT (6 digits)
+                year: year,                  // YEAR
+                rate: rateValue             // DECIMAL(6,3)
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || "Failed to update tariff rate");
+        }
+
+        const data = await response.json();
+        setSuccessMessage(data.message || "Tariff rate updated successfully");
+        
+        // Clear form after successful update
+        setFromCountry("");
+        setToCountry("");
+        setProduct("");
+        setYear("");
+        setTariffRate("");
+
+    } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "An unknown error occurred");
     } finally {
-      setIsUpdating(false)
+        setIsUpdating(false);
     }
-  }
+  };
 
   return (
     <section className="calculator-section py-20">
