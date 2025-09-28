@@ -11,7 +11,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.Arrays;
 
-@SpringBootApplication(scanBasePackages = {"web", "geminianalysis", "wits", "wto", "tariffcalculator", "persistence"}) // Scan all your packages
+@SpringBootApplication(scanBasePackages = {"web", "geminianalysis", "wits", "wto", "tariffcalculator", "database"}) // Scan all your packages
 public class AppApplication implements WebMvcConfigurer {
 
     public static void main(String[] args) {
