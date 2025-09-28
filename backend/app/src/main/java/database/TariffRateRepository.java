@@ -42,7 +42,7 @@ public class TariffRateRepository {
 
         String sql = """
             SELECT rate FROM TariffRates 
-            WHERE country_id = ? AND partner_country_id = ? AND product_id = ? AND year = ?
+            WHERE tariff_id = 1 AND country_id = ? AND partner_country_id = ? AND product_id = ? AND year = ?
         """;
 
         Double rate = jdbcTemplate.queryForObject(sql, Double.class, 
