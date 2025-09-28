@@ -31,7 +31,8 @@ export default function CalculatorSection() {
 
   // States for API Integration
   const [apiResponse, setApiResponse] = useState<GeminiApiResponse | string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isCalculatingTariff, setIsCalculatingTariff] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [inputError, setInputError] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
 
@@ -40,7 +41,7 @@ export default function CalculatorSection() {
   // Function to call API
   const callGeminiApi = async (data: string, prompt?: string) => {
     try {
-      setIsLoading(true)
+      setIsAnalyzing(true)
       setApiError(null)
 
       const baseUrl = 'https://teamcmiggwp.duckdns.org/gemini/analyze'
@@ -78,7 +79,7 @@ export default function CalculatorSection() {
       setApiError(errorMessage)
       console.error('API Error:', errorMessage)
     } finally {
-      setIsLoading(false)
+      setIsAnalyzing(false)
     }
   }
 
@@ -92,6 +93,10 @@ export default function CalculatorSection() {
     setApiError(null)
     setTariffPercentage(null)
     setCalculatedTariff(null)
+    setApiResponse(null)
+
+    setIsCalculatingTariff(true)
+    setIsAnalyzing(false)
 
     try {
       const dummyApiUrl = `https://teamcmiggwp.duckdns.org/api/wits/tariffs/min-rate?reporter=${toCountry}&partner=${fromCountry}&product=${product}&year=${year}`;
@@ -117,16 +122,20 @@ export default function CalculatorSection() {
         setCalculatedTariff(null)
       }
 
-      //reverting
     } catch (err) {
       setTariffPercentage("MFN")
       setCalculatedTariff(null)
+    } finally {
+      setIsCalculatingTariff(false)
     }
+
+    setIsAnalyzing(true)
 
     const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`
     const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors"
 
     await callGeminiApi(apiData, prompt)
+    setIsAnalyzing(false)
   }
 
   const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
@@ -278,10 +287,10 @@ export default function CalculatorSection() {
             <div className="flex justify-center pt-6">
               <Button
                 onClick={calculateTariff}
-                disabled={!fromCountry || !toCountry || !product || !value || isLoading}
+                disabled={!fromCountry || !toCountry || !product || !value || isCalculatingTariff || isAnalyzing}
                 className="calculator-button"
               >
-                {isLoading ? "Calculating..." : "Calculate Tariff"}
+                {isCalculatingTariff ? "Calculating..." : isAnalyzing ? "Analyzing..." : "Calculate Tariff"}
               </Button>
             </div>
 
