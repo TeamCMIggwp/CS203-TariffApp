@@ -22,4 +22,15 @@ public class TariffRate {
     
     public Double getRate() { return rate; }
     public void setRate(Double rate) { this.rate = rate; }
+
+    @Override
+    public String toString() {
+        return "TariffRate{" +
+            "partnerId=" + partnerId +
+            ", countryId=" + countryId +
+            ", productHsCode=" + productHsCode +
+            ", year='" + year + '\'' +
+            ", rate=" + rate +
+            '}';
+    }
 }
