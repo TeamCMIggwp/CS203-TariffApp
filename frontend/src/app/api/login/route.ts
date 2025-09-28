@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDBConnection } from "../../../lib/db";
+import { accountsDb } from "../../../lib/db";
 import argon2 from "argon2";
 
 export async function POST(req: Request) {
@@ -10,14 +10,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Missing credentials" }, { status: 400 });
     }
 
-    const conn = await getDBConnection();
+    const conn = await accountsDb.getConnection();
 
     const [rows] = await conn.execute(
       "SELECT users.id, accounts.password_hash FROM users JOIN accounts ON users.id = accounts.user_id WHERE users.email = ?",
       [email]
     );
 
-    await conn.end();
+    await conn.release();
 
     type UserRow = {
       id: string;
