@@ -19,7 +19,7 @@ public class TariffRepository {
         return jdbcTemplate.queryForObject(sql, Integer.class, hsCode);
     }
 
-    public Integer getCountryIdByIsoNumeric(String isoNumeric) {
+    public Integer getCountryIdByIsoNumeric(int isoNumeric) {
         String sql = "SELECT country_id FROM Country WHERE iso_numeric = ?";
         return jdbcTemplate.queryForObject(sql, Integer.class, isoNumeric);
     }
