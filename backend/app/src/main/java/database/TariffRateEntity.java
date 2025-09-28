@@ -1,6 +1,6 @@
-package persistence;
+package database;
 
-public class TariffRate {
+public class TariffRateEntity {
     private Integer partnerId;      // DB ID after resolving from iso_numeric
     private Integer countryId;      // DB ID after resolving from iso_numeric
     private Integer productHsCode;  // 6-digit HS code from frontend (still int)

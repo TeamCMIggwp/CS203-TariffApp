@@ -1,30 +1,69 @@
-package persistence;
+package database;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Repository
-public class TariffRepository {
-    private static final Logger logger = LoggerFactory.getLogger(TariffRepository.class);
+public class TariffRateRepository {
+    private static final Logger logger = LoggerFactory.getLogger(TariffRateRepository.class);
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
     public Integer getProductIdByHsCode(Integer hsCode) {
-        String sql = "SELECT product_id FROM Products WHERE hs_code = ?";
-        return jdbcTemplate.queryForObject(sql, Integer.class, hsCode);
+        try {
+            String sql = "SELECT product_id FROM Products WHERE hs_code = ?";
+            return jdbcTemplate.queryForObject(sql, Integer.class, hsCode);
+        } catch (EmptyResultDataAccessException e) {
+            logger.warn("No product found with HS code: {}", hsCode);
+            return null;
+        }
     }
 
     public Integer getCountryIdByIsoNumeric(int isoNumeric) {
-        String sql = "SELECT country_id FROM Country WHERE iso_numeric = ?";
-        return jdbcTemplate.queryForObject(sql, Integer.class, isoNumeric);
+        try {
+            String sql = "SELECT country_id FROM Country WHERE iso_numeric = ?";
+            return jdbcTemplate.queryForObject(sql, Integer.class, isoNumeric);
+        } catch (EmptyResultDataAccessException e) {
+            logger.warn("No country found with ISO numeric: {}", isoNumeric);
+            return null;
+        }
     }
 
-    public void updateTariffRate(TariffRate tariffRate) throws DataAccessException {
+    public Double getTariffRate(Integer reporterCountryId, Integer partnerCountryId, Integer productId, String year) {
+    try {
+        logger.debug("Querying tariff rate for: countryId={}, partnerCountryId={}, productId={}, year={}", 
+                    reporterCountryId, partnerCountryId, productId, year);
+
+        String sql = """
+            SELECT rate FROM TariffRates 
+            WHERE country_id = ? AND partner_country_id = ? AND product_id = ? AND year = ?
+        """;
+
+        Double rate = jdbcTemplate.queryForObject(sql, Double.class, 
+            reporterCountryId, partnerCountryId, productId, year);
+
+        logger.debug("Found tariff rate: {} for countryId={}, partnerCountryId={}, productId={}, year={}", 
+                    rate, reporterCountryId, partnerCountryId, productId, year);
+
+        return rate;
+
+    } catch (EmptyResultDataAccessException e) {
+        logger.info("No tariff rate found for countryId={}, partnerCountryId={}, productId={}, year={}", 
+                   reporterCountryId, partnerCountryId, productId, year);
+        return null;
+    } catch (DataAccessException e) {
+        logger.error("Database error while retrieving tariff rate: {}", e.getMessage(), e);
+        throw e;
+    }
+}
+
+    public void updateTariffRate(TariffRateEntity tariffRate) throws DataAccessException {
         logger.debug("Checking existence of tariff rate: {}", tariffRate);
 
         Integer countryId = tariffRate.getCountryId();
@@ -96,6 +135,3 @@ public class TariffRepository {
         }
     }
 }
-
-
-
