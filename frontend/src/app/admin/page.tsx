@@ -19,17 +19,15 @@ export default function AdminPage() {
   const [successMessage, setSuccessMessage] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
 
-  const getCountryId = (countryCode: string): number | null => {
-    const country = countries.find(c => c.code === countryCode);
-    if (!country) return null;
-    
-    const id = parseInt(countryCode);
-    return !isNaN(id) ? id : null;
-  };
+  const parseCountryCode = (code: string): string | null => {
+    return code ? code : null
+  }
 
-  const getProductHsCode = (hsCode: string): number | null => {
-    return hsCode ? parseInt(hsCode) : null;
-  };
+  const parseHsCode = (hsCode: string): number | null => {
+    if (!hsCode) return null
+    const parsed = parseInt(hsCode, 10)
+    return isNaN(parsed) ? null : parsed
+  }
 
   const handleSubmit = async () => {
     try {
@@ -37,11 +35,11 @@ export default function AdminPage() {
             throw new Error("Please fill in all fields.");
         }
 
-        const fromCountryId = getCountryId(fromCountry);
-        const toCountryId = getCountryId(toCountry);
-        const hsCode = getProductHsCode(product);
+        const fromCountryIso = parseCountryCode(fromCountry)
+        const toCountryIso = parseCountryCode(toCountry)
+        const hsCode = parseHsCode(product)
 
-        if (fromCountryId === null || toCountryId === null) {
+        if (fromCountryIso === null || toCountryIso === null) {
             throw new Error("Invalid country selection");
         }
 
@@ -58,23 +56,28 @@ export default function AdminPage() {
         setErrorMessage("");
         setSuccessMessage("");
 
-        const response = await fetch("https://teamcmiggwp.duckdns.org/api/admin/update-tariff", {
+        const response = await fetch("https://teamcmiggwp.duckdns.org/api/admin/update", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                partnerId: fromCountryId,    // INT (3 digits)
-                countryId: toCountryId,      // INT (3 digits)
-                productHsCode: hsCode,       // INT (6 digits)
-                year: year,                  // YEAR
-                rate: rateValue             // DECIMAL(6,3)
+              partnerIsoNumeric: fromCountryIso,   
+              countryIsoNumeric: toCountryIso,     
+              productHsCode: hsCode,              
+              year: year,
+              rate: rateValue
             })
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || "Failed to update tariff rate");
+            // try to parse JSON error message, otherwise show generic
+            let errorText = "Failed to update tariff rate";
+            try {
+              const errorData = await response.json();
+              errorText = errorData.message || errorText;
+            } catch (_) {}
+            throw new Error(errorText);
         }
 
         const data = await response.json();

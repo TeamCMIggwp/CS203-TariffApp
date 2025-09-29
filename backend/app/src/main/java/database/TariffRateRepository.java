@@ -15,70 +15,48 @@ public class TariffRateRepository {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    public Integer getProductIdByHsCode(Integer hsCode) {
+    public Double getTariffRate(String reporterCountryId, String partnerCountryId, Integer productId, String year) {
         try {
-            String sql = "SELECT product_id FROM Products WHERE hs_code = ?";
-            return jdbcTemplate.queryForObject(sql, Integer.class, hsCode);
-        } catch (EmptyResultDataAccessException e) {
-            logger.warn("No product found with HS code: {}", hsCode);
-            return null;
-        }
-    }
-
-    public Integer getCountryIdByIsoNumeric(int isoNumeric) {
-        try {
-            String sql = "SELECT country_id FROM Country WHERE iso_numeric = ?";
-            return jdbcTemplate.queryForObject(sql, Integer.class, isoNumeric);
-        } catch (EmptyResultDataAccessException e) {
-            logger.warn("No country found with ISO numeric: {}", isoNumeric);
-            return null;
-        }
-    }
-
-    public Double getTariffRate(Integer reporterCountryId, Integer partnerCountryId, Integer productId, String year) {
-    try {
-        logger.debug("Querying tariff rate for: countryId={}, partnerCountryId={}, productId={}, year={}", 
+            logger.debug("Querying tariff rate for: countryId={}, partnerCountryId={}, productId={}, year={}",
                     reporterCountryId, partnerCountryId, productId, year);
 
-        String sql = """
-            SELECT rate FROM TariffRates 
-            WHERE tariff_id = 1 AND country_id = ? AND partner_country_id = ? AND product_id = ? AND year = ?
-        """;
+            String sql = """
+                SELECT rate FROM TariffRates 
+                WHERE country_id = ? AND partner_country_id = ? AND product_id = ? AND year = ?
+            """;
 
-        Double rate = jdbcTemplate.queryForObject(sql, Double.class, 
-            reporterCountryId, partnerCountryId, productId, year);
+            Double rate = jdbcTemplate.queryForObject(sql, Double.class,
+                reporterCountryId, partnerCountryId, productId, year);
 
-        logger.debug("Found tariff rate: {} for countryId={}, partnerCountryId={}, productId={}, year={}", 
+            logger.debug("Found tariff rate: {} for countryId={}, partnerCountryId={}, productId={}, year={}",
                     rate, reporterCountryId, partnerCountryId, productId, year);
 
-        return rate;
+            return rate;
 
-    } catch (EmptyResultDataAccessException e) {
-        logger.info("No tariff rate found for countryId={}, partnerCountryId={}, productId={}, year={}", 
-                   reporterCountryId, partnerCountryId, productId, year);
-        return null;
-    } catch (DataAccessException e) {
-        logger.error("Database error while retrieving tariff rate: {}", e.getMessage(), e);
-        throw e;
+        } catch (EmptyResultDataAccessException e) {
+            logger.info("No tariff rate found for countryId={}, partnerCountryId={}, productId={}, year={}",
+                    reporterCountryId, partnerCountryId, productId, year);
+            return null;
+        } catch (DataAccessException e) {
+            logger.error("Database error while retrieving tariff rate: {}", e.getMessage(), e);
+            throw e;
+        }
     }
-}
 
     public void updateTariffRate(TariffRateEntity tariffRate) throws DataAccessException {
         logger.debug("Checking existence of tariff rate: {}", tariffRate);
 
-        Integer countryId = tariffRate.getCountryId();
-        Integer partnerCountryId = tariffRate.getPartnerId();
+        String countryId = tariffRate.getCountryIsoNumeric();          // char(3) expected
+        String partnerCountryId = tariffRate.getPartnerIsoNumeric();  // char(3) expected
+        Integer productId = tariffRate.getProductHsCode();            // codeUnique (int)
 
-        if (countryId == null || partnerCountryId == null) {
-            throw new DataAccessException("Country or partner country ID is null") {};
+        if (countryId == null || countryId.trim().isEmpty() ||
+            partnerCountryId == null || partnerCountryId.trim().isEmpty() ||
+            productId == null) {
+            throw new DataAccessException("Missing country, partner or product id") {};
         }
 
-        Integer productId = getProductIdByHsCode(tariffRate.getProductHsCode());
-        if (productId == null) {
-            throw new DataAccessException("No product found with HS code: " + tariffRate.getProductHsCode()) {};
-        }
-
-        logger.info("Resolved IDs before DB operation - countryId: {}, partnerCountryId: {}, productId: {}, year: {}",
+        logger.info("Resolved values before DB operation - countryId: {}, partnerCountryId: {}, productId: {}, year: {}",
                 countryId, partnerCountryId, productId, tariffRate.getYear());
 
         String checkSql = """
@@ -87,10 +65,8 @@ public class TariffRateRepository {
         """;
 
         Integer count = jdbcTemplate.queryForObject(checkSql, Integer.class,
-            countryId,
-            partnerCountryId,
-            productId,
-            tariffRate.getYear());
+            countryId, partnerCountryId, productId, tariffRate.getYear()
+        );
 
         if (count != null && count > 0) {
             logger.debug("Record exists, updating tariff rate: {}", tariffRate);
@@ -107,7 +83,8 @@ public class TariffRateRepository {
                 countryId,
                 partnerCountryId,
                 productId,
-                tariffRate.getYear());
+                tariffRate.getYear()
+            );
 
             logger.info("Updated {} rows for tariff rate: {}", rowsUpdated, tariffRate);
 

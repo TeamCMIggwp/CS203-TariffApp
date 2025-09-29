@@ -17,7 +17,7 @@ public class DatabaseConnectionTest {
             "SELECT * FROM Products LIMIT 5",
             (rs, rowNum) -> String.format(
                 "Product ID: %d, HS Code: %s, Name: %s",
-                rs.getInt("product_id"),
+                rs.getInt("codeUnique"),
                 rs.getString("hs_code"),
                 rs.getString("name")
             )
