@@ -4,13 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -23,6 +17,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
+import wits.WitsApiService; // Add this import
+
 @RestController
 @RequestMapping("/api/database")
 @CrossOrigin(origins = {"http://localhost:3000", "https://teamcmiggwp.duckdns.org"})
@@ -33,41 +29,9 @@ public class TariffController {
     @Autowired
     private TariffRateRepository tariffRepository;
 
-    @Operation(
-        summary = "Update or insert tariff rate",
-        description = "Updates an existing tariff rate or inserts a new one if it doesn't exist. " +
-                      "All fields are required. The operation will check if a record exists for the given " +
-                      "country, partner, product, and year combination, then either update or insert accordingly."
-    )
-    @ApiResponses(value = {
-        @ApiResponse(
-            responseCode = "200",
-            description = "Tariff rate updated successfully",
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = SuccessResponse.class),
-                examples = @ExampleObject(value = "{\"message\": \"Tariff rate updated successfully\"}")
-            )
-        ),
-        @ApiResponse(
-            responseCode = "400",
-            description = "Bad request - missing required fields",
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = ErrorResponse.class),
-                examples = @ExampleObject(value = "{\"message\": \"All fields are required\"}")
-            )
-        ),
-        @ApiResponse(
-            responseCode = "500",
-            description = "Internal server error",
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = ErrorResponse.class),
-                examples = @ExampleObject(value = "{\"message\": \"Failed to update tariff rate: ...\"}")
-            )
-        )
-    })
+    @Autowired  // Add this
+    private WitsApiService witsApiService;
+
     @PostMapping("/update")
     public ResponseEntity<?> updateTariffRate(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -113,11 +77,11 @@ public class TariffController {
                 .body(new ErrorResponse("Failed to update tariff rate: " + e.getMessage()));
         }
     }
-
     @Operation(
         summary = "Retrieve tariff rate",
-        description = "Retrieves the tariff rate for a specific reporter-partner-product-year combination from the database. " +
-                      "Returns the tariff rate if found, or 404 if no matching record exists."
+        description = "Retrieves the tariff rate for a specific reporter-partner-product-year combination. " +
+                      "First queries WITS API, then falls back to local database if no data found in WITS. " +
+                      "Returns the tariff rate if found, or 404 if no matching record exists in either source."
     )
     @ApiResponses(value = {
         @ApiResponse(
@@ -126,7 +90,7 @@ public class TariffController {
             content = @Content(
                 mediaType = "application/json",
                 schema = @Schema(implementation = TariffRateResponse.class),
-                examples = @ExampleObject(value = "{\"rate\": 24.0}")
+                examples = @ExampleObject(value = "{\"rate\": 24.0, \"source\": \"WITS\"}")
             )
         ),
         @ApiResponse(
@@ -140,7 +104,7 @@ public class TariffController {
         ),
         @ApiResponse(
             responseCode = "404",
-            description = "No tariff rate found for the specified parameters"
+            description = "No tariff rate found in WITS or database"
         ),
         @ApiResponse(
             responseCode = "500",
@@ -153,69 +117,101 @@ public class TariffController {
         )
     })
     @GetMapping("/retrieve")
-    public ResponseEntity<?> retrieveTariffRate(
-            @Parameter(
-                description = "Reporter (Importing) country ISO numeric code (3 characters)",
-                example = "840",
-                required = true
-            )
-            @RequestParam(defaultValue = "840") String reporter,
-            
-            @Parameter(
-                description = "Partner (Exporting) country ISO numeric code (3 characters)",
-                example = "356",
-                required = true
-            )
-            @RequestParam(defaultValue = "356") String partner,
-            
-            @Parameter(
-                description = "Product HS code (integer)",
-                example = "100630",
-                required = true
-            )
-            @RequestParam(defaultValue = "100630") Integer product,
-            
-            @Parameter(
-                description = "Year for tariff data (YYYY format)",
-                example = "2020",
-                required = true
-            )
-            @RequestParam(defaultValue = "2020") String year) {
+public ResponseEntity<?> retrieveTariffRate(
+        @Parameter(
+            description = "Reporter (Importing) country ISO numeric code (3 characters)",
+            example = "840",
+            required = true
+        )
+        @RequestParam(defaultValue = "840") String reporter,
+        
+        @Parameter(
+            description = "Partner (Exporting) country ISO numeric code (3 characters)",
+            example = "356",
+            required = true
+        )
+        @RequestParam(defaultValue = "356") String partner,
+        
+        @Parameter(
+            description = "Product HS code (integer)",
+            example = "100630",
+            required = true
+        )
+        @RequestParam(defaultValue = "100630") Integer product,
+        
+        @Parameter(
+            description = "Year for tariff data (YYYY format)",
+            example = "2020",
+            required = true
+        )
+        @RequestParam(defaultValue = "2020") String year) {
 
-        logger.info("Received request to retrieve tariff rate: reporter={}, partner={}, product={}, year={}",
-                   reporter, partner, product, year);
+    logger.info("Received request to retrieve tariff rate: reporter={}, partner={}, product={}, year={}",
+               reporter, partner, product, year);
 
-        try {
-            // Validate required parameters
-            if (reporter == null || reporter.trim().isEmpty() ||
-                partner == null || partner.trim().isEmpty() ||
-                product == null || year == null || year.trim().isEmpty()) {
-                logger.warn("Validation failed: missing required parameters");
-                return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("All parameters (reporter, partner, product, year) are required"));
-            }
-
-            // Retrieve tariff rate from database (note: now repository expects iso codes directly)
-            Double tariffRate = tariffRepository.getTariffRate(reporter, partner, product, year);
-
-            if (tariffRate == null) {
-                logger.info("No tariff rate found for: reporter={}, partner={}, product={}, year={}",
-                           reporter, partner, product, year);
-                return ResponseEntity.notFound().build();
-            }
-
-            logger.info("Successfully retrieved tariff rate: {} for reporter={}, partner={}, product={}, year={}",
-                       tariffRate, reporter, partner, product, year);
-
-            return ResponseEntity.ok(new TariffRateResponse(tariffRate));
-
-        } catch (Exception e) {
-            logger.error("Failed to retrieve tariff rate for reporter={}, partner={}, product={}, year={}: {}",
-                        reporter, partner, product, year, e.getMessage(), e);
-            return ResponseEntity.internalServerError()
-                .body(new ErrorResponse("Failed to retrieve tariff rate: " + e.getMessage()));
+    try {
+        // Validate required parameters
+        if (reporter == null || reporter.trim().isEmpty() ||
+            partner == null || partner.trim().isEmpty() ||
+            product == null || year == null || year.trim().isEmpty()) {
+            logger.warn("Validation failed: missing required parameters");
+            return ResponseEntity.badRequest()
+                .body(new ErrorResponse("All parameters (reporter, partner, product, year) are required"));
         }
+
+        // STEP 1: Try to get data from WITS API first
+        logger.info("Querying WITS API for tariff rate...");
+        ResponseEntity<String> witsResponse = witsApiService.getMinRateOnly(
+            reporter, partner, product.toString(), year
+        );
+
+        String witsData = witsResponse.getBody();
+        logger.info("WITS API response: {}", witsData);
+
+        // Check if WITS returned valid data (not an error or "no result" message)
+        if (witsData != null && 
+            !witsData.equalsIgnoreCase("No result found in WITS") && 
+            !witsData.equalsIgnoreCase("API Error")) {
+            
+            try {
+                // Try to parse the rate from WITS
+                Double witsRate = Double.parseDouble(witsData.trim());
+                logger.info("Successfully retrieved tariff rate from WITS: {}", witsRate);
+                return ResponseEntity.ok(new TariffRateResponse(witsRate, "WITS"));
+            } catch (NumberFormatException e) {
+                logger.warn("WITS returned non-numeric data: {}", witsData);
+                // Continue to database fallback
+            }
+        }
+
+        // STEP 2: WITS has no data, fall back to local database
+        logger.info("WITS has no data, querying local database...");
+        Double dbRate = tariffRepository.getTariffRate(reporter, partner, product, year);
+
+        if (dbRate == null) {
+            logger.info("No tariff rate found in either WITS or database for: reporter={}, partner={}, product={}, year={}",
+                       reporter, partner, product, year);
+            return ResponseEntity.status(404)
+                .body(new ErrorResponse(
+                    "No tariff rate data found for the specified parameters. " +
+                    "Neither the WITS API nor the local database contain information for " +
+                    "reporter: " + reporter + ", partner: " + partner + 
+                    ", product: " + product + ", year: " + year
+                ));
+        }
+
+        logger.info("Successfully retrieved tariff rate from database: {} for reporter={}, partner={}, product={}, year={}",
+                   dbRate, reporter, partner, product, year);
+
+        return ResponseEntity.ok(new TariffRateResponse(dbRate, "Database"));
+
+    } catch (Exception e) {
+        logger.error("Failed to retrieve tariff rate for reporter={}, partner={}, product={}, year={}: {}",
+                    reporter, partner, product, year, e.getMessage(), e);
+        return ResponseEntity.internalServerError()
+            .body(new ErrorResponse("Failed to retrieve tariff rate: " + e.getMessage()));
     }
+}
 
     @Schema(description = "Error response")
     private static class ErrorResponse {
@@ -250,15 +246,23 @@ public class TariffController {
     @Schema(description = "Tariff rate response")
     private static class TariffRateResponse {
         private final Double rate;
+        private final String source;
         
-        public TariffRateResponse(Double rate) { 
-            this.rate = rate; 
+        public TariffRateResponse(Double rate, String source) { 
+            this.rate = rate;
+            this.source = source;
         }
 
         @Schema(description = "Tariff rate value", example = "24.0")
         @JsonProperty("rate")
         public Double getRate() { 
             return rate; 
+        }
+
+        @Schema(description = "Data source (WITS or Database)", example = "WITS")
+        @JsonProperty("source")
+        public String getSource() {
+            return source;
         }
     }
 }
