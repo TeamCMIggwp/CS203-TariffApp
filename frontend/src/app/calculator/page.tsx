@@ -1,5 +1,6 @@
 "use client"
 
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger, } from "@/components/ui/accordion"
 import { useState } from "react"
 import { motion, useMotionValue } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,11 +23,11 @@ type GeminiApiResponse = {
 
 export default function CalculatorSection() {
   const calculatorY = useMotionValue(0)
-  const [fromCountry, setFromCountry] = useState("")
-  const [toCountry, setToCountry] = useState("")
-  const [product, setProduct] = useState("")
-  const [value, setValue] = useState("")
-  const [year, setYear] = useState("")
+  const [fromCountry, setFromCountry] = useState("000")
+  const [toCountry, setToCountry] = useState("840")
+  const [product, setProduct] = useState("100630")
+  const [value, setValue] = useState("100")
+  const [year, setYear] = useState("2020")
   const [calculatedTariff, setCalculatedTariff] = useState<number | null>(null)
 
   // States for API Integration
@@ -139,6 +140,11 @@ export default function CalculatorSection() {
   }
 
   const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
+
+  const getCountryName = (code: string) => {
+    const country = countries.find((c) => c.code === code)
+    return country ? country.name : code
+  }
 
   return (
     <motion.section style={{ y: calculatorY }} className="calculator-section py-20">
@@ -313,12 +319,14 @@ export default function CalculatorSection() {
                   <div>
                     <p className="text-gray-300">Trade Route:</p>
                     <p className="font-semibold">
-                      {fromCountry} → {toCountry}
+                      {getCountryName(fromCountry)} → {getCountryName(toCountry)}
                     </p>
                   </div>
                   <div>
                     <p className="text-gray-300">Product:</p>
-                    <p className="font-semibold">{product}</p>
+                    <p className="font-semibold">
+                      {agriculturalProducts.find((p) => p.hs_code === product)?.name || product}
+                    </p>
                   </div>
                   <div>
                     <p className="text-gray-300">Goods Value:</p>
@@ -343,70 +351,100 @@ export default function CalculatorSection() {
                   </div>
                 </div>
 
-                {/* Gemini AI Analysis (Plain Text) */}
+                {/* Gemini AI Analysis */}
                 {apiResponse && (
-                  <div className="mt-8 bg-blue-600 p-4 rounded-lg text-white">
-                    <h4 className="text-white font-semibold mb-4">Gemini AI Analysis</h4>
+                  <div className="mt-8 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 rounded-xl text-white shadow-lg">
+                    <h3 className="text-3xl font-extrabold mb-6 tracking-wide">
+                      Gemini AI Analysis
+                    </h3>
 
-                    {typeof apiResponse === "string" ? (
-                      <p className="whitespace-pre-wrap">{apiResponse}</p>
-                    ) : (
-                      <>
-                        {/* Metrics first */}
-                        {apiResponse.metrics && (
-                          <div className="mb-4">
-                            <h5 className="font-semibold">Metrics</h5>
-                            <ul className="list-disc list-inside">
-                              {Object.entries(apiResponse.metrics).map(([key, value]) => (
-                                <li key={key}>
-                                  <strong>{key}:</strong> {value}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
+                    <Accordion type="multiple" className="space-y-3">
+                      {typeof apiResponse === "string" ? (
+                        <AccordionItem value="raw">
+                          <AccordionTrigger className="text-lg font-semibold text-white/90">
+                            Analysis Text
+                          </AccordionTrigger>
+                          <AccordionContent className="text-white/80 leading-relaxed">
+                            <p className="whitespace-pre-wrap">{apiResponse}</p>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ) : (
+                        <>
+                          {apiResponse.metrics && (
+                            <AccordionItem value="metrics">
+                              <AccordionTrigger className="text-lg font-semibold text-white/90">
+                                Metrics
+                              </AccordionTrigger>
+                              <AccordionContent className="text-white/80 leading-relaxed">
+                                <ul className="list-disc list-inside space-y-1">
+                                  {Object.entries(apiResponse.metrics).map(([key, value]) => (
+                                    <li key={key}>
+                                      <strong>{key}:</strong> {value}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </AccordionContent>
+                            </AccordionItem>
+                          )}
 
-                        {/* Summary */}
-                        {apiResponse.summary && (
-                          <div className="mb-4">
-                            <h5 className="font-semibold">Summary</h5>
-                            <p>{apiResponse.summary}</p>
-                          </div>
-                        )}
+                          {apiResponse.summary && (
+                            <AccordionItem value="summary">
+                              <AccordionTrigger className="text-lg font-semibold text-white/90">
+                                Summary
+                              </AccordionTrigger>
+                              <AccordionContent className="text-white/80 leading-relaxed">
+                                <p className="font-semibold">{apiResponse.summary}</p>
+                              </AccordionContent>
+                            </AccordionItem>
+                          )}
 
-                        {/* Insights */}
-                        {apiResponse.insights && (
-                          <div className="mb-4">
-                            <h5 className="font-semibold">Insights</h5>
-                            <ul className="list-disc list-inside">
-                              {apiResponse.insights.map((insight, idx) => (
-                                <li key={idx}>{insight}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
+                          {apiResponse.insights && (
+                            <AccordionItem value="insights">
+                              <AccordionTrigger className="text-lg font-semibold text-white/90">
+                                Insights
+                              </AccordionTrigger>
+                              <AccordionContent className="text-white/80 leading-relaxed">
+                                <ul className="list-disc list-inside space-y-1">
+                                  {apiResponse.insights.map((insight, idx) => (
+                                    <li key={idx} className="font-semibold">
+                                      {insight}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </AccordionContent>
+                            </AccordionItem>
+                          )}
 
-                        {/* Recommendations */}
-                        {apiResponse.recommendations && (
-                          <div className="mb-4">
-                            <h5 className="font-semibold">Recommendations</h5>
-                            <ul className="list-disc list-inside">
-                              {apiResponse.recommendations.map((rec, idx) => (
-                                <li key={idx}>{rec}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
+                          {apiResponse.recommendations && (
+                            <AccordionItem value="recommendations">
+                              <AccordionTrigger className="text-lg font-semibold text-white/90">
+                                Recommendations
+                              </AccordionTrigger>
+                              <AccordionContent className="text-white/80 leading-relaxed">
+                                <ul className="list-disc list-inside space-y-1">
+                                  {apiResponse.recommendations.map((rec, idx) => (
+                                    <li key={idx} className="font-semibold">
+                                      {rec}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </AccordionContent>
+                            </AccordionItem>
+                          )}
 
-                        {/* Confidence */}
-                        {apiResponse.confidence && (
-                          <div>
-                            <h5 className="font-semibold">Confidence</h5>
-                            <p>{apiResponse.confidence}</p>
-                          </div>
-                        )}
-                      </>
-                    )}
+                          {apiResponse.confidence && (
+                            <AccordionItem value="confidence">
+                              <AccordionTrigger className="text-lg font-semibold text-white/90">
+                                Confidence
+                              </AccordionTrigger>
+                              <AccordionContent className="text-white/80 leading-relaxed">
+                                <p className="font-semibold">{apiResponse.confidence}</p>
+                              </AccordionContent>
+                            </AccordionItem>
+                          )}
+                        </>
+                      )}
+                    </Accordion>
                   </div>
                 )}
 
