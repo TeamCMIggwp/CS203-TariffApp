@@ -25,7 +25,7 @@ public class WtoController {
         summary = "Get WTO rice tariff data",
         description = """
             Retrieves preferential tariff data for all rice products from the WTO API.
-            This endpoint returns data for rice product codes: 100610, 100620, 100630, 100640 (including broken rice).
+            This endpoint returns hardcoded data for rice product codes: 100610, 100620, 100630, 100640 (including broken rice).
             
             The data includes:
             - Preferential tariff rates between countries
@@ -85,31 +85,6 @@ public class WtoController {
                               "Indicator": "Lowest preferential tariff - simple average ad valorem tariff at HS 6-digit",
                               "ReportingEconomyCode": "068",
                               "ReportingEconomy": "Bolivia, Plurinational State of",
-                              "PartnerEconomyCode": "032",
-                              "PartnerEconomy": "Argentina",
-                              "ProductOrSectorClassificationCode": "HS",
-                              "ProductOrSectorClassification": "Harmonized System",
-                              "ProductOrSectorCode": "100640",
-                              "ProductOrSector": "Broken rice",
-                              "PeriodCode": "A",
-                              "Period": "Annual",
-                              "FrequencyCode": "A",
-                              "Frequency": "Annual",
-                              "UnitCode": "PCT",
-                              "Unit": "Percent",
-                              "Year": 2022,
-                              "ValueFlagCode": "PREF",
-                              "ValueFlag": "Preferential scheme",
-                              "TextValue": "Free-trade agreement duty rate for the Southern Common Market (MERCOSUR)",
-                              "Value": 0.0
-                            },
-                            {
-                              "IndicatorCategoryCode": "TPA_PRF_HS",
-                              "IndicatorCategory": "Preferential tariffs",
-                              "IndicatorCode": "HS_P_0070",
-                              "Indicator": "Lowest preferential tariff - simple average ad valorem tariff at HS 6-digit",
-                              "ReportingEconomyCode": "068",
-                              "ReportingEconomy": "Bolivia, Plurinational State of",
                               "PartnerEconomyCode": "076",
                               "PartnerEconomy": "Brazil",
                               "ProductOrSectorClassificationCode": "HS",
@@ -131,7 +106,7 @@ public class WtoController {
                           ]
                         }
                         """,
-                    description = "WTO rice tariff data with preferential rates for different countries and years"
+                    description = "WTO rice tariff data with preferential rates"
                 )
             )
         ),
