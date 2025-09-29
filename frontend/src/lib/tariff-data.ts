@@ -24,7 +24,7 @@ export const countries = [
   { code: "032", name: "Argentina" },
   { code: "764", name: "Thailand" },
   { code: "372", name: "Ireland" },
-  { code: "0000", name: "Test Dummy Entry"}
+  { code: "0", name: "Test Dummy Entry"}
 ];
 
 export const agriculturalProducts = [
