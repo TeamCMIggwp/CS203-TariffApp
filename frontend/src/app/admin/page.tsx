@@ -56,7 +56,7 @@ export default function AdminPage() {
         setErrorMessage("");
         setSuccessMessage("");
 
-        const response = await fetch("https://teamcmiggwp.duckdns.org/api/admin/update", {
+    const response = await fetch("https://teamcmiggwp.duckdns.org/api/database/update", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"

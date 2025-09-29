@@ -1,12 +1,15 @@
 package database;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Repository
 public class TariffRateRepository {
@@ -49,15 +52,38 @@ public class TariffRateRepository {
         String countryId = tariffRate.getCountryIsoNumeric();          // char(3) expected
         String partnerCountryId = tariffRate.getPartnerIsoNumeric();  // char(3) expected
         Integer productId = tariffRate.getProductHsCode();            // codeUnique (int)
+        String yearStr = tariffRate.getYear();                        // stored as INT in DB
+        Double rateDouble = tariffRate.getRate();                     // DECIMAL(6,3) in DB
+        String unit = tariffRate.getUnit();                           // VARCHAR(20) in DB
 
         if (countryId == null || countryId.trim().isEmpty() ||
             partnerCountryId == null || partnerCountryId.trim().isEmpty() ||
-            productId == null) {
-            throw new DataAccessException("Missing country, partner or product id") {};
+            productId == null || yearStr == null || yearStr.trim().isEmpty() || rateDouble == null) {
+            throw new DataAccessException("Missing country, partner, product, year or rate") {};
         }
 
-        logger.info("Resolved values before DB operation - countryId: {}, partnerCountryId: {}, productId: {}, year: {}",
-                countryId, partnerCountryId, productId, tariffRate.getYear());
+        // Default unit if not provided
+        if (unit == null || unit.trim().isEmpty()) {
+            unit = "percent";
+        }
+        // Trim to VARCHAR(20) safe length
+        if (unit.length() > 20) {
+            unit = unit.substring(0, 20);
+        }
+
+        logger.info("Resolved values before DB operation - countryId: {}, partnerCountryId: {}, productId: {}, year: {}, unit: {}",
+                countryId, partnerCountryId, productId, yearStr, unit);
+
+        // Ensure year is numeric to match DB column type (INT)
+        Integer year;
+        try {
+            year = Integer.valueOf(yearStr);
+        } catch (NumberFormatException ex) {
+            throw new DataAccessException("Invalid year format: " + yearStr) {};
+        }
+
+        // Ensure rate fits DECIMAL(6,3): round to 3 decimal places
+        BigDecimal rate = BigDecimal.valueOf(rateDouble).setScale(3, RoundingMode.HALF_UP);
 
         String checkSql = """
             SELECT COUNT(*) FROM TariffRates
@@ -65,25 +91,25 @@ public class TariffRateRepository {
         """;
 
         Integer count = jdbcTemplate.queryForObject(checkSql, Integer.class,
-            countryId, partnerCountryId, productId, tariffRate.getYear()
-        );
+            countryId, partnerCountryId, productId, year);
 
         if (count != null && count > 0) {
             logger.debug("Record exists, updating tariff rate: {}", tariffRate);
 
             String updateSql = """
                 UPDATE TariffRates SET 
-                    rate = ?, 
-                    last_updated = CURRENT_TIMESTAMP
+                    rate = ?,
+                    unit = ?
                 WHERE country_id = ? AND partner_country_id = ? AND product_id = ? AND year = ?
             """;
 
             int rowsUpdated = jdbcTemplate.update(updateSql,
-                tariffRate.getRate(),
+                rate,
+                unit,
                 countryId,
                 partnerCountryId,
                 productId,
-                tariffRate.getYear()
+                year
             );
 
             logger.info("Updated {} rows for tariff rate: {}", rowsUpdated, tariffRate);
@@ -93,19 +119,17 @@ public class TariffRateRepository {
 
             String insertSql = """
                 INSERT INTO TariffRates (
-                    country_id, partner_country_id, product_id, 
-                    year, rate, unit, in_effect, last_updated
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    country_id, partner_country_id, product_id, year, rate, unit
+                ) VALUES (?, ?, ?, ?, ?, ?)
             """;
 
             int rowsInserted = jdbcTemplate.update(insertSql,
                 countryId,
                 partnerCountryId,
                 productId,
-                tariffRate.getYear(),
-                tariffRate.getRate(),
-                "percent",
-                1
+                year,
+                rate,
+                unit
             );
 
             logger.info("Inserted {} rows for tariff rate: {}", rowsInserted, tariffRate);

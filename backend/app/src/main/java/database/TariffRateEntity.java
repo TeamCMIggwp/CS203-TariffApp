@@ -9,6 +9,7 @@ public class TariffRateEntity {
 
     private String year;
     private Double rate;
+    private String unit;
 
     // Getters and setters
     
@@ -37,6 +38,9 @@ public class TariffRateEntity {
     public Double getRate() { return rate; }
     public void setRate(Double rate) { this.rate = rate; }
 
+    public String getUnit() { return unit; }
+    public void setUnit(String unit) { this.unit = unit; }
+
     @Override
     public String toString() {
         return "TariffRateEntity{" +
@@ -44,7 +48,8 @@ public class TariffRateEntity {
                 ", partnerIsoNumeric='" + partnerIsoNumeric + '\'' +
                 ", productHsCode=" + productHsCode +
                 ", year='" + year + '\'' +
-                ", rate=" + rate +
+        ", rate=" + rate +
+        ", unit='" + unit + '\'' +
                 '}';
     }
 }
