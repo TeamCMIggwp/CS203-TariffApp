@@ -26,13 +26,13 @@ export function useLogin() {
         body: JSON.stringify({ email: username, password }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({})); // guard against non‑JSON
 
       if (!res.ok) {
         setError(data.message || "Invalid credentials.");
       } else {
-        // ✅ Redirect to home page after successful login
-        router.push("/");
+        // ✅ Only redirect once, after successful login
+        router.push("/calculator");
       }
     } catch (err) {
       console.error("Login error:", err);

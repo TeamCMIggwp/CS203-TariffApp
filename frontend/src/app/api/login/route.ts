@@ -49,12 +49,13 @@ export async function POST(req: Request) {
     const accessToken = await signAccessToken({ userId: user.user_id, role: user.role });
 
     // Set refresh token cookie
-    cookies().set("refresh_token", sessionId, {
+    const cookieStore = await cookies();
+    cookieStore.set("refresh_token", sessionId, {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: Number(process.env.REFRESH_TOKEN_TTL_SECONDS || 604800),
+      maxAge: 60 * 60 * 24 * 7,
     });
 
     return NextResponse.json({ accessToken });

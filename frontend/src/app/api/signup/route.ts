@@ -32,15 +32,17 @@ export async function POST(req: Request) {
     // Generate UUID manually
     const userId = randomUUID();
 
-    // Insert into users
+    // Insert into users (with role defaulting to 'user')
     await conn.execute(
-      "INSERT INTO users (id, email, name, country_code) VALUES (?, ?, ?, ?)",
-      [userId, email, name, country]
+      "INSERT INTO users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+      [userId, email, name, country, "user"]
     );
 
     // Insert into accounts
     await conn.execute(
-      "INSERT INTO accounts (id, user_id, provider, provider_account_id, password_hash, password_algorithm) VALUES (UUID(), ?, 'credentials', ?, ?, 'argon2id')",
+      `INSERT INTO accounts 
+        (id, user_id, provider, provider_account_id, password_hash, password_algorithm) 
+       VALUES (UUID(), ?, 'credentials', ?, ?, 'argon2id')`,
       [userId, email, hash]
     );
 
@@ -49,7 +51,7 @@ export async function POST(req: Request) {
     console.log(`✅ User ${email} signed up successfully`);
     return NextResponse.json({ message: "Signup successful" });
   } catch (err: any) {
-    console.error("❌ Signup error:", err);
-    return NextResponse.json({ message: "Signup failed" }, { status: 500 });
+    console.error("❌ Signup error:", err.message, err.stack);
+    return NextResponse.json({ message: "Signup failed", error: err.message }, { status: 500 });
   }
 }
