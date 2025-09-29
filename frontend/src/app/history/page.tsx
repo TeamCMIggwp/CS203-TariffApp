@@ -1,12 +1,5 @@
-"use client";
-
-import React from "react";
-
-interface ComingSoonPageProps {
-  title: string;
-}
-
-const ComingSoonPage: React.FC<ComingSoonPageProps> = ({ title }) => {
+export default function Page() {
+  const title = "History";
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 text-white p-4">
       <div className="text-center max-w-md">
@@ -23,6 +16,4 @@ const ComingSoonPage: React.FC<ComingSoonPageProps> = ({ title }) => {
       </div>
     </div>
   );
-};
-
-export default ComingSoonPage;
+}
