@@ -132,7 +132,7 @@ export default function CalculatorSection() {
     setIsAnalyzing(true)
 
     const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`
-    const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors"
+    const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors, 000 is world"
 
     await callGeminiApi(apiData, prompt)
     setIsAnalyzing(false)
