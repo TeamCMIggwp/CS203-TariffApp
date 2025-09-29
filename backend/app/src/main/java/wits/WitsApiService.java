@@ -53,7 +53,7 @@ public class WitsApiService {
     public ResponseEntity<String> getMinRateOnly(String reporter, String partner, String product, String year) {
     try {
         String path = String.format(
-            "/datasource/TRN/reporter/%s/partner/%s/product/%s/yeara/%s/datatype/reported?format=JSON",
+            "/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/reported?format=JSON",
             reporter, partner, product, year
         );
 
