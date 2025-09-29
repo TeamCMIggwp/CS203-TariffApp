@@ -3,8 +3,6 @@ package wits;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import database.TariffController;
-import database.TariffRateService;
 import reactor.core.publisher.Mono;
 
 import org.springframework.http.ResponseEntity;
@@ -16,14 +14,12 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 public class WitsApiService {
 
     private final WebClient webClient;
-    private final TariffRateService tariffRateService;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public WitsApiService(TariffRateService tariffRateService) {
+    public WitsApiService() {
         this.webClient = WebClient.builder()
                 .baseUrl("https://wits.worldbank.org/API/V1/SDMX/V21")
                 .build();
-        this.tariffRateService = tariffRateService;
     }
 
     /**
@@ -83,13 +79,10 @@ public class WitsApiService {
 
     } catch (WebClientResponseException e) {
         // Network OK but server returned error not handled above (e.g., 5xx)
-        return ResponseEntity.ok("test: API Error");
+        return ResponseEntity.ok("API Error");
     } catch (Exception e) {
         // Timeouts, deserialization failures, etc.
-        return tariffRateService.retrieveTariffRateAsText(reporter, partner, product, year)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.status(502)
-                    .body("API Error; DB fallback: no result"));
+        return ResponseEntity.ok("API Error");
     }
 }
 
