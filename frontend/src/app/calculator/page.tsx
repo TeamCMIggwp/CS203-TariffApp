@@ -140,6 +140,11 @@ export default function CalculatorSection() {
 
   const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
 
+  const getCountryName = (code: string) => {
+    const country = countries.find((c) => c.code === code)
+    return country ? country.name : code
+  }
+
   return (
     <motion.section style={{ y: calculatorY }} className="calculator-section py-20">
       <div className="max-w-4xl mx-auto px-4">
@@ -313,12 +318,14 @@ export default function CalculatorSection() {
                   <div>
                     <p className="text-gray-300">Trade Route:</p>
                     <p className="font-semibold">
-                      {fromCountry} → {toCountry}
+                      {getCountryName(fromCountry)} → {getCountryName(toCountry)}
                     </p>
                   </div>
                   <div>
                     <p className="text-gray-300">Product:</p>
-                    <p className="font-semibold">{product}</p>
+                    <p className="font-semibold">
+                      {agriculturalProducts.find((p) => p.hs_code === product)?.name || product}
+                    </p>
                   </div>
                   <div>
                     <p className="text-gray-300">Goods Value:</p>
