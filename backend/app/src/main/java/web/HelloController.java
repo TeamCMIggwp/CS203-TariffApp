@@ -20,7 +20,7 @@ public class HelloController {
         description = """
             Returns a message to verify the Spring Boot application is running correctly.
             
-            **Example URL:** `https://teamcmiggwp.duckdns.org/hello`
+            **Example URL:** https://teamcmiggwp.duckdns.org/hello
             
             **cURL Example:**
 
