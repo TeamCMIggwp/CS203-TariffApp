@@ -18,9 +18,6 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
-import java.io.IOException;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -29,12 +26,12 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/gemini")
-@Tag(name = "GeminiAnalysis", description = "APIs for analyzing data using Google's Gemini AI")
+@Tag(name = "Gemini Analysis", description = "AI-powered data analysis using Google's Gemini API")
 public class GeminiController {
 
     private static final Logger logger = LoggerFactory.getLogger(GeminiController.class);
 
-    @Value("${gemini.api.key:#{environment.GEMINI_API_KEY}}")
+    @Value("${google.api.key:#{environment.GOOGLE_API_KEY}}")
     private String apiKey;
 
     private GeminiAnalyzer geminiAnalyzer;
@@ -46,7 +43,7 @@ public class GeminiController {
     @PostConstruct
     public void init() {
         if (apiKey == null || apiKey.trim().isEmpty()) {
-            logger.error("Gemini API key not configured. Set gemini.api.key property or GEMINI_API_KEY environment variable");
+            logger.error("Gemini API key not configured. Set google.api.key property or GOOGLE_API_KEY environment variable");
             throw new IllegalStateException("Gemini API key is required");
         }
         this.geminiAnalyzer = new GeminiAnalyzer(apiKey);
@@ -66,121 +63,130 @@ public class GeminiController {
 
     /**
      * Analyzes the provided data using Gemini AI.
-     * Now accepts data as URL query parameters for easy web browser testing.
      */
     @GetMapping("/analyze")
     @Operation(
-            summary = "Analyze data using Gemini AI",
-            description = "Submits data to Google's Gemini AI for analysis via URL query parameters. " +
-                         "Returns structured JSON analysis when possible, or raw text analysis otherwise. " +
-                         "Example: /gemini/analyze?data=china&prompt=analyze this country"
+        summary = "Analyze data with Gemini AI",
+        description = """
+            Analyzes the provided data using Google's Gemini AI and returns structured insights.
+            
+            **Example URL:** https://teamcmiggwp.duckdns.org/gemini/analyze?data=Trade analysis: Export from 000 to 356. Product: 100630, Value: $123, Year: 2020&prompt=Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors
+            
+            **cURL Example:** 
+            
+            curl -X GET "https://teamcmiggwp.duckdns.org/gemini/analyze?data=Trade%20analysis%3A%20Export%20from%20000%20to%20356.%20Product%3A%20100630%2C%20Value%3A%20%24123%2C%20Year%3A%202020&prompt=Analyze%20this%20agricultural%20trade%20data%20and%20provide%20insights%20on%20tariff%20implications%2C%20trade%20relationships%2C%20and%20economic%20factors" -H "accept: application/json"""
     )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Analysis completed successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = AnalysisResponse.class),
-                            examples = {
-                                    @ExampleObject(
-                                            name = "Structured Analysis",
-                                            value = """
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "Successfully analyzed data",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = Map.class),
+                examples = @ExampleObject(
+                    name = "Success Response",
+                    value = """
                         {
                           "success": true,
-                          "timestamp": 1642778400000,
+                          "timestamp": 1727600000000,
                           "analysisType": "structured",
                           "analysis": {
-                            "summary": "China is the world's most populous country",
-                            "insights": ["Population over 1.4 billion", "Major economic power", "Rich cultural history"],
-                            "metrics": {"population": "1.4B", "gdp_rank": "2"},
-                            "recommendations": ["Focus on sustainable development", "Continue economic reforms"],
+                            "summary": "Agricultural trade analysis shows significant export activity",
+                            "insights": ["Export value of $123 for product 100630", "Trade flow from country 000 to 356"],
+                            "metrics": {
+                              "exportValue": "$123",
+                              "year": "2020",
+                              "product": "100630"
+                            },
+                            "recommendations": ["Consider tariff implications", "Analyze trade relationships"],
                             "confidence": "high"
                           },
-                          "summary": "China is the world's most populous country",
+                          "summary": "Agricultural trade analysis shows significant export activity",
                           "confidence": "high"
                         }
                         """
-                                    )
-                            }
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid request - missing or empty data parameter",
-                    content = @Content(
-                            mediaType = "application/json",
-                            examples = @ExampleObject(value = """
-                {
-                  "success": false,
-                  "error": "Data parameter is required and cannot be empty"
-                }
-                """)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "500",
-                    description = "Internal server error",
-                    content = @Content(
-                            mediaType = "application/json",
-                            examples = @ExampleObject(value = """
-                {
-                  "success": false,
-                  "error": "Unexpected error occurred during analysis"
-                }
-                """)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "503",
-                    description = "Service unavailable - Gemini API communication failed",
-                    content = @Content(
-                            mediaType = "application/json",
-                            examples = @ExampleObject(value = """
-                {
-                  "success": false,
-                  "error": "Failed to communicate with Gemini API: Connection timeout"
-                }
-                """)
-                    )
+                )
             )
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "Invalid request - data parameter is required",
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    value = """
+                        {
+                          "success": false,
+                          "error": "Data parameter is required and cannot be empty"
+                        }
+                        """
+                )
+            )
+        ),
+        @ApiResponse(
+            responseCode = "500",
+            description = "Internal server error - analysis failed",
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    value = """
+                        {
+                          "success": false,
+                          "error": "Failed to communicate with Gemini API"
+                        }
+                        """
+                )
+            )
+        ),
+        @ApiResponse(
+            responseCode = "503",
+            description = "Service unavailable - Gemini API error",
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    value = """
+                        {
+                          "success": false,
+                          "error": "Failed to communicate with Gemini API: Connection timeout"
+                        }
+                        """
+                )
+            )
+        )
     })
     public ResponseEntity<Map<String, Object>> analyzeData(
             @Parameter(
-                    description = "The data to be analyzed by Gemini AI",
-                    example = "china",
-                    required = true
+                description = "Trade or economic data to be analyzed by Gemini AI",
+                required = true,
+                example = "Trade analysis: Export from 000 to 356. Product: 100630, Value: $123, Year: 2020"
             )
             @RequestParam String data,
             
             @Parameter(
-                    description = "Optional custom prompt to guide the AI analysis",
-                    example = "Analyze this country and provide demographic and economic insights"
+                description = "Custom analysis prompt (optional). If not provided, a default analysis prompt will be used.",
+                required = false,
+                example = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors"
             )
             @RequestParam(required = false) String prompt) {
 
-        logger.info("Received GET analysis request for data: '{}'", 
-                data != null && data.length() > 50 ? data.substring(0, 50) + "..." : data);
+        logger.info("Received analysis request for data: {}", data != null ? "provided" : "missing");
 
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // URL decode the data parameter in case it contains special characters
-            String decodedData = URLDecoder.decode(data, StandardCharsets.UTF_8);
-            
-            if (decodedData == null || decodedData.trim().isEmpty()) {
+            if (data == null || data.trim().isEmpty()) {
                 response.put("success", false);
                 response.put("error", "Data parameter is required and cannot be empty");
                 return ResponseEntity.badRequest().body(response);
             }
 
-            // URL decode the prompt if provided
-            String decodedPrompt = null;
-            if (prompt != null && !prompt.trim().isEmpty()) {
-                decodedPrompt = URLDecoder.decode(prompt, StandardCharsets.UTF_8);
-            }
+            // Create AnalysisRequest object from parameters
+            AnalysisRequest request = new AnalysisRequest(data, prompt);
 
-            GeminiResponse geminiResponse = geminiAnalyzer.analyzeData(decodedData, decodedPrompt);
+            GeminiResponse geminiResponse = geminiAnalyzer.analyzeData(
+                    request.getData(),
+                    request.getPrompt()
+            );
 
             if (geminiResponse.isSuccess()) {
                 response.put("success", true);
@@ -196,8 +202,7 @@ public class GeminiController {
                     response.put("analysis", geminiResponse.getRawResponse());
                 }
 
-                logger.info("Analysis completed successfully for data: '{}'", 
-                        decodedData.length() > 20 ? decodedData.substring(0, 20) + "..." : decodedData);
+                logger.info("Analysis completed successfully");
                 return ResponseEntity.ok(response);
 
             } else {
@@ -207,17 +212,11 @@ public class GeminiController {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
             }
 
-        } catch (IOException e) {
-            response.put("success", false);
-            response.put("error", "Failed to communicate with Gemini API: " + e.getMessage());
-            logger.error("IOException during analysis", e);
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
-
         } catch (Exception e) {
             response.put("success", false);
-            response.put("error", "Unexpected error occurred during analysis");
-            logger.error("Unexpected error during analysis", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            response.put("error", "Failed to communicate with Gemini API: " + e.getMessage());
+            logger.error("Exception during analysis", e);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
         }
     }
 
@@ -226,25 +225,37 @@ public class GeminiController {
      */
     @GetMapping("/health")
     @Operation(
-            summary = "Health check",
-            description = "Returns the current health status of the Gemini analysis service"
+        summary = "Health check",
+        description = """
+            Check the health status of the Gemini analysis service.
+            
+            **Example URL:** `https://teamcmiggwp.duckdns.org/gemini/health`
+            
+            **cURL Example:**
+
+            curl -X GET "https://teamcmiggwp.duckdns.org/gemini/health" -H "accept: application/json"
+
+            """
     )
-    @ApiResponse(
+    @ApiResponses(value = {
+        @ApiResponse(
             responseCode = "200",
             description = "Service is healthy",
             content = @Content(
-                    mediaType = "application/json",
-                    schema = @Schema(implementation = HealthResponse.class),
-                    examples = @ExampleObject(value = """
-            {
-              "status": "UP",
-              "service": "gemini-analysis",
-              "timestamp": 1642778400000,
-              "apiKeyConfigured": true
-            }
-            """)
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    value = """
+                        {
+                          "status": "UP",
+                          "service": "gemini-analysis",
+                          "timestamp": 1727600000000,
+                          "apiKeyConfigured": true
+                        }
+                        """
+                )
             )
-    )
+        )
+    })
     public ResponseEntity<Map<String, Object>> health() {
         Map<String, Object> health = new HashMap<>();
         health.put("status", "UP");
@@ -255,49 +266,33 @@ public class GeminiController {
     }
 
     /**
-     * Response schema for analysis operations.
+     * Data Transfer Object for analysis requests.
      */
-    @Schema(description = "Response object for analysis operations")
-    public static class AnalysisResponse {
+    public static class AnalysisRequest {
+        private String data;
+        private String prompt;
 
-        @Schema(description = "Whether the analysis was successful", example = "true")
-        public boolean success;
+        public AnalysisRequest() {}
 
-        @Schema(description = "Timestamp of the analysis", example = "1642778400000")
-        public long timestamp;
+        public AnalysisRequest(String data, String prompt) {
+            this.data = data;
+            this.prompt = prompt;
+        }
 
-        @Schema(description = "Type of analysis returned", allowableValues = {"structured", "text"}, example = "structured")
-        public String analysisType;
+        public String getData() {
+            return data;
+        }
 
-        @Schema(description = "The analysis result (JSON object for structured, string for text)")
-        public Object analysis;
+        public void setData(String data) {
+            this.data = data;
+        }
 
-        @Schema(description = "Brief summary of the analysis", example = "China is the world's most populous country")
-        public String summary;
+        public String getPrompt() {
+            return prompt;
+        }
 
-        @Schema(description = "Confidence level of the analysis", allowableValues = {"high", "medium", "low"}, example = "high")
-        public String confidence;
-
-        @Schema(description = "Error message if analysis failed", example = "Failed to communicate with Gemini API")
-        public String error;
-    }
-
-    /**
-     * Response schema for health check operations.
-     */
-    @Schema(description = "Response object for health check")
-    public static class HealthResponse {
-
-        @Schema(description = "Service status", example = "UP")
-        public String status;
-
-        @Schema(description = "Service name", example = "gemini-analysis")
-        public String service;
-
-        @Schema(description = "Timestamp of the health check", example = "1642778400000")
-        public long timestamp;
-
-        @Schema(description = "Whether API key is properly configured", example = "true")
-        public boolean apiKeyConfigured;
+        public void setPrompt(String prompt) {
+            this.prompt = prompt;
+        }
     }
 }

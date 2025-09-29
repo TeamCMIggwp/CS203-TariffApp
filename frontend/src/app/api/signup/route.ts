@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDBConnection } from "../../../lib/db";
+import { accountsDb } from "../../../lib/db";
 import argon2 from "argon2";
 import { randomUUID } from "crypto";
 
@@ -20,11 +20,12 @@ export async function POST(req: Request) {
       parallelism: 1,
     });
 
-    const conn = await getDBConnection();
+    const conn = await accountsDb.getConnection();
 
     // Check for existing user
     const [existing] = await conn.execute("SELECT id FROM users WHERE email = ?", [email]);
-    if ((existing as any[]).length > 0) {
+    type ExistingUserRow = { id: string };
+    if ((existing as ExistingUserRow[]).length > 0) {
       await conn.end();
       return NextResponse.json({ message: "Email already registered" }, { status: 409 });
     }
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
       [userId, email, hash]
     );
 
-    await conn.end();
+    await conn.release();
 
     console.log(`✅ User ${email} signed up successfully`);
     return NextResponse.json({ message: "Signup successful" });

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { randomUUID } from "crypto";
+import { accountsDb } from "@/lib/db";
 import argon2 from "argon2";
-import { getDBConnection } from "@/lib/db";
 import { signAccessToken } from "@/lib/auth";
 
 export async function POST(req: Request) {
@@ -12,7 +12,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Missing credentials" }, { status: 400 });
     }
 
-    const conn = await getDBConnection();
+    const conn = await accountsDb.getConnection();
+
     const [rows] = await conn.execute(
       `SELECT u.id AS user_id, u.role, a.password_hash
        FROM users u
@@ -26,27 +27,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Invalid email or password" }, { status: 401 });
     }
 
-    const ok = await argon2.verify(user.password_hash, password);
-    if (!ok) {
-      await conn.end();
+    await conn.release();
+
+    type UserRow = {
+      id: string;
+      password_hash: string;
+    };
+
+    const user = (rows as UserRow[])[0];
+    if (!user) {
       return NextResponse.json({ message: "Invalid email or password" }, { status: 401 });
     }
-
-    // Create opaque refresh token (session)
-    const sessionId = randomUUID();
-    const expiresAt = new Date(Date.now() + Number(process.env.REFRESH_TOKEN_TTL_SECONDS || 604800) * 1000);
-    const ip = req.headers.get("x-forwarded-for") || null;
-    const userAgent = req.headers.get("user-agent") || null;
-
-    await conn.execute(
-      `INSERT INTO sessions (id, user_id, expires_at, ip, user_agent)
-       VALUES (?, ?, ?, ?, ?)`,
-      [sessionId, user.user_id, expiresAt, ip, userAgent]
-    );
-    await conn.end();
-
-    // Short-lived access token (JWT)
-    const accessToken = await signAccessToken({ userId: user.user_id, role: user.role });
 
     // Set refresh token cookie
     const cookieStore = await cookies();

@@ -156,7 +156,8 @@
 
   /* Calculator section styles */
   .calculator-section {
-    @apply relative z-20 min-h-screen bg-gradient-to-b from-transparent via-black/80 to-black px-4 py-20;
+    @apply relative z-20 min-h-screen px-4 py-20 backdrop-blur-md;
+    background-color: rgba(255, 255, 255, 0.6);
   }
 
   .calculator-card {

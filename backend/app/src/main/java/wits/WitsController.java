@@ -5,6 +5,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.Parameter;
+
 @RestController
 public class WitsController {
 
@@ -14,41 +16,51 @@ public class WitsController {
         this.wits = wits;
     }
 
-    // Hardcoded service method for testing
+    // Hardcoded service method for testing (entire json response)
     @GetMapping("/api/wits/tariffs/demo")
     public ResponseEntity<String> tariffDemo() {
         return wits.getTariffData();
     }
 
-    // Parameterized version for production use
-    @GetMapping("/api/wits/tariffs")
-    public ResponseEntity<String> getTariffs(
-        @RequestParam String reporter,
-        @RequestParam String partner,
-        @RequestParam String product,
-        @RequestParam String year,
-        @RequestParam(defaultValue = "reported") String datatype
-    ) {
-        return wits.getTariffData(reporter, partner, product, year, datatype);
-    }
-
-    // NEW: hardcoded demo returning MIN_RATE
+    // Hardcoded demo returning MIN_RATE (single value)
     @GetMapping("/api/wits/tariffs/demo/min-rate")
     public ResponseEntity<String> minRateDemo() {
         return wits.getMinRateOnly();
     }
 
-    // NEW: parameterized MIN_RATE
+    // Parameterized MIN_RATE (takes in 4 parameters and return single value)
     @GetMapping("/api/wits/tariffs/min-rate")
     public ResponseEntity<String> getMinRate(
+            @Parameter(
+                    description = "Reporting (Importing) country code (string)",
+                    example = "China",
+                    required = true
+            ) 
             @RequestParam String reporter,
+
+            @Parameter(
+                    description = "Partner (Exporting) country code (string)",
+                    example = "USA",
+                    required = true
+            )
             @RequestParam String partner,
+            
+            @Parameter(
+                    description = "Product code (integer)",
+                    example = "100610",
+                    required = true
+            )
             @RequestParam String product,
-            @RequestParam String year,
-            @RequestParam(defaultValue = "reported") String datatype
+            
+            @Parameter(
+                    description = "Year (integer)",
+                    example = "2020",
+                    required = true
+            )
+            @RequestParam String year
+
     ) {
-        return wits.getMinRateOnly(reporter, partner, product, year, datatype);
+        return wits.getMinRateOnly(reporter, partner, product, year);
     }
 
-    
 }

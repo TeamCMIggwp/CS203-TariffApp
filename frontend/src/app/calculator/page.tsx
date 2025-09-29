@@ -9,13 +9,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
 
-type GeminiApiResponse = {
-  analysis?: string;
-  success?: boolean;
-  [key: string]: any;
-};
+type MetricValue = string | number;
 
-//test
+type GeminiApiResponse = {
+  summary?: string;
+  insights?: string[];
+  metrics?: Record<string, MetricValue>;
+  recommendations?: string[];
+  confidence?: string;
+} | string | null;
+
+
 export default function CalculatorSection() {
   const calculatorY = useMotionValue(0)
   const [fromCountry, setFromCountry] = useState("")
@@ -27,19 +31,20 @@ export default function CalculatorSection() {
 
   // States for API Integration
   const [apiResponse, setApiResponse] = useState<GeminiApiResponse | string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isCalculatingTariff, setIsCalculatingTariff] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [inputError, setInputError] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
 
-  const [dummyApiResponse, setDummyApiResponse] = useState<string | null>(null)
+  const [tariffPercentage, setTariffPercentage] = useState<string | null>(null)
 
   // Function to call API
   const callGeminiApi = async (data: string, prompt?: string) => {
     try {
-      setIsLoading(true)
+      setIsAnalyzing(true)
       setApiError(null)
 
-      const baseUrl = 'http://3.106.20.106:8080/gemini/analyze'
+      const baseUrl = 'https://teamcmiggwp.duckdns.org/gemini/analyze'
       const params = new URLSearchParams()
       params.append('data', data)
       if (prompt) params.append('prompt', prompt)
@@ -59,20 +64,22 @@ export default function CalculatorSection() {
 
       // Save raw text or structured result to display
       if (result?.success && result?.analysis) {
-        setApiResponse(
-          typeof result.analysis === 'string'
-            ? result.analysis
-            : JSON.stringify(result.analysis, null, 2)
-        )
+        if (result.analysisType === "structured") {
+          // store JSON object directly
+          setApiResponse(result.analysis);
+        } else {
+          // fallback to plain text
+          setApiResponse(result.analysis);
+        }
       } else {
-        setApiResponse("No analysis data returned from API.")
+        setApiResponse("No analysis data returned from API.");
       }
-    } catch (err) {
+    } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
       setApiError(errorMessage)
       console.error('API Error:', errorMessage)
     } finally {
-      setIsLoading(false)
+      setIsAnalyzing(false)
     }
   }
 
@@ -84,31 +91,51 @@ export default function CalculatorSection() {
 
     setInputError(null)
     setApiError(null)
+    setTariffPercentage(null)
+    setCalculatedTariff(null)
+    setApiResponse(null)
 
-    const baseRate = Math.random() * 0.25 + 0.05
-    const productMultiplier = agriculturalProducts.indexOf(product) * 0.01 + 1
-    const tariffAmount = Number.parseFloat(value) * baseRate * productMultiplier
-
-    setCalculatedTariff(tariffAmount)
+    setIsCalculatingTariff(true)
+    setIsAnalyzing(false)
 
     try {
-      const dummyApiUrl = `http://3.106.20.106:8080/tariff/calculate?reportingCountry=${fromCountry}&partnerCountry=${toCountry}&productCode=${product}&year=${year}`;
+      const dummyApiUrl = `https://teamcmiggwp.duckdns.org/api/wits/tariffs/min-rate?reporter=${toCountry}&partner=${fromCountry}&product=${product}&year=${year}`;
+
       const dummyResponse = await fetch(dummyApiUrl);
-      
+
       if (!dummyResponse.ok) {
         throw new Error("Dummy API call failed");
       }
 
       const dummyText = await dummyResponse.text();
-      setDummyApiResponse(dummyText);
+
+      const match = dummyText.match(/([\d.]+)%?/)
+      const parsedPercentage = match ? parseFloat(match[1]) : null
+
+      if (parsedPercentage !== null && !isNaN(parsedPercentage)) {
+        setTariffPercentage(`${parsedPercentage.toFixed(2)}%`)
+        const goodsValue = parseFloat(value)
+        const tariffAmount = (parsedPercentage / 100) * goodsValue
+        setCalculatedTariff(tariffAmount)
+      } else {
+        setTariffPercentage("MFN")
+        setCalculatedTariff(null)
+      }
+
     } catch (err) {
-      setDummyApiResponse("Error calling dummy API.");
+      setTariffPercentage("MFN")
+      setCalculatedTariff(null)
+    } finally {
+      setIsCalculatingTariff(false)
     }
 
+    setIsAnalyzing(true)
+
     const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`
-    const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors"
+    const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors, 000 is world"
 
     await callGeminiApi(apiData, prompt)
+    setIsAnalyzing(false)
   }
 
   const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
@@ -122,6 +149,7 @@ export default function CalculatorSection() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
               {/* From Country */}
               <div className="space-y-2">
                 <Label htmlFor="from-country" className="calculator-label">
@@ -129,12 +157,25 @@ export default function CalculatorSection() {
                 </Label>
                 <Select value={fromCountry} onValueChange={setFromCountry}>
                   <SelectTrigger className="calculator-select">
-                    <SelectValue placeholder="Select exporting country" />
+                    <SelectValue placeholder="Select exporting country">
+                      {fromCountry
+                        ? countries.find((c) => c.code === fromCountry)?.name
+                        : "Select exporting country"}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="calculator-select-content">
                     {countries.map((country) => (
-                      <SelectItem key={country} value={country} className="calculator-select-item">
-                        {country}
+                      <SelectItem
+                        key={country.code}
+                        value={country.code}
+                        className="calculator-select-item"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{country.name}</span>
+                          <span className="text-xs text-gray-600 mt-0.5">
+                            code: {country.code}
+                          </span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -148,12 +189,26 @@ export default function CalculatorSection() {
                 </Label>
                 <Select value={toCountry} onValueChange={setToCountry}>
                   <SelectTrigger className="calculator-select">
-                    <SelectValue placeholder="Select importing country" />
+                    {/* Show ONLY the country name in the trigger */}
+                    <SelectValue placeholder="Select importing country">
+                      {toCountry
+                        ? countries.find((c) => c.code === toCountry)?.name
+                        : "Select importing country"}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="calculator-select-content">
                     {countries.map((country) => (
-                      <SelectItem key={country} value={country} className="calculator-select-item">
-                        {country}
+                      <SelectItem
+                        key={country.code}
+                        value={country.code}
+                        className="calculator-select-item"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{country.name}</span>
+                          <span className="text-xs text-gray-600 mt-0.5">
+                            code: {country.code}
+                          </span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -167,12 +222,26 @@ export default function CalculatorSection() {
                 </Label>
                 <Select value={product} onValueChange={setProduct}>
                   <SelectTrigger className="calculator-select">
-                    <SelectValue placeholder="Select product type" />
+                    {/* Show ONLY the product name in the trigger */}
+                    <SelectValue placeholder="Select product type">
+                      {product
+                        ? agriculturalProducts.find((p) => p.hs_code === product)?.name
+                        : "Select product type"}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="calculator-select-content">
                     {agriculturalProducts.map((prod) => (
-                      <SelectItem key={prod} value={prod} className="calculator-select-item">
-                        {prod}
+                      <SelectItem
+                        key={prod.hs_code}
+                        value={prod.hs_code}
+                        className="calculator-select-item"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{prod.name}</span>
+                          <span className="text-xs text-gray-600 mt-0.5">
+                            code: {prod.hs_code}
+                          </span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -218,10 +287,10 @@ export default function CalculatorSection() {
             <div className="flex justify-center pt-6">
               <Button
                 onClick={calculateTariff}
-                disabled={!fromCountry || !toCountry || !product || !value || isLoading}
+                disabled={!fromCountry || !toCountry || !product || !value || isCalculatingTariff || isAnalyzing}
                 className="calculator-button"
               >
-                {isLoading ? "Calculating..." : "Calculate Tariff"}
+                {isCalculatingTariff ? "Calculating..." : isAnalyzing ? "Analyzing..." : "Calculate Tariff"}
               </Button>
             </div>
 
@@ -237,7 +306,7 @@ export default function CalculatorSection() {
             )}
 
             {/* Results */}
-            {calculatedTariff !== null && (
+            {tariffPercentage && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="calculator-results">
                 <h3 className="text-xl font-bold text-white mb-4">Tariff Calculation Results</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white">
@@ -258,34 +327,89 @@ export default function CalculatorSection() {
                     </p>
                   </div>
                   <div>
+                    <p className="text-gray-300">Tariff Percentage:</p>
+                    <p className="font-semibold">
+                      {tariffPercentage}
+                    </p>
+                  </div>
+
+                  <div className="md:col-span-2">
                     <p className="text-gray-300">Estimated Tariff:</p>
-                    <p className="font-semibold text-green-400">
-                      {selectedCurrency} {calculatedTariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    <p className="font-semibold">
+                      {calculatedTariff !== null
+                        ? `${selectedCurrency} ${calculatedTariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                        : "MFN"}
                     </p>
                   </div>
                 </div>
 
-                {/* Dummy API Result */}
-                {dummyApiResponse && (
-                  <div className="mt-6 bg-yellow-600 p-4 rounded-lg">
-                    <h4 className="text-white font-semibold mb-2">Tariff Service API Result</h4>
-                    <p className="text-white">{dummyApiResponse}</p>
+                {/* Gemini AI Analysis (Plain Text) */}
+                {apiResponse && (
+                  <div className="mt-8 bg-blue-600 p-4 rounded-lg text-white">
+                    <h4 className="text-white font-semibold mb-4">Gemini AI Analysis</h4>
+
+                    {typeof apiResponse === "string" ? (
+                      <p className="whitespace-pre-wrap">{apiResponse}</p>
+                    ) : (
+                      <>
+                        {/* Metrics first */}
+                        {apiResponse.metrics && (
+                          <div className="mb-4">
+                            <h5 className="font-semibold">Metrics</h5>
+                            <ul className="list-disc list-inside">
+                              {Object.entries(apiResponse.metrics).map(([key, value]) => (
+                                <li key={key}>
+                                  <strong>{key}:</strong> {value}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Summary */}
+                        {apiResponse.summary && (
+                          <div className="mb-4">
+                            <h5 className="font-semibold">Summary</h5>
+                            <p>{apiResponse.summary}</p>
+                          </div>
+                        )}
+
+                        {/* Insights */}
+                        {apiResponse.insights && (
+                          <div className="mb-4">
+                            <h5 className="font-semibold">Insights</h5>
+                            <ul className="list-disc list-inside">
+                              {apiResponse.insights.map((insight, idx) => (
+                                <li key={idx}>{insight}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Recommendations */}
+                        {apiResponse.recommendations && (
+                          <div className="mb-4">
+                            <h5 className="font-semibold">Recommendations</h5>
+                            <ul className="list-disc list-inside">
+                              {apiResponse.recommendations.map((rec, idx) => (
+                                <li key={idx}>{rec}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Confidence */}
+                        {apiResponse.confidence && (
+                          <div>
+                            <h5 className="font-semibold">Confidence</h5>
+                            <p>{apiResponse.confidence}</p>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
 
-                {/* Gemini AI Analysis (Plain Text) */}
-                {apiResponse && (
-                  <div className="mt-8 bg-blue-600 p-4 rounded-lg">
-                    <h4 className="text-white font-semibold mb-2">Gemini AI Analysis</h4>
-                    <p className="text-white whitespace-pre-wrap">
-                      {typeof apiResponse === 'object' && apiResponse !== null && 'analysis' in apiResponse
-                        ? apiResponse.analysis
-                        : typeof apiResponse === 'string'
-                          ? apiResponse
-                          : 'No analysis available.'}
-                    </p>
-                  </div>
-                )}
 
                 {/* API Error Message */}
                 {apiError && (

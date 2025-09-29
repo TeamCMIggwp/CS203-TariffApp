@@ -2,9 +2,13 @@ package wits;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import reactor.core.publisher.Mono;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 @Service
 public class WitsApiService {
@@ -33,22 +37,6 @@ public class WitsApiService {
         return ResponseEntity.ok(body);
     }
 
-    /**
-     * Parameterized version for dynamic queries
-     */
-    public ResponseEntity<String> getTariffData(String reporter, String partner, String product, String year, String datatype) {
-        String path = String.format("/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/%s?format=JSON", 
-                                    reporter, partner, product, year, datatype);
-
-        String body = webClient.get()
-                .uri(path)
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
-
-        return ResponseEntity.ok(body);
-    }
-
     /** Hardcoded demo that returns MIN_RATE only (as plain text). */
     public ResponseEntity<String> getMinRateOnly() {
         String path = "/datasource/TRN/reporter/840/partner/000/product/100630/year/2020/datatype/reported?format=JSON";
@@ -58,15 +46,45 @@ public class WitsApiService {
     }
 
     /** Parameterized version that returns MIN_RATE only (as plain text). */
-    public ResponseEntity<String> getMinRateOnly(String reporter, String partner, String product, String year, String datatype) {
+    public ResponseEntity<String> getMinRateOnly(String reporter, String partner, String product, String year) {
+    try {
         String path = String.format(
-                "/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/%s?format=JSON",
-                reporter, partner, product, year, datatype
+            "/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/reported?format=JSON",
+            reporter, partner, product, year
         );
-        String body = webClient.get().uri(path).retrieve().bodyToMono(String.class).block();
+
+        // Do NOT let 204/4xx throw; treat them as "no result".
+        String body = webClient.get()
+            .uri(path)
+            .exchangeToMono(resp -> {
+                if (resp.statusCode().is2xxSuccessful()) {
+                    return resp.bodyToMono(String.class).defaultIfEmpty("");
+                }
+                if (resp.statusCode().value() == 204 || resp.statusCode().is4xxClientError()) {
+                    // WITS often uses 204/404 when there’s no data
+                    return Mono.just(""); // mark as "no result"
+                }
+                // For 5xx, bubble up as error
+                return resp.bodyToMono(String.class)
+                           .flatMap(b -> Mono.error(new RuntimeException("Upstream " + resp.statusCode())));
+            })
+            .block();
+
+        if (body == null || body.isBlank()) {
+            return ResponseEntity.ok("No result found in WITS");
+        }
+
         String minRate = extractObservationAttribute(body, "MIN_RATE");
-        return (minRate != null) ? ResponseEntity.ok(minRate) : ResponseEntity.noContent().build();
+        return ResponseEntity.ok(minRate != null ? minRate : "No result found in WITS");
+
+    } catch (WebClientResponseException e) {
+        // Network OK but server returned error not handled above (e.g., 5xx)
+        return ResponseEntity.ok("API Error");
+    } catch (Exception e) {
+        // Timeouts, deserialization failures, etc.
+        return ResponseEntity.ok("API Error");
     }
+}
 
     /**
      * Extract an observation attribute (e.g., MIN_RATE, MAX_RATE) from SDMX-JSON v2.1.

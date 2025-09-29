@@ -10,7 +10,7 @@ import org.springframework.web.client.RestTemplate;
 public class WtoApiService {
     private final RestTemplate rest = new RestTemplate();
 
-    @Value("${wto.api.key}")
+    @Value("${wto.api.key:#{environment.WTO_API_KEY}}")
     private String apiKey;
 
     public ResponseEntity<String> getAllRiceData() {
