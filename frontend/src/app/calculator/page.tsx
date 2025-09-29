@@ -318,12 +318,14 @@ export default function CalculatorSection() {
                   <div>
                     <p className="text-gray-300">Trade Route:</p>
                     <p className="font-semibold">
-                       {getCountryName(fromCountry)} → {getCountryName(toCountry)}
+                      {getCountryName(fromCountry)} → {getCountryName(toCountry)}
                     </p>
                   </div>
                   <div>
                     <p className="text-gray-300">Product:</p>
-                    <p className="font-semibold">{product}</p>
+                    <p className="font-semibold">
+                      {agriculturalProducts.find((p) => p.hs_code === product)?.name || product}
+                    </p>
                   </div>
                   <div>
                     <p className="text-gray-300">Goods Value:</p>
