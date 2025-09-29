@@ -14,17 +14,81 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @RestController
 @RequestMapping("/api/database")
 @CrossOrigin(origins = {"http://localhost:3000", "https://teamcmiggwp.duckdns.org"})
+@Tag(name = "Database Tariff Management", description = "Endpoints for managing tariff rates in the local database")
 public class TariffController {
     private static final Logger logger = LoggerFactory.getLogger(TariffController.class);
 
     @Autowired
     private TariffRateRepository tariffRepository;
 
+    @Operation(
+        summary = "Update or insert tariff rate",
+        description = "Updates an existing tariff rate or inserts a new one if it doesn't exist. " +
+                      "All fields are required. The operation will check if a record exists for the given " +
+                      "country, partner, product, and year combination, then either update or insert accordingly."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "Tariff rate updated successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = SuccessResponse.class),
+                examples = @ExampleObject(value = "{\"message\": \"Tariff rate updated successfully\"}")
+            )
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "Bad request - missing required fields",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples = @ExampleObject(value = "{\"message\": \"All fields are required\"}")
+            )
+        ),
+        @ApiResponse(
+            responseCode = "500",
+            description = "Internal server error",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples = @ExampleObject(value = "{\"message\": \"Failed to update tariff rate: ...\"}")
+            )
+        )
+    })
     @PostMapping("/update")
-    public ResponseEntity<?> updateTariffRate(@RequestBody TariffRateEntity tariffRate) {
+    public ResponseEntity<?> updateTariffRate(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                description = "Tariff rate data to update or insert",
+                required = true,
+                content = @Content(
+                    schema = @Schema(implementation = TariffRateEntity.class),
+                    examples = @ExampleObject(
+                        name = "Example Tariff Rate",
+                        value = "{\n" +
+                                "  \"countryIsoNumeric\": \"840\",\n" +
+                                "  \"partnerIsoNumeric\": \"356\",\n" +
+                                "  \"productHsCode\": 100630,\n" +
+                                "  \"year\": \"2020\",\n" +
+                                "  \"rate\": 24,\n" +
+                                "  \"unit\": \"percent\"\n" +
+                                "}"
+                    )
+                )
+            )
+            @RequestBody TariffRateEntity tariffRate) {
         logger.info("Received request to update tariff rate: {}", tariffRate);
 
         try {
@@ -50,13 +114,73 @@ public class TariffController {
         }
     }
 
-    // Retrieve accepts reporter and partner as String iso codes (char(3)) and product as int
+    @Operation(
+        summary = "Retrieve tariff rate",
+        description = "Retrieves the tariff rate for a specific reporter-partner-product-year combination from the database. " +
+                      "Returns the tariff rate if found, or 404 if no matching record exists."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "Tariff rate found",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = TariffRateResponse.class),
+                examples = @ExampleObject(value = "{\"rate\": 24.0}")
+            )
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "Bad request - missing required parameters",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples = @ExampleObject(value = "{\"message\": \"All parameters (reporter, partner, product, year) are required\"}")
+            )
+        ),
+        @ApiResponse(
+            responseCode = "404",
+            description = "No tariff rate found for the specified parameters"
+        ),
+        @ApiResponse(
+            responseCode = "500",
+            description = "Internal server error",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples = @ExampleObject(value = "{\"message\": \"Failed to retrieve tariff rate: ...\"}")
+            )
+        )
+    })
     @GetMapping("/retrieve")
     public ResponseEntity<?> retrieveTariffRate(
-            @RequestParam String reporter,
-            @RequestParam String partner,
-            @RequestParam Integer product,
-            @RequestParam String year) {
+            @Parameter(
+                description = "Reporter (Importing) country ISO numeric code (3 characters)",
+                example = "840",
+                required = true
+            )
+            @RequestParam(defaultValue = "840") String reporter,
+            
+            @Parameter(
+                description = "Partner (Exporting) country ISO numeric code (3 characters)",
+                example = "356",
+                required = true
+            )
+            @RequestParam(defaultValue = "356") String partner,
+            
+            @Parameter(
+                description = "Product HS code (integer)",
+                example = "100630",
+                required = true
+            )
+            @RequestParam(defaultValue = "100630") Integer product,
+            
+            @Parameter(
+                description = "Year for tariff data (YYYY format)",
+                example = "2020",
+                required = true
+            )
+            @RequestParam(defaultValue = "2020") String year) {
 
         logger.info("Received request to retrieve tariff rate: reporter={}, partner={}, product={}, year={}",
                    reporter, partner, product, year);
@@ -93,27 +217,48 @@ public class TariffController {
         }
     }
 
+    @Schema(description = "Error response")
     private static class ErrorResponse {
         private final String message;
-        public ErrorResponse(String message) { this.message = message; }
+        
+        public ErrorResponse(String message) { 
+            this.message = message; 
+        }
 
+        @Schema(description = "Error message", example = "All fields are required")
         @JsonProperty("message")
-        public String getMessage() { return message; }
+        public String getMessage() { 
+            return message; 
+        }
     }
 
+    @Schema(description = "Success response")
     private static class SuccessResponse {
         private final String message;
-        public SuccessResponse(String message) { this.message = message; }
+        
+        public SuccessResponse(String message) { 
+            this.message = message; 
+        }
 
+        @Schema(description = "Success message", example = "Tariff rate updated successfully")
         @JsonProperty("message")
-        public String getMessage() { return message; }
+        public String getMessage() { 
+            return message; 
+        }
     }
 
+    @Schema(description = "Tariff rate response")
     private static class TariffRateResponse {
         private final Double rate;
-        public TariffRateResponse(Double rate) { this.rate = rate; }
+        
+        public TariffRateResponse(Double rate) { 
+            this.rate = rate; 
+        }
 
+        @Schema(description = "Tariff rate value", example = "24.0")
         @JsonProperty("rate")
-        public Double getRate() { return rate; }
+        public Double getRate() { 
+            return rate; 
+        }
     }
 }
