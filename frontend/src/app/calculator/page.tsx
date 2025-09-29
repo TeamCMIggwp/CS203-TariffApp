@@ -23,11 +23,11 @@ type GeminiApiResponse = {
 
 export default function CalculatorSection() {
   const calculatorY = useMotionValue(0)
-  const [fromCountry, setFromCountry] = useState("")
-  const [toCountry, setToCountry] = useState("")
-  const [product, setProduct] = useState("")
-  const [value, setValue] = useState("")
-  const [year, setYear] = useState("")
+  const [fromCountry, setFromCountry] = useState("000")
+  const [toCountry, setToCountry] = useState("840")
+  const [product, setProduct] = useState("100630")
+  const [value, setValue] = useState("100")
+  const [year, setYear] = useState("2020")
   const [calculatedTariff, setCalculatedTariff] = useState<number | null>(null)
 
   // States for API Integration
