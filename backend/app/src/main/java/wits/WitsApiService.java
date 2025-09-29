@@ -86,7 +86,8 @@ public class WitsApiService {
         return ResponseEntity.ok("test: API Error");
     } catch (Exception e) {
         // Timeouts, deserialization failures, etc.
-        return tariffRateService.retrieveTariffRateAsText(reporter, partner, product, year)
+        int temp = Integer.parseInt(product);
+        return tariffRateService.retrieveTariffRateAsText(reporter, partner, temp, year)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(502)
                     .body("API Error; DB fallback: no result"));
