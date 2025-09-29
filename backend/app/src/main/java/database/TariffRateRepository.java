@@ -18,7 +18,7 @@ public class TariffRateRepository {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    public Double getTariffRate(String reporterCountryId, String partnerCountryId, Integer productId, String year) {
+    public Double getTariffRate(String reporterCountryId, String partnerCountryId, String productId, String year) {
         try {
             logger.debug("Querying tariff rate for: countryId={}, partnerCountryId={}, productId={}, year={}",
                     reporterCountryId, partnerCountryId, productId, year);

@@ -12,7 +12,7 @@ public class TariffRateService {
     }
 
     /** Returns DB rate as text (so WitsApiService can return a String body easily). */
-    public Optional<String> retrieveTariffRateAsText(String reporter, String partner, Integer product, String year) {
+    public Optional<String> retrieveTariffRateAsText(String reporter, String partner, String product, String year) {
         Double rate = repo.getTariffRate(reporter, partner, product, year); // all Strings
         return Optional.ofNullable(rate).map(String::valueOf);
     }
