@@ -30,6 +30,24 @@
 		<java.version>17</java.version>
 	</properties>
 	<dependencies>
+
+  <!-- Auth: JWT and Argon2 for password verification -->
+  <dependency>
+    <groupId>com.auth0</groupId>
+    <artifactId>java-jwt</artifactId>
+    <version>4.4.0</version>
+  </dependency>
+  <dependency>
+    <groupId>org.springframework.security</groupId>
+    <artifactId>spring-security-crypto</artifactId>
+  </dependency>
+
+    <!-- Required for Argon2PasswordEncoder (provides org.bouncycastle.crypto.params.Argon2Parameters) -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+      <version>1.78.1</version>
+    </dependency>
   <!-- Core Boot (you can keep this, but it's optional if you already have spring-boot-starter-web) -->
   <dependency>
     <groupId>org.springframework.boot</groupId>

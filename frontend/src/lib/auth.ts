@@ -19,3 +19,11 @@ export async function verifyAccessToken(token: string) {
   });
   return payload as { userId: string; role?: string; iat: number; exp: number };
 }
+
+export async function appLogout(): Promise<void> {
+  try {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+  } catch {
+    // ignore network errors during logout
+  }
+}
