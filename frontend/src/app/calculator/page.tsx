@@ -45,7 +45,7 @@ export default function CalculatorSection() {
       setIsAnalyzing(true)
       setApiError(null)
 
-      const baseUrl = 'https://teamcmiggwp.duckdns.org/gemini/analyze'
+  const baseUrl = '/gemini/analyze'
       const params = new URLSearchParams()
       params.append('data', data)
       if (prompt) params.append('prompt', prompt)
@@ -100,9 +100,9 @@ export default function CalculatorSection() {
     setIsAnalyzing(false)
 
     try {
-      const dummyApiUrl = `https://teamcmiggwp.duckdns.org/api/wits/tariffs/min-rate?reporter=${toCountry}&partner=${fromCountry}&product=${product}&year=${year}`;
+  const dummyApiUrl = `/api/wits/tariffs/min-rate?reporter=${toCountry}&partner=${fromCountry}&product=${product}&year=${year}`;
 
-      const dummyResponse = await fetch(dummyApiUrl);
+  const dummyResponse = await fetch(dummyApiUrl, { credentials: 'include' });
 
       if (!dummyResponse.ok) {
         throw new Error("Dummy API call failed");
