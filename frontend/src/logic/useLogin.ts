@@ -1,6 +1,26 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { decodeJwt } from "jose";
+import { decodeJwt, type JWTPayload } from "jose";
+
+type AuthResponse = {
+  accessToken?: string;
+  role?: string;
+  message?: string;
+};
+
+function rolesFromPayload(payload: JWTPayload | undefined): string[] {
+  if (!payload) return [];
+  const read = (k: string) => payload[k as keyof JWTPayload] as unknown;
+  const candidates: unknown[] = [read("role"), read("roles"), read("authorities")];
+  for (const val of candidates) {
+    if (typeof val === "string") return [val.toLowerCase()];
+    if (Array.isArray(val)) {
+      const arr = val.filter((v) => typeof v === "string").map((v) => (v as string).toLowerCase());
+      if (arr.length) return arr;
+    }
+  }
+  return [];
+}
 
 export function useLogin() {
   const [username, setUsername] = useState("");
@@ -30,23 +50,23 @@ export function useLogin() {
         body: JSON.stringify({ email: username, password }),
       });
 
-  const data = await res.json().catch(() => ({})); // guard against non‑JSON
+      const data: AuthResponse = await res.json().catch(() => ({} as AuthResponse)); // guard against non‑JSON
 
       if (!res.ok) {
         setError(data.message || "Invalid credentials.");
       } else {
         // Prefer explicit role from backend; fallback to decoding token
         let dest = "/";
-        const roleResp = (data?.role as string | undefined) || undefined;
+        const roleResp = data?.role || undefined;
         if (roleResp) {
           dest = roleResp === "admin" ? "/admin" : "/";
         } else {
           const token: string | undefined = data?.accessToken;
           try {
             if (token) {
-              const payload: any = decodeJwt(token);
-              const role = (payload?.role || payload?.roles || payload?.authorities) as string | string[] | undefined;
-              const isAdmin = Array.isArray(role) ? role.includes("admin") : role === "admin";
+              const payload = decodeJwt(token) as JWTPayload;
+              const roles = rolesFromPayload(payload);
+              const isAdmin = roles.includes("admin");
               dest = isAdmin ? "/admin" : "/";
             }
           } catch {}

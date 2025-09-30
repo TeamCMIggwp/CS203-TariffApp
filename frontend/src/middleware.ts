@@ -1,9 +1,23 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { jwtVerify } from "jose";
+import { jwtVerify, type JWTPayload } from "jose";
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
 const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
+function rolesFromPayload(payload: JWTPayload | undefined): string[] {
+  if (!payload) return [];
+  const get = (k: string) => payload[k as keyof JWTPayload] as unknown;
+  const candidates: unknown[] = [get("role"), get("roles"), get("authorities")];
+  for (const v of candidates) {
+    if (typeof v === "string") return [v.toLowerCase()];
+    if (Array.isArray(v)) {
+      const arr = v.filter((x) => typeof x === "string").map((x) => (x as string).toLowerCase());
+      if (arr.length) return arr;
+    }
+  }
+  return [];
+}
 
 // Paths that don’t require auth (frontend API routes removed)
 const publicPaths = ["/login", "/signup"];
@@ -46,8 +60,7 @@ export async function middleware(req: NextRequest) {
             issuer: process.env.JWT_ISSUER || "tariff",
             audience: process.env.JWT_AUDIENCE || "tariff-web",
           });
-          const role = (payload as any)?.role;
-          const roles = Array.isArray(role) ? role : [role];
+          const roles = rolesFromPayload(payload);
           const isAdmin = roles.includes("admin");
           return NextResponse.redirect(new URL(isAdmin ? "/admin" : "/", req.url));
         } catch {
@@ -70,8 +83,7 @@ export async function middleware(req: NextRequest) {
                 issuer: process.env.JWT_ISSUER || "tariff",
                 audience: process.env.JWT_AUDIENCE || "tariff-web",
               });
-              const role = (payload as any)?.role;
-              const roles = Array.isArray(role) ? role : [role];
+              const roles = rolesFromPayload(payload);
               const isAdmin = roles.includes("admin");
               const resp = NextResponse.redirect(new URL(isAdmin ? "/admin" : "/", req.url));
               const setCookie = backendRes.headers.get("set-cookie");
@@ -112,7 +124,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // 2. No valid access token: attempt server-side refresh on the backend directly.
-  const url = req.nextUrl;
+    // const url = req.nextUrl; // not needed; avoid unused var warning
   const refreshCookie = req.cookies.get("refresh_token")?.value;
   if (!refreshCookie) {
     return NextResponse.redirect(new URL("/login", req.url));
@@ -132,7 +144,7 @@ export async function middleware(req: NextRequest) {
     }
 
     const data = await backendRes.json();
-  const accessToken = data?.accessToken as string | undefined;
+    const accessToken = data?.accessToken as string | undefined;
     const resp = NextResponse.next();
 
     // Forward refresh cookie from backend if present
@@ -152,8 +164,7 @@ export async function middleware(req: NextRequest) {
           audience: process.env.JWT_AUDIENCE || "tariff-web",
         });
         if (pathname.startsWith("/admin")) {
-          const role = (payload as any)?.role;
-          const roles = Array.isArray(role) ? role : [role];
+          const roles = rolesFromPayload(payload);
           const isAdmin = roles.includes("admin");
           if (!isAdmin) {
             return NextResponse.redirect(new URL("/", req.url));
