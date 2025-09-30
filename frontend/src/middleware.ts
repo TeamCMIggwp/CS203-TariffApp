@@ -110,8 +110,7 @@ export async function middleware(req: NextRequest) {
       });
       // Role-based gate for admin routes
       if (pathname.startsWith("/admin")) {
-        const role = (payload as any)?.role;
-        const roles = Array.isArray(role) ? role : [role];
+        const roles = rolesFromPayload(payload);
         const isAdmin = roles.includes("admin");
         if (!isAdmin) {
           return NextResponse.redirect(new URL("/", req.url));
