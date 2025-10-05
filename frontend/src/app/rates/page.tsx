@@ -56,11 +56,12 @@ export default function RatesPage() {
         year: year,
       })
 
-      const response = await fetch(`https://teamcmiggwp.duckdns.org/api/database/retrieve?${query.toString()}`, {
+      const response = await fetch(`/api/database/retrieve?${query.toString()}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
       })
 
       if (!response.ok) {

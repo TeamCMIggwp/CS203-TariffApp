@@ -1,5 +1,26 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { decodeJwt, type JWTPayload } from "jose";
+
+type AuthResponse = {
+  accessToken?: string;
+  role?: string;
+  message?: string;
+};
+
+function rolesFromPayload(payload: JWTPayload | undefined): string[] {
+  if (!payload) return [];
+  const read = (k: string) => payload[k as keyof JWTPayload] as unknown;
+  const candidates: unknown[] = [read("role"), read("roles"), read("authorities")];
+  for (const val of candidates) {
+    if (typeof val === "string") return [val.toLowerCase()];
+    if (Array.isArray(val)) {
+      const arr = val.filter((v) => typeof v === "string").map((v) => (v as string).toLowerCase());
+      if (arr.length) return arr;
+    }
+  }
+  return [];
+}
 
 export function useLogin() {
   const [username, setUsername] = useState("");
@@ -20,19 +41,52 @@ export function useLogin() {
     }
 
     try {
-      const res = await fetch("/api/login", {
+      // use Next.js rewrite to proxy to backend, avoiding browser CORS entirely
+      const res = await fetch(`/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // Send cookies across origins if backend sets refresh cookie
+        credentials: "include",
         body: JSON.stringify({ email: username, password }),
       });
 
-      const data = await res.json();
+      const data: AuthResponse = await res.json().catch(() => ({} as AuthResponse)); // guard against non‑JSON
 
       if (!res.ok) {
         setError(data.message || "Invalid credentials.");
       } else {
-        // ✅ Redirect to home page after successful login
-        router.push("/");
+        // Prefer explicit role from backend; fallback to decoding token
+        let dest = "/";
+        const roleResp = data?.role || undefined;
+        if (roleResp) {
+          dest = roleResp === "admin" ? "/admin" : "/";
+        } else {
+          const token: string | undefined = data?.accessToken;
+          try {
+            if (token) {
+              const payload = decodeJwt(token) as JWTPayload;
+              const roles = rolesFromPayload(payload);
+              const isAdmin = roles.includes("admin");
+              dest = isAdmin ? "/admin" : "/";
+            }
+          } catch {}
+        }
+        // Log decision for quick debugging
+        if (typeof window !== "undefined") {
+          console.log("login redirect:", { role: roleResp ?? "(decoded)", dest });
+        }
+        // Robust navigation: try SPA navigation, then hard redirect fallback
+        try {
+          // replace prevents going back to login on browser back
+          // next/navigation router.replace is safe in client components
+          router.replace(dest);
+        } catch {}
+        // Fallback in case SPA navigation is blocked by pending state
+        setTimeout(() => {
+          if (typeof window !== "undefined" && window.location.pathname !== dest) {
+            window.location.assign(dest);
+          }
+        }, 0);
       }
     } catch (err) {
       console.error("Login error:", err);
