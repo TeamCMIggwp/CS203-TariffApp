@@ -72,15 +72,29 @@ export default function AdminPage() {
         });
 
         if (!response.ok) {
-            // try to parse JSON error message, otherwise show generic
-            let errorText = "Failed to update tariff rate";
+            // Try to parse JSON error message, otherwise read raw text, else fallback to generic
+            const ct = response.headers.get("content-type") || "";
+            let errorText = `Failed to update tariff rate (HTTP ${response.status})`;
             try {
-              const errorData = await response.json();
-              errorText = errorData.message || errorText;
-            } catch (_) {}
+              if (ct.includes("application/json")) {
+                const errorData = await response.json();
+                errorText = errorData.message || errorText;
+              } else {
+                const text = await response.text();
+                if (text) errorText = text.slice(0, 500);
+              }
+            } catch (_) {
+              // ignore parse errors
+            }
             throw new Error(errorText);
         }
 
+        // Ensure backend returned JSON; avoid JSON parse errors on unexpected HTML
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          const text = await response.text();
+          throw new Error(text?.slice(0, 200) || "Unexpected non-JSON response from server");
+        }
         const data = await response.json();
         setSuccessMessage(data.message || "Tariff rate updated successfully");
         

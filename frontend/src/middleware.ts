@@ -46,8 +46,11 @@ export async function middleware(req: NextRequest) {
     publicPaths.some((path) => pathname.startsWith(path)) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon.ico") ||
-    // Never intercept auth API endpoints; let rewrites proxy to backend
-    pathname.startsWith("/api/auth/")
+    // Never intercept proxied backend API endpoints; let rewrites proxy to backend directly
+    pathname.startsWith("/api/auth/") ||
+    pathname.startsWith("/api/database/") ||
+    pathname.startsWith("/api/wits/") ||
+    pathname.startsWith("/gemini/")
   ) {
     // If user is already authenticated and hits /login or /signup, redirect them based on role
     if (pathname === "/login" || pathname === "/signup") {

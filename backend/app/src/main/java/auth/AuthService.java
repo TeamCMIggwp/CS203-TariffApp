@@ -38,90 +38,54 @@ public class AuthService {
     @Value("${app.auth.allowPlaintext:false}")
     private boolean allowPlaintext;
 
-    public AuthService(@org.springframework.beans.factory.annotation.Qualifier("authJdbcTemplate") JdbcTemplate jdbc) {
+    public AuthService(@Qualifier("authJdbcTemplate") JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
     public ResponseEntity<?> signup(SignupRequest req) {
-        if (req.name() == null || req.email() == null || req.country() == null || req.password() == null) {
+        if (req.name() == null || req.email() == null || req.password() == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "Missing required fields"));
         }
-
-        Integer exists = jdbc.queryForObject("SELECT COUNT(1) FROM users WHERE LOWER(email) = LOWER(?)", Integer.class, req.email());
+        // Check existing in accounts.users
+        Integer exists = jdbc.queryForObject("SELECT COUNT(1) FROM accounts.users WHERE LOWER(email) = LOWER(?)", Integer.class, req.email());
         if (exists != null && exists > 0) {
             return ResponseEntity.status(409).body(Map.of("message", "Email already registered"));
         }
         String hash = argon2.encode(req.password());
         String userId = UUID.randomUUID().toString();
-
-    boolean insertedUser = false;
-        // Try default expected schema
+        boolean insertedUser = false;
         try {
-            jdbc.update("INSERT INTO users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
-                    userId, req.email(), req.name(), req.country(), "user");
+            jdbc.update("INSERT INTO accounts.users (id, email, name, role) VALUES (?, ?, ?, ?)",
+                    userId, req.email(), req.name(), "user");
             insertedUser = true;
-        } catch (BadSqlGrammarException e) {
-            // Try variants
+        } catch (BadSqlGrammarException e1) {
             try {
-                // Without country_code
-                jdbc.update("INSERT INTO users (id, email, name, role) VALUES (?, ?, ?, ?)",
-                        userId, req.email(), req.name(), "user");
+                jdbc.update("INSERT INTO accounts.users (id, email, role) VALUES (?, ?, ?)",
+                        userId, req.email(), "user");
                 insertedUser = true;
             } catch (BadSqlGrammarException e2) {
-                try {
-                    // Minimal columns
-                    jdbc.update("INSERT INTO users (id, email) VALUES (?, ?)", userId, req.email());
-                    insertedUser = true;
-                } catch (BadSqlGrammarException e3) {
-                    try {
-                        // Some schemas store password on users.hashed_password
-                        jdbc.update("INSERT INTO users (id, email, name, role, hashed_password) VALUES (?, ?, ?, ?, ?)",
-                                userId, req.email(), req.name(), "user", hash);
-                        insertedUser = true;
-                    } catch (BadSqlGrammarException e4) {
-                        try {
-                            // Or users.password_hash
-                            jdbc.update("INSERT INTO users (id, email, name, role, password_hash) VALUES (?, ?, ?, ?, ?)",
-                                    userId, req.email(), req.name(), "user", hash);
-                            insertedUser = true;
-                        } catch (BadSqlGrammarException e5) {
-                            log.warn("Signup: none of the users table variants matched the schema");
-                        }
-                    }
-                }
+                log.warn("Signup: failed to insert user into accounts.users");
             }
         }
-
         if (!insertedUser) {
             return ResponseEntity.internalServerError().body(Map.of("message", "Signup failed"));
         }
-
-        // After inserting basic user row, attempt to persist password hash on users table if columns exist
-        // Try common variants in order and ignore grammar errors if column doesn't exist
+        // Ensure user_passwords exists and set hash
         try {
-            jdbc.update("UPDATE users SET hashed_password = ? WHERE id = ?", hash, userId);
-        } catch (BadSqlGrammarException ignore) {
-            try {
-                jdbc.update("UPDATE users SET password_hash = ? WHERE id = ?", hash, userId);
-            } catch (BadSqlGrammarException ignore2) {
-                try {
-                    // NextAuth/Prisma default column name
-                    jdbc.update("UPDATE users SET hashedPassword = ? WHERE id = ?", hash, userId);
-                } catch (BadSqlGrammarException ignore3) {
-                    log.debug("Signup: users password hash column not found (tried hashed_password, password_hash, hashedPassword)");
-                }
+            jdbc.execute("CREATE TABLE IF NOT EXISTS accounts.user_passwords (\n" +
+                        "  user_id VARCHAR(64) NOT NULL PRIMARY KEY,\n" +
+                        "  password_hash TEXT NOT NULL,\n" +
+                        "  algorithm VARCHAR(32) NOT NULL\n" +
+                        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            int n = jdbc.update(
+                "UPDATE accounts.user_passwords SET password_hash = ?, algorithm = 'argon2id' WHERE user_id = ?",
+                hash, userId);
+            if (n == 0) {
+                jdbc.update(
+                    "INSERT INTO accounts.user_passwords (user_id, password_hash, algorithm) VALUES (?, ?, 'argon2id')",
+                    userId, hash);
             }
-        }
-
-        // Try inserting into accounts table for credentials provider if present
-        try {
-            jdbc.update("INSERT INTO accounts (id, user_id, provider, provider_account_id, password_hash, password_algorithm) VALUES (UUID(), ?, 'credentials', ?, ?, 'argon2id')",
-                    userId, req.email(), hash);
-        } catch (BadSqlGrammarException e) {
-            // accounts table may not exist in this schema; ignore
-            log.debug("Signup: skipping accounts insert (table/columns not present)");
-        }
-
+        } catch (BadSqlGrammarException ignore) {}
         return ResponseEntity.ok(Map.of("message", "Signup successful"));
     }
 
@@ -188,85 +152,47 @@ public class AuthService {
     }
 
     private CredRow fetchCredentials(String email) {
-        // Variant A: users + accounts (credentials)
+        // Primary: accounts.users + accounts.user_passwords by email
         try {
             var m = jdbc.queryForMap(
-                "SELECT u.id as user_id, u.role as role, a.password_hash as password_hash, a.password_algorithm as password_algorithm " +
-                "FROM users u JOIN accounts a ON u.id = a.user_id WHERE LOWER(u.email) = LOWER(?) AND a.provider = 'credentials'",
+                "SELECT u.id as user_id, u.role as role, p.password_hash as password_hash, p.algorithm as password_algorithm " +
+                "FROM accounts.users u JOIN accounts.user_passwords p ON p.user_id = u.id WHERE LOWER(TRIM(u.email)) = LOWER(?)",
                 email);
-            log.debug("Auth: credentials via accounts table");
+            log.debug("Auth: credentials via accounts.users + user_passwords");
             return new CredRow((String)m.get("user_id"), (String)m.get("role"), (String)m.get("password_hash"), (String)m.get("password_algorithm"));
         } catch (BadSqlGrammarException | EmptyResultDataAccessException ignore) {}
-        // Variant A2: accounts.hashed_password
+        // Secondary: accounts.accounts + accounts.user_passwords by provider_account_id
         try {
             var m = jdbc.queryForMap(
-                "SELECT u.id as user_id, u.role as role, a.hashed_password as password_hash, a.password_algorithm as password_algorithm " +
-                "FROM users u JOIN accounts a ON u.id = a.user_id WHERE LOWER(u.email) = LOWER(?) AND a.provider = 'credentials'",
+                "SELECT a.user_id as user_id, u.role as role, p.password_hash as password_hash, p.algorithm as password_algorithm " +
+                "FROM accounts.accounts a JOIN accounts.user_passwords p ON p.user_id = a.user_id " +
+                "JOIN accounts.users u ON u.id = a.user_id " +
+                "WHERE LOWER(TRIM(a.provider_account_id)) = LOWER(?) AND a.provider = 'credentials'",
                 email);
-            log.debug("Auth: credentials via accounts.hashed_password");
+            log.debug("Auth: credentials via accounts.accounts + user_passwords");
             return new CredRow((String)m.get("user_id"), (String)m.get("role"), (String)m.get("password_hash"), (String)m.get("password_algorithm"));
         } catch (BadSqlGrammarException | EmptyResultDataAccessException ignore) {}
-        // Variant A3: accounts.hashedPassword (camelCase) and passwordAlgorithm
+        // Legacy fallback: accounts.accounts password_hash directly
         try {
             var m = jdbc.queryForMap(
-                "SELECT u.id as user_id, u.role as role, a.hashedPassword as password_hash, a.passwordAlgorithm as password_algorithm " +
-                "FROM users u JOIN accounts a ON u.id = a.user_id WHERE LOWER(u.email) = LOWER(?) AND a.provider = 'credentials'",
+                "SELECT a.user_id as user_id, u.role as role, a.password_hash as password_hash, a.password_algorithm as password_algorithm " +
+                "FROM accounts.accounts a JOIN accounts.users u ON u.id = a.user_id " +
+                "WHERE LOWER(TRIM(a.provider_account_id)) = LOWER(?) AND a.provider = 'credentials'",
                 email);
-            log.debug("Auth: credentials via accounts.hashedPassword/passwordAlgorithm");
+            log.debug("Auth: credentials via accounts.accounts (legacy)");
             return new CredRow((String)m.get("user_id"), (String)m.get("role"), (String)m.get("password_hash"), (String)m.get("password_algorithm"));
-        } catch (BadSqlGrammarException | EmptyResultDataAccessException ignore) {}
-        // Variant A4: accounts.password (plaintext or unknown)
-        try {
-            var m = jdbc.queryForMap(
-                "SELECT u.id as user_id, u.role as role, a.password as password_hash, NULL as password_algorithm " +
-                "FROM users u JOIN accounts a ON u.id = a.user_id WHERE LOWER(u.email) = LOWER(?) AND a.provider = 'credentials'",
-                email);
-            log.debug("Auth: credentials via accounts.password");
-            return new CredRow((String)m.get("user_id"), (String)m.get("role"), (String)m.get("password_hash"), null);
-        } catch (BadSqlGrammarException | EmptyResultDataAccessException ignore) {}
-        // Variant B: users.hashed_password
-        try {
-            var m = jdbc.queryForMap(
-                "SELECT u.id as user_id, u.role as role, u.hashed_password as password_hash, NULL as password_algorithm FROM users u WHERE LOWER(u.email) = LOWER(?)",
-                email);
-            log.debug("Auth: credentials via users.hashed_password");
-            return new CredRow((String)m.get("user_id"), (String)m.get("role"), (String)m.get("password_hash"), null);
-        } catch (BadSqlGrammarException | EmptyResultDataAccessException ignore) {}
-        // Variant C: users.password_hash
-        try {
-            var m = jdbc.queryForMap(
-                "SELECT u.id as user_id, u.role as role, u.password_hash as password_hash, NULL as password_algorithm FROM users u WHERE LOWER(u.email) = LOWER(?)",
-                email);
-            log.debug("Auth: credentials via users.password_hash");
-            return new CredRow((String)m.get("user_id"), (String)m.get("role"), (String)m.get("password_hash"), null);
-        } catch (BadSqlGrammarException | EmptyResultDataAccessException ignore) {}
-        // Variant C2: users.hashedPassword (camelCase)
-        try {
-            var m = jdbc.queryForMap(
-                "SELECT u.id as user_id, u.role as role, u.hashedPassword as password_hash, NULL as password_algorithm FROM users u WHERE LOWER(u.email) = LOWER(?)",
-                email);
-            log.debug("Auth: credentials via users.hashedPassword");
-            return new CredRow((String)m.get("user_id"), (String)m.get("role"), (String)m.get("password_hash"), null);
-        } catch (BadSqlGrammarException | EmptyResultDataAccessException ignore) {}
-        // Variant D: users.password
-        try {
-            var m = jdbc.queryForMap(
-                "SELECT u.id as user_id, u.role as role, u.password as password_hash, NULL as password_algorithm FROM users u WHERE LOWER(u.email) = LOWER(?)",
-                email);
-            log.debug("Auth: credentials via users.password");
-            return new CredRow((String)m.get("user_id"), (String)m.get("role"), (String)m.get("password_hash"), null);
         } catch (BadSqlGrammarException | EmptyResultDataAccessException ignore) {}
         throw new EmptyResultDataAccessException(1);
     }
 
     public LoginResult refresh(String refreshToken) {
         try {
-            var row = jdbc.queryForMap(
-                    "SELECT s.user_id, u.role, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?",
+        var row = jdbc.queryForMap(
+            "SELECT s.user_id, u.role, s.expires_at FROM accounts.sessions s JOIN accounts.users u ON u.id = s.user_id WHERE s.id = ?",
                     refreshToken);
             var expiresAt = (java.sql.Timestamp) row.get("expires_at");
             if (expiresAt.toInstant().isBefore(Instant.now())) {
-                jdbc.update("DELETE FROM sessions WHERE id = ?", refreshToken);
+                jdbc.update("DELETE FROM accounts.sessions WHERE id = ?", refreshToken);
                 throw new Unauthorized("Session expired");
             }
             String userId = (String) row.get("user_id");
@@ -278,7 +204,7 @@ public class AuthService {
     }
 
     public void logout(String refreshToken) {
-        jdbc.update("DELETE FROM sessions WHERE id = ?", refreshToken);
+    jdbc.update("DELETE FROM accounts.sessions WHERE id = ?", refreshToken);
     }
 
     // --- Dev helpers (guard usage at controller level) ---
@@ -288,19 +214,74 @@ public class AuthService {
 
     public int devResetPassword(String email, String newPassword) {
         String hash = argon2.encode(newPassword);
-        // Prefer accounts table when present
-        try {
-            int n = jdbc.update(
-                "UPDATE accounts a JOIN users u ON a.user_id = u.id SET a.password_hash = ?, a.password_algorithm = 'argon2id' " +
-                "WHERE a.provider = 'credentials' AND LOWER(u.email) = LOWER(?)",
-                hash, email);
-            if (n > 0) return n;
-        } catch (BadSqlGrammarException ignore) {}
-        // Fallback to users table variants
         int total = 0;
-        try { total += jdbc.update("UPDATE users SET hashed_password = ? WHERE LOWER(email) = LOWER(?)", hash, email); } catch (BadSqlGrammarException ignore) {}
-        try { total += jdbc.update("UPDATE users SET password_hash = ? WHERE LOWER(email) = LOWER(?)", hash, email); } catch (BadSqlGrammarException ignore) {}
-        try { total += jdbc.update("UPDATE users SET hashedPassword = ? WHERE LOWER(email) = LOWER(?)", hash, email); } catch (BadSqlGrammarException ignore) {}
+        // Resolve user id from users table in accounts schema
+        String userId = null;
+        try {
+            userId = jdbc.queryForObject(
+                "SELECT id FROM accounts.users WHERE LOWER(TRIM(email)) = LOWER(?) LIMIT 1",
+                String.class, email);
+        } catch (EmptyResultDataAccessException nf) {
+            userId = null;
+        }
+        // Try resolve via accounts mapping if not found in users
+        if (userId == null) {
+            try {
+                userId = jdbc.queryForObject(
+                    "SELECT user_id FROM accounts.accounts WHERE LOWER(TRIM(provider_account_id)) = LOWER(?) AND provider = 'credentials' LIMIT 1",
+                    String.class, email);
+            } catch (EmptyResultDataAccessException nf) {
+                userId = null;
+            } catch (BadSqlGrammarException ignore) {
+                userId = null;
+            }
+        }
+        // If still not found, create a minimal users row
+        if (userId == null) {
+            String newId = UUID.randomUUID().toString();
+            boolean inserted = false;
+            try {
+                jdbc.update("INSERT INTO accounts.users (id, email) VALUES (?, ?)", newId, email);
+                inserted = true;
+            } catch (BadSqlGrammarException e1) {
+                try {
+                    // Try with name column if required by schema
+                    String name = email.contains("@") ? email.substring(0, email.indexOf('@')) : email;
+                    jdbc.update("INSERT INTO accounts.users (id, email, name) VALUES (?, ?, ?)", newId, email, name);
+                    inserted = true;
+                } catch (BadSqlGrammarException e2) {
+                    try {
+                        // Capitalized Users table variant
+                        jdbc.update("INSERT INTO accounts.Users (id, email) VALUES (?, ?)", newId, email);
+                        inserted = true;
+                    } catch (BadSqlGrammarException e3) {
+                        // give up creating user row
+                    }
+                }
+            }
+            if (inserted) {
+                userId = newId;
+                log.info("devResetPassword: created users row for {} with id {}", email, userId);
+            }
+        }
+        if (userId == null) return 0;
+        // Ensure user_passwords exists and upsert
+        try {
+            jdbc.execute("CREATE TABLE IF NOT EXISTS accounts.user_passwords (\n" +
+                        "  user_id VARCHAR(64) NOT NULL PRIMARY KEY,\n" +
+                        "  password_hash TEXT NOT NULL,\n" +
+                        "  algorithm VARCHAR(32) NOT NULL\n" +
+                        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            int n = jdbc.update(
+                "UPDATE accounts.user_passwords SET password_hash = ?, algorithm = 'argon2id' WHERE user_id = ?",
+                hash, userId);
+            total += n;
+            if (n == 0) {
+                total += jdbc.update(
+                    "INSERT INTO accounts.user_passwords (user_id, password_hash, algorithm) VALUES (?, ?, 'argon2id')",
+                    userId, hash);
+            }
+        } catch (BadSqlGrammarException ignore) {}
         return total;
     }
 
@@ -367,9 +348,9 @@ public class AuthService {
         String newSessionId = UUID.randomUUID().toString();
         Instant newExp = Instant.now().plusSeconds(refreshTtlSeconds);
         if (oldRefreshToken != null) {
-            jdbc.update("DELETE FROM sessions WHERE id = ?", oldRefreshToken);
+            jdbc.update("DELETE FROM accounts.sessions WHERE id = ?", oldRefreshToken);
         }
-        jdbc.update("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)",
+        jdbc.update("INSERT INTO accounts.sessions (id, user_id, expires_at) VALUES (?, ?, ?)",
                 newSessionId, userId, java.sql.Timestamp.from(newExp));
 
         Algorithm alg = Algorithm.HMAC256(jwtSecret);

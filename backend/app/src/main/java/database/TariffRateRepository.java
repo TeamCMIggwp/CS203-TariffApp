@@ -16,6 +16,7 @@ public class TariffRateRepository {
     private static final Logger logger = LoggerFactory.getLogger(TariffRateRepository.class);
 
     @Autowired
+    @org.springframework.beans.factory.annotation.Qualifier("appJdbcTemplate")
     private JdbcTemplate jdbcTemplate;
 
     public Double getTariffRate(String reporterCountryId, String partnerCountryId, Integer productId, String year) {
@@ -24,8 +25,8 @@ public class TariffRateRepository {
                     reporterCountryId, partnerCountryId, productId, year);
 
             String sql = """
-                SELECT rate FROM TariffRates 
-                WHERE country_id = ? AND partner_country_id = ? AND product_id = ? AND year = ?
+                SELECT `rate` FROM `wto_tariffs`.`TariffRates`
+                WHERE `country_id` = ? AND `partner_country_id` = ? AND `product_id` = ? AND `year` = ?
             """;
 
             Double rate = jdbcTemplate.queryForObject(sql, Double.class,
@@ -86,8 +87,8 @@ public class TariffRateRepository {
         BigDecimal rate = BigDecimal.valueOf(rateDouble).setScale(3, RoundingMode.HALF_UP);
 
         String checkSql = """
-            SELECT COUNT(*) FROM TariffRates
-            WHERE country_id = ? AND partner_country_id = ? AND product_id = ? AND year = ?
+            SELECT COUNT(*) FROM `wto_tariffs`.`TariffRates`
+            WHERE `country_id` = ? AND `partner_country_id` = ? AND `product_id` = ? AND `year` = ?
         """;
 
         Integer count = jdbcTemplate.queryForObject(checkSql, Integer.class,
@@ -97,10 +98,10 @@ public class TariffRateRepository {
             logger.debug("Record exists, updating tariff rate: {}", tariffRate);
 
             String updateSql = """
-                UPDATE TariffRates SET 
-                    rate = ?,
-                    unit = ?
-                WHERE country_id = ? AND partner_country_id = ? AND product_id = ? AND year = ?
+                UPDATE `wto_tariffs`.`TariffRates` SET 
+                    `rate` = ?,
+                    `unit` = ?
+                WHERE `country_id` = ? AND `partner_country_id` = ? AND `product_id` = ? AND `year` = ?
             """;
 
             int rowsUpdated = jdbcTemplate.update(updateSql,
@@ -118,8 +119,8 @@ public class TariffRateRepository {
             logger.debug("No existing record found, inserting new tariff rate: {}", tariffRate);
 
             String insertSql = """
-                INSERT INTO TariffRates (
-                    country_id, partner_country_id, product_id, year, rate, unit
+                INSERT INTO `wto_tariffs`.`TariffRates` (
+                    `country_id`, `partner_country_id`, `product_id`, `year`, `rate`, `unit`
                 ) VALUES (?, ?, ?, ?, ?, ?)
             """;
 
