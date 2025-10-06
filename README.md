@@ -1,44 +1,86 @@
 # CS203-TariffApp
 
+A comprehensive web application for calculating and analyzing international tariff rates, integrating data from WTO and WITS APIs with AI-powered analysis capabilities.
 
-## Installation & Usage
+## Features
 
-1. Clone this repository
+- Interactive tariff rate calculator
+- Real-time data integration with WTO and WITS APIs
+- Admin dashboard for tariff management
+- AI-powered trade analysis using Gemini
+- Interactive global trade visualization
+- User authentication and history tracking
 
-2. First time installation:
-``` 
+## Tech Stack
+
+- **Frontend:**
+  - Next.js
+  - TypeScript
+  - Tailwind CSS
+  - Framer Motion
+
+- **Backend:**
+  - Java Spring Boot
+  - Maven
+  - MySQL Database
+
+## Prerequisites
+
+- Node.js (v16 or higher)
+- Java JDK 17 or higher
+- Maven
+- MySQL
+
+## Installation
+
+### Frontend Setup
+
+1. Navigate to the frontend directory:
+```bash
+cd frontend
+```
+
+2. Install dependencies:
+```bash
 npm install
 ```
 
-3. To run the file 
-```
+3. Start the development server:
+```bash
 npm run dev
 ```
 
-4. Some basic Git commands are:
+### Backend Setup
+
+1. Navigate to the backend directory:
+```bash
+cd backend/app
 ```
-git status
-git add
-git commit
+
+2. Build the project:
+```bash
+mvn clean install
 ```
 
+3. Run the application:
+```bash
+mvn spring-boot:run
+```
 
-## License
+## Production Deployment
 
-Credits / Authors / Acknowledgment
+To run the backend service in production:
+```bash
+nohup java -jar target/app-name.jar &
+```
 
-Contributors, Libraries, or References
-
-# Things to note
-If connecting to server, use command below so that when you close the terminal, service will not be stopped
-nohup java -jar <jarFile>
-
-If you wanna stop the service, use 
-# Find the process ID (PID)
+To stop the service:
+```bash
 ps aux | grep java
+kill <PID>
+```
 
-# Or more specific for Spring Boot
-ps aux | grep "your-app.jar"
+## API Documentation
 
-# Kill the process (replace XXXX with the actual PID)
-kill XXXX
+The API documentation is available at:
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
