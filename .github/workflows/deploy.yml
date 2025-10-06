@@ -41,5 +41,10 @@ jobs:
           cd backend/app/target
           killall java || true
           sleep 5
-          nohup env GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" WTO_API_KEY="${{ secrets.WTO_API_KEY }}"\
-            java -jar api-server-1.0.jar > app.log 2>&1 &
+          nohup env \
+          GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
+          WTO_API_KEY="${{ secrets.WTO_API_KEY }}" \
+          AUTH_DB_URL="${{ secrets.AUTH_DB_URL }}" \
+          AUTH_DB_USERNAME="${{ secrets.AUTH_DB_USERNAME }}" \
+          AUTH_DB_PASSWORD="${{ secrets.AUTH_DB_PASSWORD }}" \
+          java -jar api-server-1.0.jar > app.log 2>&1 &
