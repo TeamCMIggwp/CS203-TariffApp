@@ -24,6 +24,15 @@ jobs:
         mvn clean package -DskipTests
         
     - name: Test
+      env:
+        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        WTO_API_KEY: ${{ secrets.WTO_API_KEY }}
+        AUTH_DB_URL: ${{ secrets.AUTH_DB_URL }}
+        AUTH_DB_USERNAME: ${{ secrets.AUTH_DB_USERNAME }}
+        AUTH_DB_PASSWORD: ${{ secrets.AUTH_DB_PASSWORD }}
+        SPRING_DB_URL: ${{ secrets.SPRING_DB_URL }}
+        SPRING_DB_USERNAME: ${{ secrets.SPRING_DB_USERNAME }}
+        SPRING_DB_PASSWORD: ${{ secrets.SPRING_DB_PASSWORD }}
       run: |
         cd backend/app
         mvn test
