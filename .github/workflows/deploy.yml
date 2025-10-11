@@ -9,9 +9,11 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
       
-    - uses: actions/setup-java@v4
+    - name: Setup Java
+      uses: actions/setup-java@v4
       with:
         java-version: '21'
         distribution: 'temurin'
@@ -21,33 +23,89 @@ jobs:
         cd backend/app
         mvn clean package -DskipTests
         
-    - name: Deploy
+    - name: Test
+      run: |
+        cd backend/app
+        mvn test
+        
+    - name: Deploy JAR to Server
+      if: success()
       uses: appleboy/scp-action@v0.1.4
       with:
         host: ${{ secrets.AWS_HOST }}
         username: ${{ secrets.AWS_USERNAME }}
         key: ${{ secrets.AWS_PRIVATE_KEY }}
         source: "backend/app/target/api-server-1.0.jar"
-        target: "backend/app/target/"
+        target: "/tmp/"
         strip_components: 3
         
     - name: Restart Application
+      if: success()
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.AWS_HOST }}
         username: ${{ secrets.AWS_USERNAME }}
         key: ${{ secrets.AWS_PRIVATE_KEY }}
         script: |
-          cd backend/app/target
-          killall java || true
-          sleep 5
-          nohup env \
-          GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
-          WTO_API_KEY="${{ secrets.WTO_API_KEY }}" \
-          AUTH_DB_URL="${{ secrets.AUTH_DB_URL }}" \
-          AUTH_DB_USERNAME="${{ secrets.AUTH_DB_USERNAME }}" \
-          AUTH_DB_PASSWORD="${{ secrets.AUTH_DB_PASSWORD }}" \
-          SPRING_DB_URL="${{ secrets.SPRING_DB_URL }}" \
-          SPRING_DB_USERNAME="${{ secrets.SPRING_DB_USERNAME }}" \
-          SPRING_DB_PASSWORD="${{ secrets.SPRING_DB_PASSWORD }}" \
-          java -jar api-server-1.0.jar > app.log 2>&1 &
+          set -e
+          
+          APP_DIR="backend/app/target"
+          JAR_NAME="api-server-1.0.jar"
+          
+          mkdir -p $APP_DIR
+          cd $APP_DIR
+          
+          if [ -f "$JAR_NAME" ]; then
+            cp $JAR_NAME ${JAR_NAME}.backup
+          fi
+          
+          mv /tmp/$JAR_NAME $JAR_NAME
+          
+          OLD_PID=$(pgrep -f "$JAR_NAME" || echo "")
+          
+          nohup java -jar $JAR_NAME \
+            -Dspring.profiles.active=prod \
+            > app.log 2>&1 &
+          NEW_PID=$!
+          
+          sleep 15
+          
+          MAX_ATTEMPTS=12
+          ATTEMPT=0
+          HEALTH_OK=false
+          
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            if curl -f http://localhost:8080/actuator/health 2>/dev/null; then
+              HEALTH_OK=true
+              break
+            fi
+            sleep 5
+            ATTEMPT=$((ATTEMPT+1))
+          done
+          
+          if [ "$HEALTH_OK" = true ]; then
+            if [ -n "$OLD_PID" ]; then
+              kill $OLD_PID || true
+              sleep 2
+              kill -9 $OLD_PID 2>/dev/null || true
+            fi
+            exit 0
+          else
+            tail -50 app.log
+            
+            kill $NEW_PID 2>/dev/null || true
+            sleep 2
+            kill -9 $NEW_PID 2>/dev/null || true
+            
+            if [ -f "${JAR_NAME}.backup" ]; then
+              mv ${JAR_NAME}.backup $JAR_NAME
+              
+              nohup java -jar $JAR_NAME \
+                -Dspring.profiles.active=prod \
+                > app.log 2>&1 &
+              
+              sleep 10
+            fi
+            
+            exit 1
+          fi
