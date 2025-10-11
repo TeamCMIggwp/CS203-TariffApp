@@ -1,4 +1,54 @@
-- name: Restart Application
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        
+    - name: Build
+      run: |
+        cd backend/app
+        mvn clean package -DskipTests
+        
+    - name: Test
+      env:
+        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        WTO_API_KEY: ${{ secrets.WTO_API_KEY }}
+        AUTH_DB_URL: ${{ secrets.AUTH_DB_URL }}
+        AUTH_DB_USERNAME: ${{ secrets.AUTH_DB_USERNAME }}
+        AUTH_DB_PASSWORD: ${{ secrets.AUTH_DB_PASSWORD }}
+        SPRING_DB_URL: ${{ secrets.SPRING_DB_URL }}
+        SPRING_DB_USERNAME: ${{ secrets.SPRING_DB_USERNAME }}
+        SPRING_DB_PASSWORD: ${{ secrets.SPRING_DB_PASSWORD }}
+      run: |
+        cd backend/app
+        mvn test
+        
+    - name: Deploy JAR to Server
+      if: success()
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.AWS_HOST }}
+        username: ${{ secrets.AWS_USERNAME }}
+        key: ${{ secrets.AWS_PRIVATE_KEY }}
+        source: "backend/app/target/api-server-1.0.jar"
+        target: "/tmp/"
+        strip_components: 3
+        
+    - name: Restart Application
       if: success()
       uses: appleboy/ssh-action@v1.0.0
       with:
