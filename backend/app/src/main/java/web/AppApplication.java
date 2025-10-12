@@ -13,7 +13,16 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-@SpringBootApplication(scanBasePackages = {"web", "geminianalysis", "wits", "wto", "tariffcalculator", "database", "auth", "config"})
+@SpringBootApplication(scanBasePackages = {"web",
+                                            "geminianalysis",
+                                            "wits",
+                                            "wto", 
+                                            "tariffcalculator", 
+                                            "database", 
+                                            "auth", 
+                                            "config",
+                                            "scraper"
+                                        })
 public class AppApplication implements WebMvcConfigurer {
 
     @Autowired
