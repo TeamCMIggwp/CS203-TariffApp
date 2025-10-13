@@ -106,12 +106,8 @@ export async function middleware(req: NextRequest) {
           // ignore
         }
       }
-      // If we are on a different domain than the backend, we cannot read/send the backend cookie from middleware.
-      // Delegate refresh to the backend via browser redirect so the browser sends the cookie to BACKEND_URL.
-      if (isCrossSite) {
-        const url = `${BACKEND_URL}/auth/refresh?returnTo=${encodeURIComponent(req.url)}`;
-        return NextResponse.redirect(url);
-      }
+      // If cross-site, do NOT redirect from /login or /signup to avoid loops.
+      // Let the login/signup pages render and perform direct backend calls from the client.
     }
     return NextResponse.next();
   }
@@ -143,10 +139,10 @@ export async function middleware(req: NextRequest) {
     // const url = req.nextUrl; // not needed; avoid unused var warning
   const refreshCookie = req.cookies.get("refresh_token")?.value;
   if (!refreshCookie) {
-    // If backend is on a different host, redirect the browser to backend refresh so it can use its own cookie.
+    // If backend is on a different host, avoid redirect loops — allow request through;
+    // page-level code should handle 401s and route to /login.
     if (isCrossSite) {
-      const url = `${BACKEND_URL}/auth/refresh?returnTo=${encodeURIComponent(req.url)}`;
-      return NextResponse.redirect(url);
+      return NextResponse.next();
     }
     return NextResponse.redirect(new URL("/login", req.url));
   }
