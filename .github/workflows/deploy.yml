@@ -31,6 +31,11 @@ jobs:
         SPRING_DB_URL: ${{ secrets.SPRING_DB_URL }}
         SPRING_DB_USERNAME: ${{ secrets.SPRING_DB_USERNAME }}
         SPRING_DB_PASSWORD: ${{ secrets.SPRING_DB_PASSWORD }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
+        JWT_AUDIENCE: ${{ secrets.JWT_AUDIENCE }}
+        ACCESS_TOKEN_TTL_SECONDS: ${{ secrets.ACCESS_TOKEN_TTL_SECONDS }}
+        REFRESH_TOKEN_TTL_SECONDS: ${{ secrets.REFRESH_TOKEN_TTL_SECONDS }}
       run: |
         cd backend/app
         mvn test
@@ -66,4 +71,9 @@ jobs:
           SPRING_DB_URL="${{ secrets.SPRING_DB_URL }}" \
           SPRING_DB_USERNAME="${{ secrets.SPRING_DB_USERNAME }}" \
           SPRING_DB_PASSWORD="${{ secrets.SPRING_DB_PASSWORD }}" \
+            JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            JWT_ISSUER="${{ secrets.JWT_ISSUER }}" \
+            JWT_AUDIENCE="${{ secrets.JWT_AUDIENCE }}" \
+            ACCESS_TOKEN_TTL_SECONDS="${{ secrets.ACCESS_TOKEN_TTL_SECONDS }}" \
+            REFRESH_TOKEN_TTL_SECONDS="${{ secrets.REFRESH_TOKEN_TTL_SECONDS }}" \
           java -jar api-server-1.0.jar > app.log 2>&1 &
