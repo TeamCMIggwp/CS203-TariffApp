@@ -80,7 +80,22 @@ export async function middleware(req: NextRequest) {
           // fall through
         }
       }
-      // 2) Try refreshing with cookie
+      // 2) Try access_token cookie on Amplify domain
+      const accessCookiePublic = req.cookies.get("access_token")?.value;
+      if (accessCookiePublic) {
+        try {
+          const { payload } = await jwtVerify(accessCookiePublic, secret, {
+            issuer: process.env.JWT_ISSUER || "tariff",
+            audience: process.env.JWT_AUDIENCE || "tariff-web",
+          });
+          const roles = rolesFromPayload(payload);
+          const isAdmin = roles.includes("admin");
+          return NextResponse.redirect(new URL(isAdmin ? "/admin" : "/", req.url));
+        } catch {
+          // fall through
+        }
+      }
+      // 3) Try refreshing with cookie
       const refreshCookie2 = req.cookies.get("refresh_token")?.value;
       if (refreshCookie2 && !isCrossSite) {
         try {
