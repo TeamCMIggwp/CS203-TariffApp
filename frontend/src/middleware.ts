@@ -49,7 +49,7 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isCrossSite = backendHost && backendHost !== req.nextUrl.host;
 
-  // Skip middleware for public paths and static assets
+  // Skip middleware for public paths and static assets 
   if (
     publicPaths.some((path) => pathname.startsWith(path)) ||
     pathname.startsWith("/_next") ||
