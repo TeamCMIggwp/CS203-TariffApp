@@ -24,6 +24,3 @@ applications:
         # Set actual values in the Amplify console Environment variables UI
         NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL}
         BACKEND_URL: ${BACKEND_URL}
-        JWT_SECRET: ${JWT_SECRET}
-        JWT_ISSUER: tariff
-        JWT_AUDIENCE: tariff-web
