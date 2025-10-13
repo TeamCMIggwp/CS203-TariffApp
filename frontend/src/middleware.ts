@@ -59,6 +59,7 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/api/database/") ||
     pathname.startsWith("/api/wits/") ||
     pathname.startsWith("/gemini/") ||
+    pathname.startsWith("/api/debug/") ||
     // Allow internal session endpoint to set access_token cookie
     pathname.startsWith("/api/session/")
   ) {
