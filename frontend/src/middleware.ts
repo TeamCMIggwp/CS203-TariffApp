@@ -58,7 +58,9 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/database/") ||
     pathname.startsWith("/api/wits/") ||
-    pathname.startsWith("/gemini/")
+    pathname.startsWith("/gemini/") ||
+    // Allow internal session endpoint to set access_token cookie
+    pathname.startsWith("/api/session/")
   ) {
     // If user is already authenticated and hits /login or /signup, redirect them based on role
   if (pathname === "/login" || pathname === "/signup") {
@@ -150,7 +152,10 @@ export async function middleware(req: NextRequest) {
           return NextResponse.redirect(new URL("/", req.url));
         }
       }
-      return NextResponse.next();
+      // Inject Authorization header for downstream handlers and API proxies
+      const reqHeaders = new Headers(req.headers);
+      reqHeaders.set("authorization", `Bearer ${accessCookie}`);
+      return NextResponse.next({ request: { headers: reqHeaders } });
     } catch {
       // fall through to refresh logic
     }
