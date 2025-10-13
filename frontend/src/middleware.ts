@@ -135,13 +135,46 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // 2. No valid access token: attempt server-side refresh on the backend directly.
+  // 2. Try an access token stored as a cookie on the Amplify (frontend) domain.
+  //    This enables auth gating in cross-site deployments where refresh cookies are not visible to Amplify.
+  const accessCookie = req.cookies.get("access_token")?.value;
+  if (accessCookie) {
+    try {
+      const { payload } = await jwtVerify(accessCookie, secret, {
+        issuer: process.env.JWT_ISSUER || "tariff",
+        audience: process.env.JWT_AUDIENCE || "tariff-web",
+      });
+      if (pathname.startsWith("/admin")) {
+        const roles = rolesFromPayload(payload);
+        if (!roles.includes("admin")) {
+          return NextResponse.redirect(new URL("/", req.url));
+        }
+      }
+      return NextResponse.next();
+    } catch {
+      // fall through to refresh logic
+    }
+  }
+
+  // 3. No valid access token: attempt server-side refresh on the backend directly when same-site only.
     // const url = req.nextUrl; // not needed; avoid unused var warning
   const refreshCookie = req.cookies.get("refresh_token")?.value;
   if (!refreshCookie) {
     // If backend is on a different host, avoid redirect loops — allow request through;
     // page-level code should handle 401s and route to /login.
     if (isCrossSite) {
+      // For protected routes (non-public, not static and not API proxies), require login
+      const isProtected =
+        !publicPaths.some((p) => pathname.startsWith(p)) &&
+        !pathname.startsWith("/_next") &&
+        !pathname.startsWith("/favicon.ico") &&
+        !pathname.startsWith("/api/auth/") &&
+        !pathname.startsWith("/api/database/") &&
+        !pathname.startsWith("/api/wits/") &&
+        !pathname.startsWith("/gemini/");
+      if (isProtected) {
+        return NextResponse.redirect(new URL("/login", req.url));
+      }
       return NextResponse.next();
     }
     return NextResponse.redirect(new URL("/login", req.url));

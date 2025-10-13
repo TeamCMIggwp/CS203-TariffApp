@@ -76,6 +76,16 @@ export function useLogin() {
             }
           } catch {}
         }
+        // Set an access_token cookie on the Amplify domain so middleware can gate protected routes
+        try {
+          if (data?.accessToken) {
+            await fetch("/api/session/set", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ accessToken: data.accessToken }),
+            });
+          }
+        } catch {}
         // Log decision for quick debugging
         if (typeof window !== "undefined") {
           console.log("login redirect:", { role: roleResp ?? "(decoded)", dest });
