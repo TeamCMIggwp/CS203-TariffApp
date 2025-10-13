@@ -6,16 +6,6 @@ First, run the development server:
 
 ```bash
 npm run dev
-
-## Configure backend target
-
-Create a `.env.local` in this folder to point the proxy rewrites and middleware to your hosted backend:
-
-```
-BACKEND_URL=https://teamcmiggwp.duckdns.org
-```
-
-Restart `npm run dev` after adding or changing env vars.
 # or
 yarn dev
 # or
