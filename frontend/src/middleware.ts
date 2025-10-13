@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify, type JWTPayload } from "jose";
 
-const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
+// Secret may be unavailable in some hosting setups; handle gracefully
+const _rawSecret = process.env.JWT_SECRET;
+const secret = _rawSecret ? new TextEncoder().encode(_rawSecret) : null;
 const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 const backendHost = (() => {
   try {
@@ -70,13 +72,17 @@ export async function middleware(req: NextRequest) {
       if (authHeader2?.startsWith("Bearer ")) {
         try {
           const token = authHeader2.split(" ")[1];
-          const { payload } = await jwtVerify(token, secret, {
-            issuer: process.env.JWT_ISSUER || "tariff",
-            audience: process.env.JWT_AUDIENCE || "tariff-web",
-          });
-          const roles = rolesFromPayload(payload);
-          const isAdmin = roles.includes("admin");
-          return NextResponse.redirect(new URL(isAdmin ? "/admin" : "/", req.url));
+          if (secret) {
+            const { payload } = await jwtVerify(token, secret, {
+              issuer: process.env.JWT_ISSUER || "tariff",
+              audience: process.env.JWT_AUDIENCE || "tariff-web",
+            });
+            const roles = rolesFromPayload(payload);
+            const isAdmin = roles.includes("admin");
+            return NextResponse.redirect(new URL(isAdmin ? "/admin" : "/", req.url));
+          } else {
+            // Without secret, don't auto-redirect; let page render
+          }
         } catch {
           // fall through
         }
@@ -85,13 +91,15 @@ export async function middleware(req: NextRequest) {
       const accessCookiePublic = req.cookies.get("access_token")?.value;
       if (accessCookiePublic) {
         try {
-          const { payload } = await jwtVerify(accessCookiePublic, secret, {
-            issuer: process.env.JWT_ISSUER || "tariff",
-            audience: process.env.JWT_AUDIENCE || "tariff-web",
-          });
-          const roles = rolesFromPayload(payload);
-          const isAdmin = roles.includes("admin");
-          return NextResponse.redirect(new URL(isAdmin ? "/admin" : "/", req.url));
+          if (secret) {
+            const { payload } = await jwtVerify(accessCookiePublic, secret, {
+              issuer: process.env.JWT_ISSUER || "tariff",
+              audience: process.env.JWT_AUDIENCE || "tariff-web",
+            });
+            const roles = rolesFromPayload(payload);
+            const isAdmin = roles.includes("admin");
+            return NextResponse.redirect(new URL(isAdmin ? "/admin" : "/", req.url));
+          }
         } catch {
           // fall through
         }
@@ -108,12 +116,15 @@ export async function middleware(req: NextRequest) {
             const data = await backendRes.json();
             const accessToken = data?.accessToken as string | undefined;
             if (accessToken) {
-              const { payload } = await jwtVerify(accessToken, secret, {
-                issuer: process.env.JWT_ISSUER || "tariff",
-                audience: process.env.JWT_AUDIENCE || "tariff-web",
-              });
-              const roles = rolesFromPayload(payload);
-              const isAdmin = roles.includes("admin");
+              let isAdmin = false;
+              if (secret) {
+                const { payload } = await jwtVerify(accessToken, secret, {
+                  issuer: process.env.JWT_ISSUER || "tariff",
+                  audience: process.env.JWT_AUDIENCE || "tariff-web",
+                });
+                const roles = rolesFromPayload(payload);
+                isAdmin = roles.includes("admin");
+              }
               const resp = NextResponse.redirect(new URL(isAdmin ? "/admin" : "/", req.url));
               const setCookie = backendRes.headers.get("set-cookie");
               if (setCookie) resp.headers.append("set-cookie", setCookie);
@@ -135,19 +146,37 @@ export async function middleware(req: NextRequest) {
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.split(" ")[1];
     try {
-      const { payload } = await jwtVerify(token, secret, {
-        issuer: process.env.JWT_ISSUER || "tariff",
-        audience: process.env.JWT_AUDIENCE || "tariff-web",
-      });
-      // Role-based gate for admin routes
-      if (pathname.startsWith("/admin")) {
-        const roles = rolesFromPayload(payload);
-        const isAdmin = roles.includes("admin");
-        if (!isAdmin) {
-          return NextResponse.redirect(new URL("/", req.url));
+      if (secret) {
+        const { payload } = await jwtVerify(token, secret, {
+          issuer: process.env.JWT_ISSUER || "tariff",
+          audience: process.env.JWT_AUDIENCE || "tariff-web",
+        });
+        // Role-based gate for admin routes
+        if (pathname.startsWith("/admin")) {
+          const roles = rolesFromPayload(payload);
+          const isAdmin = roles.includes("admin");
+          if (!isAdmin) {
+            return NextResponse.redirect(new URL("/", req.url));
+          }
         }
+        return NextResponse.next(); // valid token and allowed
+      } else {
+        // Without secret, rely on backend for auth; allow through, admin gated below
+        if (pathname.startsWith("/admin")) {
+          const check = await fetch(`${BACKEND_URL}/auth/me`, {
+            headers: { authorization: `Bearer ${token}` },
+          });
+          if (!check.ok) return NextResponse.redirect(new URL("/", req.url));
+          try {
+            const me = await check.json();
+            const roles = Array.isArray(me?.roles) ? me.roles.map((r: string) => r.toLowerCase()) : [];
+            if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
+          } catch {
+            return NextResponse.redirect(new URL("/", req.url));
+          }
+        }
+        return NextResponse.next();
       }
-      return NextResponse.next(); // valid token and allowed
     } catch {
       // fall through to cookie check
     }
@@ -158,13 +187,28 @@ export async function middleware(req: NextRequest) {
   const accessCookie = req.cookies.get("access_token")?.value;
   if (accessCookie) {
     try {
-      const { payload } = await jwtVerify(accessCookie, secret, {
-        issuer: process.env.JWT_ISSUER || "tariff",
-        audience: process.env.JWT_AUDIENCE || "tariff-web",
-      });
-      if (pathname.startsWith("/admin")) {
-        const roles = rolesFromPayload(payload);
-        if (!roles.includes("admin")) {
+      if (secret) {
+        const { payload } = await jwtVerify(accessCookie, secret, {
+          issuer: process.env.JWT_ISSUER || "tariff",
+          audience: process.env.JWT_AUDIENCE || "tariff-web",
+        });
+        if (pathname.startsWith("/admin")) {
+          const roles = rolesFromPayload(payload);
+          if (!roles.includes("admin")) {
+            return NextResponse.redirect(new URL("/", req.url));
+          }
+        }
+      } else if (pathname.startsWith("/admin")) {
+        // No secret: confirm role with backend
+        const check = await fetch(`${BACKEND_URL}/auth/me`, {
+          headers: { authorization: `Bearer ${accessCookie}` },
+        });
+        if (!check.ok) return NextResponse.redirect(new URL("/", req.url));
+        try {
+          const me = await check.json();
+          const roles = Array.isArray(me?.roles) ? me.roles.map((r: string) => r.toLowerCase()) : [];
+          if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
+        } catch {
           return NextResponse.redirect(new URL("/", req.url));
         }
       }
@@ -215,8 +259,8 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
-    const data = await backendRes.json();
-    const accessToken = data?.accessToken as string | undefined;
+  const data = await backendRes.json();
+  const accessToken = data?.accessToken as string | undefined;
     const resp = NextResponse.next();
 
     // Forward refresh cookie from backend if present
@@ -230,20 +274,32 @@ export async function middleware(req: NextRequest) {
       const reqHeaders = new Headers(req.headers);
       reqHeaders.set("authorization", `Bearer ${accessToken}`);
       // If accessing admin path, enforce role from freshly issued token
-      try {
-        const { payload } = await jwtVerify(accessToken, secret, {
-          issuer: process.env.JWT_ISSUER || "tariff",
-          audience: process.env.JWT_AUDIENCE || "tariff-web",
-        });
-        if (pathname.startsWith("/admin")) {
-          const roles = rolesFromPayload(payload);
-          const isAdmin = roles.includes("admin");
-          if (!isAdmin) {
+      if (pathname.startsWith("/admin")) {
+        if (secret) {
+          try {
+            const { payload } = await jwtVerify(accessToken, secret, {
+              issuer: process.env.JWT_ISSUER || "tariff",
+              audience: process.env.JWT_AUDIENCE || "tariff-web",
+            });
+            const roles = rolesFromPayload(payload);
+            const isAdmin = roles.includes("admin");
+            if (!isAdmin) return NextResponse.redirect(new URL("/", req.url));
+          } catch {
+            return NextResponse.redirect(new URL("/login", req.url));
+          }
+        } else {
+          const check = await fetch(`${BACKEND_URL}/auth/me`, {
+            headers: { authorization: `Bearer ${accessToken}` },
+          });
+          if (!check.ok) return NextResponse.redirect(new URL("/", req.url));
+          try {
+            const me = await check.json();
+            const roles = Array.isArray(me?.roles) ? me.roles.map((r: string) => r.toLowerCase()) : [];
+            if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
+          } catch {
             return NextResponse.redirect(new URL("/", req.url));
           }
         }
-      } catch {
-        return NextResponse.redirect(new URL("/login", req.url));
       }
       return NextResponse.next({ request: { headers: reqHeaders }, headers: resp.headers });
     }
