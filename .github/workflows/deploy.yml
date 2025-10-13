@@ -36,6 +36,9 @@ jobs:
         JWT_AUDIENCE: ${{ secrets.JWT_AUDIENCE }}
         ACCESS_TOKEN_TTL_SECONDS: ${{ secrets.ACCESS_TOKEN_TTL_SECONDS }}
         REFRESH_TOKEN_TTL_SECONDS: ${{ secrets.REFRESH_TOKEN_TTL_SECONDS }}
+        FRONTEND_ORIGIN: ${{ secrets.FRONTEND_ORIGIN }}
+        COOKIE_SECURE: ${{ secrets.COOKIE_SECURE }}
+        COOKIE_SAMESITE: ${{ secrets.COOKIE_SAMESITE }}
       run: |
         cd backend/app
         mvn test
@@ -76,4 +79,7 @@ jobs:
           JWT_AUDIENCE="${{ secrets.JWT_AUDIENCE }}" \
           ACCESS_TOKEN_TTL_SECONDS="${{ secrets.ACCESS_TOKEN_TTL_SECONDS }}" \
           REFRESH_TOKEN_TTL_SECONDS="${{ secrets.REFRESH_TOKEN_TTL_SECONDS }}" \
+          FRONTEND_ORIGIN="${{ secrets.FRONTEND_ORIGIN }}" \
+          COOKIE_SECURE="${{ secrets.COOKIE_SECURE }}" \
+          COOKIE_SAMESITE="${{ secrets.COOKIE_SAMESITE }}" \
           java -jar api-server-1.0.jar > app.log 2>&1 &

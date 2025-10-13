@@ -41,8 +41,13 @@ export function useLogin() {
     }
 
     try {
-      // use Next.js rewrite to proxy to backend, avoiding browser CORS entirely
-      const res = await fetch(`/api/auth/login`, {
+      // In production on Amplify, calling the backend directly ensures the refresh cookie is set on the backend domain.
+      // Locally, we keep using the Next.js rewrite to avoid CORS.
+      const backend = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL;
+      const loginUrl = backend && typeof window !== "undefined" && window.location.hostname !== new URL(backend).hostname
+        ? `${backend}/auth/login`
+        : `/api/auth/login`;
+      const res = await fetch(loginUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // Send cookies across origins if backend sets refresh cookie

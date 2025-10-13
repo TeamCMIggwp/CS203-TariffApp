@@ -4,6 +4,13 @@ import { jwtVerify, type JWTPayload } from "jose";
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
 const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+const backendHost = (() => {
+  try {
+    return new URL(BACKEND_URL).host;
+  } catch {
+    return "";
+  }
+})();
 
 function rolesFromPayload(payload: JWTPayload | undefined): string[] {
   if (!payload) return [];
@@ -40,6 +47,7 @@ export async function middleware(req: NextRequest) {
 
 
   const { pathname } = req.nextUrl;
+  const isCrossSite = backendHost && backendHost !== req.nextUrl.host;
 
   // Skip middleware for public paths and static assets
   if (
@@ -53,7 +61,7 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/gemini/")
   ) {
     // If user is already authenticated and hits /login or /signup, redirect them based on role
-    if (pathname === "/login" || pathname === "/signup") {
+  if (pathname === "/login" || pathname === "/signup") {
       const authHeader2 = req.headers.get("authorization");
       // 1) Try an existing Authorization header
       if (authHeader2?.startsWith("Bearer ")) {
@@ -72,7 +80,7 @@ export async function middleware(req: NextRequest) {
       }
       // 2) Try refreshing with cookie
       const refreshCookie2 = req.cookies.get("refresh_token")?.value;
-      if (refreshCookie2) {
+      if (refreshCookie2 && !isCrossSite) {
         try {
           const backendRes = await fetch(`${BACKEND_URL}/auth/refresh`, {
             method: "POST",
@@ -97,6 +105,12 @@ export async function middleware(req: NextRequest) {
         } catch {
           // ignore
         }
+      }
+      // If we are on a different domain than the backend, we cannot read/send the backend cookie from middleware.
+      // Delegate refresh to the backend via browser redirect so the browser sends the cookie to BACKEND_URL.
+      if (isCrossSite) {
+        const url = `${BACKEND_URL}/auth/refresh?returnTo=${encodeURIComponent(req.url)}`;
+        return NextResponse.redirect(url);
       }
     }
     return NextResponse.next();
@@ -129,11 +143,17 @@ export async function middleware(req: NextRequest) {
     // const url = req.nextUrl; // not needed; avoid unused var warning
   const refreshCookie = req.cookies.get("refresh_token")?.value;
   if (!refreshCookie) {
+    // If backend is on a different host, redirect the browser to backend refresh so it can use its own cookie.
+    if (isCrossSite) {
+      const url = `${BACKEND_URL}/auth/refresh?returnTo=${encodeURIComponent(req.url)}`;
+      return NextResponse.redirect(url);
+    }
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
   try {
     // Server-side call; not subject to browser CORS and we only forward the single cookie we need
+    // Only possible to forward cookie from middleware when same-site; otherwise we redirected above
     const backendRes = await fetch(`${BACKEND_URL}/auth/refresh`, {
       method: "POST",
       headers: {
