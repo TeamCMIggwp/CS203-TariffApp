@@ -7,13 +7,6 @@ applications:
           commands:
             - nvm install 20
             - nvm use 20
-            - echo "Node: $(node -v), NPM: $(npm -v)"
-            - echo "Checking required environment variables..."
-            - 'test -n "$BACKEND_URL" || (echo "ERROR: BACKEND_URL is missing" && exit 1)'
-            - 'if [ -n "$JWT_SECRET" ]; then echo "JWT_SECRET present (len: ${#JWT_SECRET})"; else echo "ERROR: JWT_SECRET is missing" && exit 1; fi'
-            - 'test -n "$JWT_ISSUER" || (echo "ERROR: JWT_ISSUER is missing" && exit 1)'
-            - 'test -n "$JWT_AUDIENCE" || (echo "ERROR: JWT_AUDIENCE is missing" && exit 1)'
-            - 'if [ -n "$NEXT_PUBLIC_BACKEND_URL" ]; then echo "NEXT_PUBLIC_BACKEND_URL present"; else echo "NEXT_PUBLIC_BACKEND_URL not set (ok if you proxy via /api/*)"; fi'
             - npm ci
         build:
           commands:
