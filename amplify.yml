@@ -11,6 +11,14 @@ applications:
         build:
           commands:
             - npm run build
+            - NEXT_PUBLIC_BACKEND_URL = ${NEXT_PUBLIC_BACKEND_URL}
+            - BACKEND_URL = ${BACKEND_URL}
+            - JWT_SECRET = ${JWT_SECRET}
+            - JWT_ISSUER = ${JWT_ISSUER}
+            - JWT_AUDIENCE = ${JWT_AUDIENCE}
+            - ACCESS_TOKEN_TTL_SECONDS = ${ACCESS_TOKEN_TTL_SECONDS}
+            - REFRESH_TOKEN_TTL_SECONDS = ${REFRESH_TOKEN_TTL_SECONDS}
+
       artifacts:
         baseDirectory: .next
         files:
