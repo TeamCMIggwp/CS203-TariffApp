@@ -19,27 +19,51 @@ public class TariffRateRepository {
     @org.springframework.beans.factory.annotation.Qualifier("appJdbcTemplate")
     private JdbcTemplate jdbcTemplate;
 
-    public Double getTariffRate(String reporterCountryId, String partnerCountryId, Integer productId, String year) {
+    /**
+     * Check if tariff exists
+     */
+    public boolean exists(String reporter, String partner, Integer product, String year) {
         try {
-            logger.debug("Querying tariff rate for: countryId={}, partnerCountryId={}, productId={}, year={}",
-                    reporterCountryId, partnerCountryId, productId, year);
+            String sql = """
+                SELECT COUNT(*) FROM `wto_tariffs`.`TariffRates`
+                WHERE `country_id` = ? AND `partner_country_id` = ? 
+                  AND `product_id` = ? AND `year` = ?
+            """;
+            
+            Integer yearInt = Integer.valueOf(year);
+            Integer count = jdbcTemplate.queryForObject(sql, Integer.class,
+                reporter, partner, product, yearInt);
+            
+            return count != null && count > 0;
+        } catch (DataAccessException e) {
+            logger.error("Error checking tariff existence: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    /**
+     * Get tariff rate
+     */
+    public Double getTariffRate(String reporter, String partner, Integer product, String year) {
+        try {
+            logger.debug("Querying tariff rate for: reporter={}, partner={}, product={}, year={}",
+                    reporter, partner, product, year);
 
             String sql = """
                 SELECT `rate` FROM `wto_tariffs`.`TariffRates`
-                WHERE `country_id` = ? AND `partner_country_id` = ? AND `product_id` = ? AND `year` = ?
+                WHERE `country_id` = ? AND `partner_country_id` = ? 
+                  AND `product_id` = ? AND `year` = ?
             """;
-
+            
+            Integer yearInt = Integer.valueOf(year);
             Double rate = jdbcTemplate.queryForObject(sql, Double.class,
-                reporterCountryId, partnerCountryId, productId, year);
+                reporter, partner, product, yearInt);
 
-            logger.debug("Found tariff rate: {} for countryId={}, partnerCountryId={}, productId={}, year={}",
-                    rate, reporterCountryId, partnerCountryId, productId, year);
-
+            logger.debug("Found tariff rate: {}", rate);
             return rate;
 
         } catch (EmptyResultDataAccessException e) {
-            logger.info("No tariff rate found for countryId={}, partnerCountryId={}, productId={}, year={}",
-                    reporterCountryId, partnerCountryId, productId, year);
+            logger.info("No tariff rate found");
             return null;
         } catch (DataAccessException e) {
             logger.error("Database error while retrieving tariff rate: {}", e.getMessage(), e);
@@ -47,93 +71,81 @@ public class TariffRateRepository {
         }
     }
 
-    public void updateTariffRate(TariffRateEntity tariffRate) throws DataAccessException {
-        logger.debug("Checking existence of tariff rate: {}", tariffRate);
-
-        String countryId = tariffRate.getCountryIsoNumeric();          // char(3) expected
-        String partnerCountryId = tariffRate.getPartnerIsoNumeric();  // char(3) expected
-        Integer productId = tariffRate.getProductHsCode();            // codeUnique (int)
-        String yearStr = tariffRate.getYear();                        // stored as INT in DB
-        Double rateDouble = tariffRate.getRate();                     // DECIMAL(6,3) in DB
-        String unit = tariffRate.getUnit();                           // VARCHAR(20) in DB
-
-        if (countryId == null || countryId.trim().isEmpty() ||
-            partnerCountryId == null || partnerCountryId.trim().isEmpty() ||
-            productId == null || yearStr == null || yearStr.trim().isEmpty() || rateDouble == null) {
-            throw new DataAccessException("Missing country, partner, product, year or rate") {};
-        }
-
-        // Default unit if not provided
-        if (unit == null || unit.trim().isEmpty()) {
-            unit = "percent";
-        }
-        // Trim to VARCHAR(20) safe length
-        if (unit.length() > 20) {
-            unit = unit.substring(0, 20);
-        }
-
-        logger.info("Resolved values before DB operation - countryId: {}, partnerCountryId: {}, productId: {}, year: {}, unit: {}",
-                countryId, partnerCountryId, productId, yearStr, unit);
-
-        // Ensure year is numeric to match DB column type (INT)
-        Integer year;
+    /**
+     * Create new tariff - throws exception if already exists
+     */
+    public void create(String reporter, String partner, Integer product, String year, 
+                      Double rate, String unit) {
         try {
-            year = Integer.valueOf(yearStr);
-        } catch (NumberFormatException ex) {
-            throw new DataAccessException("Invalid year format: " + yearStr) {};
-        }
-
-        // Ensure rate fits DECIMAL(6,3): round to 3 decimal places
-        BigDecimal rate = BigDecimal.valueOf(rateDouble).setScale(3, RoundingMode.HALF_UP);
-
-        String checkSql = """
-            SELECT COUNT(*) FROM `wto_tariffs`.`TariffRates`
-            WHERE `country_id` = ? AND `partner_country_id` = ? AND `product_id` = ? AND `year` = ?
-        """;
-
-        Integer count = jdbcTemplate.queryForObject(checkSql, Integer.class,
-            countryId, partnerCountryId, productId, year);
-
-        if (count != null && count > 0) {
-            logger.debug("Record exists, updating tariff rate: {}", tariffRate);
-
-            String updateSql = """
-                UPDATE `wto_tariffs`.`TariffRates` SET 
-                    `rate` = ?,
-                    `unit` = ?
-                WHERE `country_id` = ? AND `partner_country_id` = ? AND `product_id` = ? AND `year` = ?
-            """;
-
-            int rowsUpdated = jdbcTemplate.update(updateSql,
-                rate,
-                unit,
-                countryId,
-                partnerCountryId,
-                productId,
-                year
-            );
-
-            logger.info("Updated {} rows for tariff rate: {}", rowsUpdated, tariffRate);
-
-        } else {
-            logger.debug("No existing record found, inserting new tariff rate: {}", tariffRate);
-
-            String insertSql = """
+            logger.info("Creating new tariff: reporter={}, partner={}, product={}, year={}, rate={}, unit={}",
+                    reporter, partner, product, year, rate, unit);
+            
+            // Convert year to Integer for DB
+            Integer yearInt = Integer.valueOf(year);
+            
+            // Round rate to 3 decimal places for DECIMAL(6,3)
+            BigDecimal rateDecimal = BigDecimal.valueOf(rate).setScale(3, RoundingMode.HALF_UP);
+            
+            // Default unit if null
+            String unitValue = (unit == null || unit.trim().isEmpty()) ? "percent" : unit;
+            if (unitValue.length() > 20) {
+                unitValue = unitValue.substring(0, 20);
+            }
+            
+            String sql = """
                 INSERT INTO `wto_tariffs`.`TariffRates` (
                     `country_id`, `partner_country_id`, `product_id`, `year`, `rate`, `unit`
                 ) VALUES (?, ?, ?, ?, ?, ?)
             """;
+            
+            int rowsInserted = jdbcTemplate.update(sql,
+                reporter, partner, product, yearInt, rateDecimal, unitValue);
+            
+            logger.info("Successfully created tariff, rows inserted: {}", rowsInserted);
+            
+        } catch (DataAccessException e) {
+            logger.error("Error creating tariff: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
 
-            int rowsInserted = jdbcTemplate.update(insertSql,
-                countryId,
-                partnerCountryId,
-                productId,
-                year,
-                rate,
-                unit
-            );
-
-            logger.info("Inserted {} rows for tariff rate: {}", rowsInserted, tariffRate);
+    /**
+     * Update existing tariff - does NOT check if exists (caller's responsibility)
+     */
+    public int update(String reporter, String partner, Integer product, String year,
+                     Double rate, String unit) {
+        try {
+            logger.info("Updating tariff: reporter={}, partner={}, product={}, year={}, rate={}, unit={}",
+                    reporter, partner, product, year, rate, unit);
+            
+            // Convert year to Integer for DB
+            Integer yearInt = Integer.valueOf(year);
+            
+            // Round rate to 3 decimal places
+            BigDecimal rateDecimal = BigDecimal.valueOf(rate).setScale(3, RoundingMode.HALF_UP);
+            
+            // Default unit if null
+            String unitValue = (unit == null || unit.trim().isEmpty()) ? "percent" : unit;
+            if (unitValue.length() > 20) {
+                unitValue = unitValue.substring(0, 20);
+            }
+            
+            String sql = """
+                UPDATE `wto_tariffs`.`TariffRates` 
+                SET `rate` = ?, `unit` = ?
+                WHERE `country_id` = ? AND `partner_country_id` = ? 
+                  AND `product_id` = ? AND `year` = ?
+            """;
+            
+            int rowsUpdated = jdbcTemplate.update(sql,
+                rateDecimal, unitValue, reporter, partner, product, yearInt);
+            
+            logger.info("Updated {} rows", rowsUpdated);
+            return rowsUpdated;
+            
+        } catch (DataAccessException e) {
+            logger.error("Error updating tariff: {}", e.getMessage(), e);
+            throw e;
         }
     }
 }
