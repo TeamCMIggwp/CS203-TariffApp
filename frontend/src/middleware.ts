@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { jwtVerify, type JWTPayload } from "jose";
+import { jwtVerify, decodeJwt, type JWTPayload } from "jose";
 
 // Secret may be unavailable in some hosting setups; handle gracefully
 const _rawSecret = process.env.JWT_SECRET;
@@ -17,15 +17,40 @@ const backendHost = (() => {
 function rolesFromPayload(payload: JWTPayload | undefined): string[] {
   if (!payload) return [];
   const get = (k: string) => payload[k as keyof JWTPayload] as unknown;
-  const candidates: unknown[] = [get("role"), get("roles"), get("authorities")];
-  for (const v of candidates) {
-    if (typeof v === "string") return [v.toLowerCase()];
-    if (Array.isArray(v)) {
-      const arr = v.filter((x) => typeof x === "string").map((x) => (x as string).toLowerCase());
-      if (arr.length) return arr;
+
+  const normalize = (val: unknown): string[] => {
+    const simple = (s: string) => {
+      const lower = s.toLowerCase().trim();
+      if (lower.startsWith("role_")) return lower.replace(/^role_/, "");
+      if (lower === "administrator") return "admin";
+      return lower;
+    };
+
+    if (!val) return [];
+    if (typeof val === "string") return [simple(val)];
+    if (Array.isArray(val)) {
+      const out: string[] = [];
+      for (const item of val) {
+        if (typeof item === "string") out.push(simple(item));
+        else if (item && typeof item === "object") {
+          // Common Spring Security shape: { authority: "ROLE_ADMIN" }
+          const maybe = (item as any).authority ?? (item as any).role ?? (item as any).name;
+          if (typeof maybe === "string") out.push(simple(maybe));
+        }
+      }
+      return out;
     }
-  }
-  return [];
+    if (val && typeof val === "object") {
+      const maybe = (val as any).authority ?? (val as any).role ?? (val as any).name;
+      if (typeof maybe === "string") return [simple(maybe)];
+    }
+    return [];
+  };
+
+  const candidates: unknown[] = [get("role"), get("roles"), get("authorities")];
+  const all: string[] = candidates.flatMap((v) => normalize(v));
+  // Deduplicate
+  return Array.from(new Set(all));
 }
 
 // Paths that don’t require auth (frontend API routes removed)
@@ -58,7 +83,6 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/favicon.ico") ||
     // Never intercept proxied backend API endpoints; let rewrites proxy to backend directly
     pathname.startsWith("/api/auth/") ||
-    pathname.startsWith("/api/database/") ||
     pathname.startsWith("/api/wits/") ||
     pathname.startsWith("/gemini/") ||
     pathname.startsWith("/api/debug/") ||
@@ -141,6 +165,17 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // For backend database API proxy, inject Authorization if we have an access token, but do not gate.
+  if (pathname.startsWith("/api/database/")) {
+    const reqHeaders = new Headers(req.headers);
+    // Prefer existing Authorization header, otherwise add from cookie
+    if (!reqHeaders.get("authorization")) {
+      const token = req.cookies.get("access_token")?.value;
+      if (token) reqHeaders.set("authorization", `Bearer ${token}`);
+    }
+    return NextResponse.next({ request: { headers: reqHeaders } });
+  }
+
   // Make the entire site public except for /admin. Only enforce auth/role checks for admin routes.
   if (!pathname.startsWith("/admin")) {
     return NextResponse.next();
@@ -156,26 +191,15 @@ export async function middleware(req: NextRequest) {
           issuer: process.env.JWT_ISSUER || "tariff",
           audience: process.env.JWT_AUDIENCE || "tariff-web",
         });
-        // Role-based gate for admin routes
         const roles = rolesFromPayload(payload);
         const isAdmin = roles.includes("admin");
-        if (!isAdmin) {
-          return NextResponse.redirect(new URL("/", req.url));
-        }
-        return NextResponse.next(); // valid token and allowed
+        if (!isAdmin) return NextResponse.redirect(new URL("/", req.url));
+        return NextResponse.next();
       } else {
-        // Without secret, rely on backend for auth; allow through, admin gated below
-        const check = await fetch(`${BACKEND_URL}/auth/me`, {
-          headers: { authorization: `Bearer ${token}` },
-        });
-        if (!check.ok) return NextResponse.redirect(new URL("/", req.url));
-        try {
-          const me = await check.json();
-          const roles = Array.isArray(me?.roles) ? me.roles.map((r: string) => r.toLowerCase()) : [];
-          if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
-        } catch {
-          return NextResponse.redirect(new URL("/", req.url));
-        }
+        // Fallback: decode without verification when secret is unavailable
+        const payload = decodeJwt(token) as JWTPayload;
+        const roles = rolesFromPayload(payload);
+        if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
         return NextResponse.next();
       }
     } catch {
@@ -194,22 +218,12 @@ export async function middleware(req: NextRequest) {
           audience: process.env.JWT_AUDIENCE || "tariff-web",
         });
         const roles = rolesFromPayload(payload);
-        if (!roles.includes("admin")) {
-          return NextResponse.redirect(new URL("/", req.url));
-        }
-      } else if (pathname.startsWith("/admin")) {
-        // No secret: confirm role with backend
-        const check = await fetch(`${BACKEND_URL}/auth/me`, {
-          headers: { authorization: `Bearer ${accessCookie}` },
-        });
-        if (!check.ok) return NextResponse.redirect(new URL("/", req.url));
-        try {
-          const me = await check.json();
-          const roles = Array.isArray(me?.roles) ? me.roles.map((r: string) => r.toLowerCase()) : [];
-          if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
-        } catch {
-          return NextResponse.redirect(new URL("/", req.url));
-        }
+        if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
+      } else {
+        // Fallback: decode without verification when secret is unavailable
+        const payload = decodeJwt(accessCookie) as JWTPayload;
+        const roles = rolesFromPayload(payload);
+        if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
       }
       // Inject Authorization header for downstream handlers and API proxies
       const reqHeaders = new Headers(req.headers);
@@ -263,23 +277,15 @@ export async function middleware(req: NextRequest) {
             audience: process.env.JWT_AUDIENCE || "tariff-web",
           });
           const roles = rolesFromPayload(payload);
-          const isAdmin = roles.includes("admin");
-          if (!isAdmin) return NextResponse.redirect(new URL("/", req.url));
+          if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
         } catch {
           return NextResponse.redirect(new URL("/login", req.url));
         }
       } else {
-        const check = await fetch(`${BACKEND_URL}/auth/me`, {
-          headers: { authorization: `Bearer ${accessToken}` },
-        });
-        if (!check.ok) return NextResponse.redirect(new URL("/", req.url));
-        try {
-          const me = await check.json();
-          const roles = Array.isArray(me?.roles) ? me.roles.map((r: string) => r.toLowerCase()) : [];
-          if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
-        } catch {
-          return NextResponse.redirect(new URL("/", req.url));
-        }
+        // Fallback: decode without verification when secret is unavailable
+        const payload = decodeJwt(accessToken) as JWTPayload;
+        const roles = rolesFromPayload(payload);
+        if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
       }
       return NextResponse.next({ request: { headers: reqHeaders }, headers: resp.headers });
     }
