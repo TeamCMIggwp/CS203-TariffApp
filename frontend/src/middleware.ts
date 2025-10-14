@@ -141,7 +141,12 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 1. Try Authorization header first
+  // Make the entire site public except for /admin. Only enforce auth/role checks for admin routes.
+  if (!pathname.startsWith("/admin")) {
+    return NextResponse.next();
+  }
+
+  // 1. Try Authorization header first (admin-gated)
   const authHeader = req.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.split(" ")[1];
@@ -152,28 +157,24 @@ export async function middleware(req: NextRequest) {
           audience: process.env.JWT_AUDIENCE || "tariff-web",
         });
         // Role-based gate for admin routes
-        if (pathname.startsWith("/admin")) {
-          const roles = rolesFromPayload(payload);
-          const isAdmin = roles.includes("admin");
-          if (!isAdmin) {
-            return NextResponse.redirect(new URL("/", req.url));
-          }
+        const roles = rolesFromPayload(payload);
+        const isAdmin = roles.includes("admin");
+        if (!isAdmin) {
+          return NextResponse.redirect(new URL("/", req.url));
         }
         return NextResponse.next(); // valid token and allowed
       } else {
         // Without secret, rely on backend for auth; allow through, admin gated below
-        if (pathname.startsWith("/admin")) {
-          const check = await fetch(`${BACKEND_URL}/auth/me`, {
-            headers: { authorization: `Bearer ${token}` },
-          });
-          if (!check.ok) return NextResponse.redirect(new URL("/", req.url));
-          try {
-            const me = await check.json();
-            const roles = Array.isArray(me?.roles) ? me.roles.map((r: string) => r.toLowerCase()) : [];
-            if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
-          } catch {
-            return NextResponse.redirect(new URL("/", req.url));
-          }
+        const check = await fetch(`${BACKEND_URL}/auth/me`, {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        if (!check.ok) return NextResponse.redirect(new URL("/", req.url));
+        try {
+          const me = await check.json();
+          const roles = Array.isArray(me?.roles) ? me.roles.map((r: string) => r.toLowerCase()) : [];
+          if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
+        } catch {
+          return NextResponse.redirect(new URL("/", req.url));
         }
         return NextResponse.next();
       }
@@ -182,7 +183,7 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // 2. Try an access token stored as a cookie on the Amplify (frontend) domain.
+  // 2. Try an access token stored as a cookie on the Amplify (frontend) domain. (admin-gated)
   //    This enables auth gating in cross-site deployments where refresh cookies are not visible to Amplify.
   const accessCookie = req.cookies.get("access_token")?.value;
   if (accessCookie) {
@@ -192,11 +193,9 @@ export async function middleware(req: NextRequest) {
           issuer: process.env.JWT_ISSUER || "tariff",
           audience: process.env.JWT_AUDIENCE || "tariff-web",
         });
-        if (pathname.startsWith("/admin")) {
-          const roles = rolesFromPayload(payload);
-          if (!roles.includes("admin")) {
-            return NextResponse.redirect(new URL("/", req.url));
-          }
+        const roles = rolesFromPayload(payload);
+        if (!roles.includes("admin")) {
+          return NextResponse.redirect(new URL("/", req.url));
         }
       } else if (pathname.startsWith("/admin")) {
         // No secret: confirm role with backend
@@ -222,26 +221,9 @@ export async function middleware(req: NextRequest) {
   }
 
   // 3. No valid access token: attempt server-side refresh on the backend directly when same-site only.
-    // const url = req.nextUrl; // not needed; avoid unused var warning
+  //    If we are not on /admin, we've already returned above. We're here only for /admin.
   const refreshCookie = req.cookies.get("refresh_token")?.value;
   if (!refreshCookie) {
-    // If backend is on a different host, avoid redirect loops — allow request through;
-    // page-level code should handle 401s and route to /login.
-    if (isCrossSite) {
-      // For protected routes (non-public, not static and not API proxies), require login
-      const isProtected =
-        !publicPaths.some((p) => pathname.startsWith(p)) &&
-        !pathname.startsWith("/_next") &&
-        !pathname.startsWith("/favicon.ico") &&
-        !pathname.startsWith("/api/auth/") &&
-        !pathname.startsWith("/api/database/") &&
-        !pathname.startsWith("/api/wits/") &&
-        !pathname.startsWith("/gemini/");
-      if (isProtected) {
-        return NextResponse.redirect(new URL("/login", req.url));
-      }
-      return NextResponse.next();
-    }
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -273,32 +255,30 @@ export async function middleware(req: NextRequest) {
     if (accessToken) {
       const reqHeaders = new Headers(req.headers);
       reqHeaders.set("authorization", `Bearer ${accessToken}`);
-      // If accessing admin path, enforce role from freshly issued token
-      if (pathname.startsWith("/admin")) {
-        if (secret) {
-          try {
-            const { payload } = await jwtVerify(accessToken, secret, {
-              issuer: process.env.JWT_ISSUER || "tariff",
-              audience: process.env.JWT_AUDIENCE || "tariff-web",
-            });
-            const roles = rolesFromPayload(payload);
-            const isAdmin = roles.includes("admin");
-            if (!isAdmin) return NextResponse.redirect(new URL("/", req.url));
-          } catch {
-            return NextResponse.redirect(new URL("/login", req.url));
-          }
-        } else {
-          const check = await fetch(`${BACKEND_URL}/auth/me`, {
-            headers: { authorization: `Bearer ${accessToken}` },
+      // Enforce role from freshly issued token
+      if (secret) {
+        try {
+          const { payload } = await jwtVerify(accessToken, secret, {
+            issuer: process.env.JWT_ISSUER || "tariff",
+            audience: process.env.JWT_AUDIENCE || "tariff-web",
           });
-          if (!check.ok) return NextResponse.redirect(new URL("/", req.url));
-          try {
-            const me = await check.json();
-            const roles = Array.isArray(me?.roles) ? me.roles.map((r: string) => r.toLowerCase()) : [];
-            if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
-          } catch {
-            return NextResponse.redirect(new URL("/", req.url));
-          }
+          const roles = rolesFromPayload(payload);
+          const isAdmin = roles.includes("admin");
+          if (!isAdmin) return NextResponse.redirect(new URL("/", req.url));
+        } catch {
+          return NextResponse.redirect(new URL("/login", req.url));
+        }
+      } else {
+        const check = await fetch(`${BACKEND_URL}/auth/me`, {
+          headers: { authorization: `Bearer ${accessToken}` },
+        });
+        if (!check.ok) return NextResponse.redirect(new URL("/", req.url));
+        try {
+          const me = await check.json();
+          const roles = Array.isArray(me?.roles) ? me.roles.map((r: string) => r.toLowerCase()) : [];
+          if (!roles.includes("admin")) return NextResponse.redirect(new URL("/", req.url));
+        } catch {
+          return NextResponse.redirect(new URL("/", req.url));
         }
       }
       return NextResponse.next({ request: { headers: reqHeaders }, headers: resp.headers });

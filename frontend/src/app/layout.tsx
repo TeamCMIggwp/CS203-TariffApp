@@ -439,11 +439,7 @@ const links = [
     icon: <IconChartHistogram className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
     href: "/predictor",
   },
-  {
-    title: "Admin",
-    icon: <IconAdjustmentsCog className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
-    href: "/admin",
-  },
+  // Admin link is conditionally added based on session (see RootLayout)
   {
     title: "Login",
     icon: <IconUser className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
@@ -454,10 +450,40 @@ const links = [
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const modifiedLinks = links.map(link => ({
-    ...link,
-    href: link.href === pathname ? "#" : link.href, // Disable navigation on active link
-  }));
+  const [showAdmin, setShowAdmin] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    // Soft-check current session roles to decide whether to show Admin link
+    fetch("/api/auth/me", { credentials: "include", cache: "no-store" })
+      .then((r) => r.ok ? r.json() : { authenticated: false, roles: [] })
+      .then((data) => {
+        if (cancelled) return;
+        const roles: string[] = Array.isArray(data?.roles) ? data.roles.map((r: string) => r.toLowerCase()) : [];
+        setShowAdmin(data?.authenticated && roles.includes("admin"));
+      })
+      .catch(() => {
+        if (!cancelled) setShowAdmin(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+
+  const navLinks = React.useMemo(() => {
+    const base = [...links];
+    if (showAdmin) {
+      base.splice(6, 0, {
+        title: "Admin",
+        icon: <IconAdjustmentsCog className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+        href: "/admin",
+      });
+    }
+    return base.map((link) => ({
+      ...link,
+      href: link.href === pathname ? "#" : link.href,
+    }));
+  }, [pathname, showAdmin]);
 
   return (
     <html lang="en">
@@ -472,7 +498,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         {/* Floating Dock */}
         <div className="fixed bottom-6 left-0 w-full flex justify-center z-50">
-          <FloatingDock items={modifiedLinks} />
+          <FloatingDock items={navLinks} />
         </div>
       </body>
     </html>
