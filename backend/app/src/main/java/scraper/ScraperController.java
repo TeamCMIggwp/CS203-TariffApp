@@ -21,31 +21,45 @@ public class ScraperController {
      * POST /api/scraper/search-and-scrape
      * Body: {
      *   "query": "USA steel tariffs 2025",
-     *   "maxResults": 5
+     *   "maxResults": 10,
+     *   "minYear": 2024
      * }
-     * 
-     * This endpoint will:
-     * 1. Search Google for official sources
-     * 2. Scrape each source with 2-second delays between requests
-     * 3. Return all extracted information
      */
     @PostMapping("/search-and-scrape")
     public ResponseEntity<?> searchAndScrape(@RequestBody Map<String, Object> request) {
         
         String query = (String) request.get("query");
-        int maxResults = request.containsKey("maxResults") 
-            ? (Integer) request.get("maxResults") 
-            : 5;
         
+        // Get maxResults with default of 10 if not provided
+        Integer maxResults = request.containsKey("maxResults") 
+            ? ((Number) request.get("maxResults")).intValue()
+            : 10;
+        
+        // Get minYear with default of 2020 if not provided
+        Integer minYear = request.containsKey("minYear") 
+            ? ((Number) request.get("minYear")).intValue()
+            : 2020;
+        
+        // Validate inputs
         if (query == null || query.trim().isEmpty()) {
             return ResponseEntity.badRequest()
                 .body(Map.of("error", "Query is required"));
         }
         
+        if (maxResults < 1 || maxResults > 50) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "maxResults must be between 1 and 50"));
+        }
+        
+        if (minYear < 2000 || minYear > 2030) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "minYear must be between 2000 and 2030"));
+        }
+        
         try {
             // Execute async scraping
             CompletableFuture<TariffScraperService.ScrapeResult> future = 
-                scraperService.searchAndScrape(query, maxResults);
+                scraperService.searchAndScrape(query, maxResults, minYear);
             
             // Wait for completion (scrapes happen with delays over time)
             TariffScraperService.ScrapeResult result = future.get();

@@ -441,6 +441,11 @@ const links = [
   },
   // Admin link is conditionally added based on session (see RootLayout)
   {
+    title: "News",
+    icon: <IconChartHistogram className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+    href: "/news",
+  },
+  {
     title: "Login",
     icon: <IconUser className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
     href: "/login",

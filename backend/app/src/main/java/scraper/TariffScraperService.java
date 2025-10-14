@@ -75,60 +75,6 @@ public class TariffScraperService {
     }
 
     /**
-     * Main method: Search Google and scrape results asynchronously over time
-     */
-    @Async
-    public CompletableFuture<ScrapeResult> searchAndScrape(String query, int maxResults) {
-        log.info("Starting search and scrape for: {}", query);
-
-        ScrapeResult result = new ScrapeResult(query, new Date());
-
-        try {
-            // Step 1: Google Custom Search
-            List<SearchHit> searchResults = performGoogleSearch(query, maxResults);
-            result.setTotalSourcesFound(searchResults.size());
-            log.info("Found {} sources from Google search", searchResults.size());
-
-            // Step 2: Scrape each source with delays
-            List<ScrapedData> scrapedData = new ArrayList<>();
-            for (int i = 0; i < searchResults.size(); i++) {
-                SearchHit hit = searchResults.get(i);
-
-                log.info("Scraping {}/{}: {}", i + 1, searchResults.size(), hit.url());
-
-                try {
-                    ScrapedData data = scrapeURL(hit.url(), hit.title());
-                    if (data != null) {
-                        scrapedData.add(data);
-                        result.setSourcesScraped(result.getSourcesScraped() + 1);
-                    }
-
-                    // Delay between requests to be respectful
-                    if (i < searchResults.size() - 1) {
-                        Thread.sleep(2000); // 2 seconds between scrapes
-                    }
-
-                } catch (Exception e) {
-                    log.warn("Failed to scrape {}: {}", hit.url(), e.getMessage());
-                    result.addError(hit.url(), e.getMessage());
-                }
-            }
-
-            result.setData(scrapedData);
-            result.setCompleted(true);
-            log.info("Scraping completed. Successfully scraped {}/{} sources",
-                    result.getSourcesScraped(), result.getTotalSourcesFound());
-
-        } catch (Exception e) {
-            log.error("Error in search and scrape: {}", e.getMessage(), e);
-            result.setCompleted(true);
-            result.addError("GENERAL", e.getMessage());
-        }
-
-        return CompletableFuture.completedFuture(result);
-    }
-
-    /**
      * Perform Google Custom Search with multiple query variations
      */
     private List<SearchHit> performGoogleSearch(String query, int maxResults) {
@@ -181,8 +127,9 @@ public class TariffScraperService {
      */
     private List<SearchHit> executeGoogleSearch(String query, int maxResults) {
         try {
+            // Add date range parameter (e.g., past year)
             String url = String.format(
-                    "https://www.googleapis.com/customsearch/v1?key=%s&cx=%s&q=%s&num=%d",
+                    "https://www.googleapis.com/customsearch/v1?key=%s&cx=%s&q=%s&num=%d&dateRestrict=y1",
                     googleApiKey,
                     searchEngineId,
                     URLEncoder.encode(query, StandardCharsets.UTF_8),
@@ -200,6 +147,47 @@ public class TariffScraperService {
             log.error("Search API call failed: {}", e.getMessage());
             return new ArrayList<>();
         }
+    }
+
+    /**
+     * Process extracted text from PDFs or Word documents
+     */
+    private ScrapedData processExtractedText(String url, String title, String text) {
+        if (text == null || text.trim().isEmpty()) {
+            return null;
+        }
+
+        ScrapedData data = new ScrapedData(url, title);
+
+        // Split text into chunks for processing
+        String[] paragraphs = text.split("\n\n");
+        List<String> relevantText = new ArrayList<>();
+        Double extractedRate = null;
+
+        for (String paragraph : paragraphs) {
+            if (containsTariffKeywords(paragraph) && paragraph.length() > 50) {
+                relevantText.add(cleanText(paragraph));
+                if (extractedRate == null) {
+                    extractedRate = extractRate(paragraph);
+                }
+            }
+        }
+
+        if (!relevantText.isEmpty() || extractedRate != null) {
+            data.setRelevantText(relevantText);
+            data.setExtractedRate(extractedRate);
+            data.setSourceDomain(extractDomain(url));
+
+            // Try to extract year from text for PDFs/Word docs
+            String extractedYear = extractYearFromText(text);
+            if (extractedYear != null) {
+                data.setPublishDate(extractedYear);
+            }
+
+            return data;
+        }
+
+        return null;
     }
 
     /**
@@ -419,32 +407,25 @@ public class TariffScraperService {
     /**
      * Process extracted text from PDFs or Word documents
      */
-    private ScrapedData processExtractedText(String url, String title, String text) {
-        if (text == null || text.trim().isEmpty()) {
-            return null;
+    /**
+     * Extract year from document content
+     */
+    private String extractYearFromText(String text) {
+        // Look for patterns like "2025", "2024", etc. in context
+        Pattern yearPattern = Pattern.compile(
+                "(?:published|updated|effective|dated|as of|©|copyright)\\s*:?\\s*(20\\d{2})",
+                Pattern.CASE_INSENSITIVE);
+        Matcher matcher = yearPattern.matcher(text);
+
+        if (matcher.find()) {
+            return matcher.group(1);
         }
 
-        ScrapedData data = new ScrapedData(url, title);
-
-        // Split text into chunks for processing
-        String[] paragraphs = text.split("\n\n");
-        List<String> relevantText = new ArrayList<>();
-        Double extractedRate = null;
-
-        for (String paragraph : paragraphs) {
-            if (containsTariffKeywords(paragraph) && paragraph.length() > 50) {
-                relevantText.add(cleanText(paragraph));
-                if (extractedRate == null) {
-                    extractedRate = extractRate(paragraph);
-                }
-            }
-        }
-
-        if (!relevantText.isEmpty() || extractedRate != null) {
-            data.setRelevantText(relevantText);
-            data.setExtractedRate(extractedRate);
-            data.setSourceDomain(extractDomain(url));
-            return data;
+        // Fallback: find any 4-digit year 2020-2029
+        Pattern genericYear = Pattern.compile("\\b(202[0-9])\\b");
+        matcher = genericYear.matcher(text);
+        if (matcher.find()) {
+            return matcher.group(1);
         }
 
         return null;
@@ -529,6 +510,90 @@ public class TariffScraperService {
      */
     private String cleanText(String text) {
         return text.replaceAll("\\s+", " ").trim();
+    }
+
+    /**
+     * Extract year from date string and check if it's recent enough
+     */
+    private boolean isRecentEnough(String dateStr, int minYear) {
+        if (dateStr == null || dateStr.isEmpty()) {
+            return true; // If no date found, include it (or return false to exclude)
+        }
+
+        // Regex to find 4-digit years
+        Pattern yearPattern = Pattern.compile("\\b(20\\d{2})\\b");
+        Matcher matcher = yearPattern.matcher(dateStr);
+
+        if (matcher.find()) {
+            try {
+                int year = Integer.parseInt(matcher.group(1));
+                return year >= minYear;
+            } catch (NumberFormatException e) {
+                return true; // If parsing fails, include it
+            }
+        }
+
+        return true; // If no year found, include it (or return false to exclude)
+    }
+
+    /**
+     * Main method: Search Google and scrape results asynchronously over time
+     */
+    @Async
+    public CompletableFuture<ScrapeResult> searchAndScrape(String query, int maxResults, int minYear) {
+        log.info("Starting search and scrape for: {}", query);
+
+        ScrapeResult result = new ScrapeResult(query, new Date());
+
+        try {
+            // Step 1: Google Custom Search
+            List<SearchHit> searchResults = performGoogleSearch(query, maxResults);
+            result.setTotalSourcesFound(searchResults.size());
+            log.info("Found {} sources from Google search", searchResults.size());
+
+            // Step 2: Scrape each source with delays
+            List<ScrapedData> scrapedData = new ArrayList<>();
+            for (int i = 0; i < searchResults.size(); i++) {
+                SearchHit hit = searchResults.get(i);
+
+                log.info("Scraping {}/{}: {}", i + 1, searchResults.size(), hit.url());
+
+                try {
+                    ScrapedData data = scrapeURL(hit.url(), hit.title());
+                    if (data != null) {
+                        // Filter by year
+                        if (isRecentEnough(data.getPublishDate(), minYear)) {
+                            scrapedData.add(data);
+                            result.setSourcesScraped(result.getSourcesScraped() + 1);
+                        } else {
+                            log.info("Filtered out old source ({}): {}",
+                                    data.getPublishDate(), hit.url());
+                        }
+                    }
+
+                    // Delay between requests to be respectful
+                    if (i < searchResults.size() - 1) {
+                        Thread.sleep(2000); // 2 seconds between scrapes
+                    }
+
+                } catch (Exception e) {
+                    log.warn("Failed to scrape {}: {}", hit.url(), e.getMessage());
+                    result.addError(hit.url(), e.getMessage());
+                }
+            }
+
+            result.setData(scrapedData);
+            result.setCompleted(true);
+            log.info("Scraping completed. Successfully scraped {}/{} sources",
+                    result.getSourcesScraped(), result.getTotalSourcesFound());
+
+        } catch (Exception e) {
+            log.error("Error in search and scrape: {}", e.getMessage(), e);
+            result.setCompleted(true);
+            result.addError("GENERAL", e.getMessage());
+        }
+
+        return CompletableFuture.completedFuture(result);
     }
 
     // Data classes
