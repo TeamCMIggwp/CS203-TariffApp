@@ -69,7 +69,7 @@ export default function RatesPage() {
         try {
           const errorData = await response.json()
           errorText = errorData.message || errorText
-        } catch (_) {}
+        } catch {}
         throw new Error(errorText)
       }
 

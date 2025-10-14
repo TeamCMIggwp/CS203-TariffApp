@@ -83,7 +83,7 @@ export default function AdminPage() {
                 const text = await response.text();
                 if (text) errorText = text.slice(0, 500);
               }
-            } catch (_) {
+            } catch {
               // ignore parse errors
             }
             throw new Error(errorText);

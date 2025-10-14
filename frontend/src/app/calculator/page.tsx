@@ -123,7 +123,7 @@ export default function CalculatorSection() {
         setCalculatedTariff(null)
       }
 
-    } catch (err) {
+    } catch {
       setTariffPercentage("MFN")
       setCalculatedTariff(null)
     } finally {

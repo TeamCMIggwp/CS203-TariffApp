@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       maxAge: ttlSeconds,
     });
     return res;
-  } catch (e) {
+  } catch {
     return NextResponse.json({ message: "invalid request" }, { status: 400 });
   }
 }

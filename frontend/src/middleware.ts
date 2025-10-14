@@ -14,6 +14,19 @@ const backendHost = (() => {
   }
 })();
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+function extractRoleFromObject(o: unknown): string | undefined {
+  if (!isRecord(o)) return undefined;
+  for (const key of ["authority", "role", "name"]) {
+    const val = o[key];
+    if (typeof val === "string") return val;
+  }
+  return undefined;
+}
+
 function rolesFromPayload(payload: JWTPayload | undefined): string[] {
   if (!payload) return [];
   const get = (k: string) => payload[k as keyof JWTPayload] as unknown;
@@ -32,18 +45,15 @@ function rolesFromPayload(payload: JWTPayload | undefined): string[] {
       const out: string[] = [];
       for (const item of val) {
         if (typeof item === "string") out.push(simple(item));
-        else if (item && typeof item === "object") {
-          // Common Spring Security shape: { authority: "ROLE_ADMIN" }
-          const maybe = (item as any).authority ?? (item as any).role ?? (item as any).name;
-          if (typeof maybe === "string") out.push(simple(maybe));
+        else {
+          const maybe = extractRoleFromObject(item);
+          if (maybe) out.push(simple(maybe));
         }
       }
       return out;
     }
-    if (val && typeof val === "object") {
-      const maybe = (val as any).authority ?? (val as any).role ?? (val as any).name;
-      if (typeof maybe === "string") return [simple(maybe)];
-    }
+    const maybeOne = extractRoleFromObject(val);
+    if (maybeOne) return [simple(maybeOne)];
     return [];
   };
 

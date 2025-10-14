@@ -3,6 +3,59 @@ import { decodeJwt, type JWTPayload } from "jose";
 
 const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
+type PrimitiveRole = string;
+type RoleLikeObject = { authority?: unknown; role?: unknown; name?: unknown };
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+function asString(v: unknown): string | undefined {
+  return typeof v === "string" ? v : undefined;
+}
+
+function extractRoleFromObject(o: unknown): string | undefined {
+  if (!isRecord(o)) return undefined;
+  const keys: Array<keyof RoleLikeObject> = ["authority", "role", "name"];
+  for (const k of keys) {
+    const val = o[k as keyof typeof o];
+    if (typeof val === "string") return val;
+  }
+  return undefined;
+}
+
+function normalizeRoles(values: string[]): string[] {
+  const out: string[] = [];
+  for (const s of values) {
+    const lower = s.toLowerCase().trim();
+    if (lower.startsWith("role_")) out.push(lower.replace(/^role_/, ""));
+    else if (lower.includes("administrator")) out.push("admin");
+    else if (lower.includes("admin")) out.push("admin");
+    else if (lower.includes("user")) out.push("user");
+    else out.push(lower);
+  }
+  return Array.from(new Set(out));
+}
+
+function extractRolesFromUnknown(val: unknown): string[] {
+  const out: string[] = [];
+  if (!val) return out;
+  if (typeof val === "string") return [val];
+  if (Array.isArray(val)) {
+    for (const item of val) {
+      if (typeof item === "string") out.push(item);
+      else {
+        const maybe = extractRoleFromObject(item);
+        if (maybe) out.push(maybe);
+      }
+    }
+    return out;
+  }
+  const maybeOne = extractRoleFromObject(val);
+  if (maybeOne) out.push(maybeOne);
+  return out;
+}
+
 export async function GET(req: Request) {
   try {
     // Prefer Authorization header (set by middleware when available)
@@ -24,31 +77,15 @@ export async function GET(req: Request) {
     // Best-effort roles from token (decode only; UI hint, not an auth gate)
     const rolesFromPayload = (payload: JWTPayload | undefined): string[] => {
       if (!payload) return [];
-      const read = (k: string) => payload[k as keyof JWTPayload] as unknown;
-      const raw: unknown[] = [read("role"), read("roles"), read("authorities")];
-      const out: string[] = [];
-      for (const v of raw) {
-        if (typeof v === "string") out.push(v);
-        if (Array.isArray(v)) {
-          for (const i of v) {
-            if (typeof i === "string") out.push(i);
-            else if (i && typeof i === "object") {
-              // handle { authority: "ROLE_ADMIN" } or similar
-              const auth = (i as any).authority ?? (i as any).role ?? (i as any).name;
-              if (typeof auth === "string") out.push(auth);
-            }
-          }
-        }
-      }
-      return out
-        .map((s) => String(s).toLowerCase())
-        .flatMap((s) => {
-          const list: string[] = [];
-          if (s.includes("admin")) list.push("admin");
-          if (s.includes("user")) list.push("user");
-          return list.length ? list : [s];
-        })
-        .filter((v, idx, arr) => arr.indexOf(v) === idx);
+      const rawRole = payload["role"];
+      const rawRoles = payload["roles"];
+      const rawAuthorities = payload["authorities"];
+      const collected: string[] = [
+        ...extractRolesFromUnknown(rawRole),
+        ...extractRolesFromUnknown(rawRoles),
+        ...extractRolesFromUnknown(rawAuthorities),
+      ];
+      return normalizeRoles(collected);
     };
 
     let tokenRoles: string[] = [];
@@ -67,37 +104,17 @@ export async function GET(req: Request) {
       return NextResponse.json({ authenticated: true, roles: tokenRoles }, { status: 200 });
     }
 
-    const me = await res.json();
-
-    const normalizeRoles = (src: any): string[] => {
-      const out: string[] = [];
-      if (!src) return out;
-      const pushVal = (val: any) => {
-        if (typeof val === "string") out.push(val);
-        else if (val && typeof val === "object") {
-          const a = val.authority ?? val.role ?? val.name;
-          if (typeof a === "string") out.push(a);
-        }
-      };
-      if (typeof src.role === "string") pushVal(src.role);
-      if (Array.isArray(src.roles)) src.roles.forEach(pushVal);
-      if (Array.isArray(src.authorities)) src.authorities.forEach(pushVal);
-      return out
-        .map((s) => String(s).toLowerCase())
-        .flatMap((s) => {
-          const list: string[] = [];
-          if (s.includes("admin")) list.push("admin");
-          if (s.includes("user")) list.push("user");
-          return list.length ? list : [s];
-        })
-        .filter((v, i, arr) => arr.indexOf(v) === i);
-    };
-
-    const roles = normalizeRoles(me);
+    const me: unknown = await res.json();
+    const meRecord = isRecord(me) ? me : undefined;
+    const roles = normalizeRoles([
+      ...extractRolesFromUnknown(meRecord?.role),
+      ...extractRolesFromUnknown(meRecord?.roles),
+      ...extractRolesFromUnknown(meRecord?.authorities),
+    ]);
     // Merge with token-derived roles to be forgiving about backend shape
     const merged = Array.from(new Set([...(roles || []), ...(tokenRoles || [])]));
     return NextResponse.json({ authenticated: true, roles: merged }, { status: 200 });
-  } catch (e) {
+  } catch {
     // Do not fail hard; if we had a token, try to show at least token-derived roles
     try {
       const authHeader = (req.headers.get("authorization") || "").toString();
@@ -112,26 +129,13 @@ export async function GET(req: Request) {
 
 function rolesFromPayloadSafe(token: string): string[] {
   try {
-    const payload = decodeJwt(token);
-    const read = (k: string) => (payload as any)[k];
-    const raw: unknown[] = [read("role"), read("roles"), read("authorities")];
-    const out: string[] = [];
-    for (const v of raw) {
-      if (typeof v === "string") out.push(v);
-      if (Array.isArray(v)) {
-        for (const i of v) {
-          if (typeof i === "string") out.push(i);
-          else if (i && typeof i === "object") {
-            const auth = (i as any).authority ?? (i as any).role ?? (i as any).name;
-            if (typeof auth === "string") out.push(auth);
-          }
-        }
-      }
-    }
-    return out
-      .map((s) => String(s).toLowerCase())
-      .flatMap((s) => (s.includes("admin") ? ["admin"] : s.includes("user") ? ["user"] : [s]))
-      .filter((v, i, arr) => arr.indexOf(v) === i);
+    const payload = decodeJwt(token) as JWTPayload;
+    const collected: string[] = [
+      ...extractRolesFromUnknown(payload["role"]),
+      ...extractRolesFromUnknown(payload["roles"]),
+      ...extractRolesFromUnknown(payload["authorities"]),
+    ];
+    return normalizeRoles(collected);
   } catch {
     return [];
   }
