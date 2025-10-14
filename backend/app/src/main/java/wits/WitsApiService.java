@@ -3,16 +3,22 @@ package wits;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import wits.dto.WitsTariffRateResponse;
+import wits.exception.WitsApiException;
+import wits.exception.WitsDataNotFoundException;
+
 import reactor.core.publisher.Mono;
 
-import org.springframework.http.ResponseEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 @Service
 public class WitsApiService {
-
+    private static final Logger logger = LoggerFactory.getLogger(WitsApiService.class);
+    
     private final WebClient webClient;
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -23,68 +29,110 @@ public class WitsApiService {
     }
 
     /**
-     * Hardcoded example: US (840), World (000), Rice (100630), Year=2020, datatype=reported
+     * Get tariff rate data from WITS for specific parameters
+     * Returns structured data with MIN_RATE, MAX_RATE, AVG_RATE
      */
-    public ResponseEntity<String> getTariffData() {
-        String path = "/datasource/TRN/reporter/840/partner/000/product/100630/year/2020/datatype/reported?format=JSON";
+    public WitsTariffRateResponse getTariffRate(String reporter, String partner, 
+                                               Integer product, String year) {
+        try {
+            logger.info("Fetching WITS data: reporter={}, partner={}, product={}, year={}",
+                    reporter, partner, product, year);
+            
+            String path = String.format(
+                "/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/reported?format=JSON",
+                reporter, partner, product, year
+            );
 
-        String body = webClient.get()
+            // Fetch data with proper error handling
+            String body = webClient.get()
+                .uri(path)
+                .exchangeToMono(resp -> {
+                    if (resp.statusCode().is2xxSuccessful()) {
+                        return resp.bodyToMono(String.class).defaultIfEmpty("");
+                    }
+                    if (resp.statusCode().value() == 204 || resp.statusCode().is4xxClientError()) {
+                        // WITS uses 204/404 when there's no data
+                        return Mono.just("");
+                    }
+                    // For 5xx, bubble up as error
+                    return resp.bodyToMono(String.class)
+                               .flatMap(b -> Mono.error(new WitsApiException(
+                                   "WITS API returned " + resp.statusCode(), 
+                                   resp.statusCode().value()
+                               )));
+                })
+                .block();
+
+            // No data found
+            if (body == null || body.isBlank()) {
+                logger.warn("No data found in WITS");
+                throw new WitsDataNotFoundException(reporter, partner, product, year);
+            }
+
+            // Extract all rates
+            String minRate = extractObservationAttribute(body, "MIN_RATE");
+            String maxRate = extractObservationAttribute(body, "MAX_RATE");
+            String avgRate = extractObservationAttribute(body, "AVG_RATE");
+            
+            // If no rates extracted, data is not available
+            if (minRate == null && maxRate == null && avgRate == null) {
+                logger.warn("No tariff rates found in WITS response");
+                throw new WitsDataNotFoundException(reporter, partner, product, year);
+            }
+            
+            logger.info("Successfully retrieved WITS data: min={}, max={}, avg={}", 
+                    minRate, maxRate, avgRate);
+
+            return new WitsTariffRateResponse(
+                reporter, partner, product, year,
+                minRate, maxRate, avgRate
+            );
+
+        } catch (WitsDataNotFoundException e) {
+            throw e; // Re-throw to be handled by exception handler
+        } catch (WebClientResponseException e) {
+            logger.error("WITS API error: status={}, body={}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new WitsApiException("WITS API communication error", e.getStatusCode().value());
+        } catch (Exception e) {
+            logger.error("Unexpected error fetching WITS data", e);
+            throw new WitsApiException("Unexpected error: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Get full raw JSON response from WITS (for advanced users)
+     */
+    public String getRawTariffData(String reporter, String partner, 
+                                  Integer product, String year) {
+        try {
+            logger.info("Fetching raw WITS data: reporter={}, partner={}, product={}, year={}",
+                    reporter, partner, product, year);
+            
+            String path = String.format(
+                "/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/reported?format=JSON",
+                reporter, partner, product, year
+            );
+
+            String body = webClient.get()
                 .uri(path)
                 .retrieve()
                 .bodyToMono(String.class)
                 .block();
 
-        return ResponseEntity.ok(body);
-    }
+            if (body == null || body.isBlank()) {
+                throw new WitsDataNotFoundException(reporter, partner, product, year);
+            }
 
-    /** Hardcoded demo that returns MIN_RATE only (as plain text). */
-    public ResponseEntity<String> getMinRateOnly() {
-        String path = "/datasource/TRN/reporter/840/partner/000/product/100630/year/2020/datatype/reported?format=JSON";
-        String body = webClient.get().uri(path).retrieve().bodyToMono(String.class).block();
-        String minRate = extractObservationAttribute(body, "MIN_RATE");
-        return (minRate != null) ? ResponseEntity.ok(minRate) : ResponseEntity.noContent().build();
-    }
+            return body;
 
-    /** Parameterized version that returns MIN_RATE only (as plain text). */
-    public ResponseEntity<String> getMinRateOnly(String reporter, String partner, String product, String year) {
-    try {
-        String path = String.format(
-            "/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/reported?format=JSON",
-            reporter, partner, product, year
-        );
-
-        // Do NOT let 204/4xx throw; treat them as "no result".
-        String body = webClient.get()
-            .uri(path)
-            .exchangeToMono(resp -> {
-                if (resp.statusCode().is2xxSuccessful()) {
-                    return resp.bodyToMono(String.class).defaultIfEmpty("");
-                }
-                if (resp.statusCode().value() == 204 || resp.statusCode().is4xxClientError()) {
-                    // WITS often uses 204/404 when there’s no data
-                    return Mono.just(""); // mark as "no result"
-                }
-                // For 5xx, bubble up as error
-                return resp.bodyToMono(String.class)
-                           .flatMap(b -> Mono.error(new RuntimeException("Upstream " + resp.statusCode())));
-            })
-            .block();
-
-        if (body == null || body.isBlank()) {
-            return ResponseEntity.ok("No result found in WITS");
+        } catch (WitsDataNotFoundException e) {
+            throw e;
+        } catch (WebClientResponseException e) {
+            throw new WitsApiException("WITS API communication error", e.getStatusCode().value());
+        } catch (Exception e) {
+            throw new WitsApiException("Unexpected error: " + e.getMessage(), e);
         }
-
-        String minRate = extractObservationAttribute(body, "MIN_RATE");
-        return ResponseEntity.ok(minRate != null ? minRate : "No result found in WITS");
-
-    } catch (WebClientResponseException e) {
-        // Network OK but server returned error not handled above (e.g., 5xx)
-        return ResponseEntity.ok("API Error");
-    } catch (Exception e) {
-        // Timeouts, deserialization failures, etc.
-        return ResponseEntity.ok("API Error");
     }
-}
 
     /**
      * Extract an observation attribute (e.g., MIN_RATE, MAX_RATE) from SDMX-JSON v2.1.
@@ -157,6 +205,7 @@ public class WitsApiService {
             return null;
 
         } catch (Exception e) {
+            logger.error("Error extracting attribute {}: {}", attributeId, e.getMessage());
             return null;
         }
     }
