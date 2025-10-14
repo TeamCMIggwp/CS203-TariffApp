@@ -7,18 +7,29 @@ applications:
           commands:
             - nvm install 20
             - nvm use 20
+            - echo "Node: $(node -v), NPM: $(npm -v)"
+            - echo "Checking required environment variables..."
+            - 'test -n "$BACKEND_URL" || (echo "ERROR: BACKEND_URL is missing" && exit 1)'
+            - 'if [ -n "$JWT_SECRET" ]; then echo "JWT_SECRET present (len: ${#JWT_SECRET})"; else echo "ERROR: JWT_SECRET is missing" && exit 1; fi'
+            - 'test -n "$JWT_ISSUER" || (echo "ERROR: JWT_ISSUER is missing" && exit 1)'
+            - 'test -n "$JWT_AUDIENCE" || (echo "ERROR: JWT_AUDIENCE is missing" && exit 1)'
+            - 'if [ -n "$NEXT_PUBLIC_BACKEND_URL" ]; then echo "NEXT_PUBLIC_BACKEND_URL present"; else echo "NEXT_PUBLIC_BACKEND_URL not set (ok if you proxy via /api/*)"; fi'
             - npm ci
         build:
           commands:
+            # CAUTION: Writing secrets to .env.production helps Next.js pick them up at build time,
+            # but these values are sensitive. Prefer relying on Amplify Environment Variables.
+            # If you keep these lines, we remove the file after the build below.
+            - echo "NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL" >> .env.production
+            - echo "BACKEND_URL=$BACKEND_URL" >> .env.production
+            - echo "JWT_SECRET=$JWT_SECRET" >> .env.production
+            - echo "JWT_ISSUER=$JWT_ISSUER" >> .env.production
+            - echo "JWT_AUDIENCE=$JWT_AUDIENCE" >> .env.production
+            - echo "ACCESS_TOKEN_TTL_SECONDS=$ACCESS_TOKEN_TTL_SECONDS" >> .env.production
+            - echo "REFRESH_TOKEN_TTL_SECONDS=$REFRESH_TOKEN_TTL_SECONDS" >> .env.production
             - npm run build
-            # - NEXT_PUBLIC_BACKEND_URL = ${NEXT_PUBLIC_BACKEND_URL}
-            # - BACKEND_URL = ${BACKEND_URL}
-            # - JWT_SECRET = ${JWT_SECRET}
-            # - JWT_ISSUER = ${JWT_ISSUER}
-            # - JWT_AUDIENCE = ${JWT_AUDIENCE}
-            # - ACCESS_TOKEN_TTL_SECONDS = ${ACCESS_TOKEN_TTL_SECONDS}
-            # - REFRESH_TOKEN_TTL_SECONDS = ${REFRESH_TOKEN_TTL_SECONDS}
-
+            # Clean up to avoid leaving secrets on disk in the build environment
+            - rm -f .env.production
       artifacts:
         baseDirectory: .next
         files:
