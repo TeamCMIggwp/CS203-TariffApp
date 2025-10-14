@@ -35,7 +35,7 @@ export default function NewsPage() {
   const fetchNewsData = async (searchQuery: string, max: number, year: number) => {
     setLoading(true);
     setError(false);
-    
+
     try {
       const response = await fetch('https://teamcmiggwp.duckdns.org/api/scraper/search-and-scrape', {
         method: 'POST',
@@ -83,7 +83,7 @@ export default function NewsPage() {
             <IconAlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-white mb-2">Failed to Load News</h2>
             <p className="text-white/90">Unable to fetch tariff news at this time</p>
-            <button 
+            <button
               onClick={() => setError(false)}
               className="mt-4 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 font-bold px-6 py-2 rounded-lg border border-cyan-400/40"
             >
@@ -114,13 +114,13 @@ export default function NewsPage() {
   return (
     <section className="py-20 min-h-screen relative z-10">
       <div className="max-w-6xl mx-auto px-4">
-        
+
         {/* Header with Search */}
         <div className="text-center mb-10 bg-black/30 backdrop-blur-md p-6 rounded-2xl border border-white/30">
           <h1 className="text-5xl font-extrabold text-white mb-6 drop-shadow-lg">
             Latest Tariff News
           </h1>
-          
+
           {/* Search Form */}
           <form onSubmit={handleSearch} className="max-w-4xl mx-auto mb-6">
             {/* Query Input */}
@@ -276,33 +276,35 @@ export default function NewsPage() {
                   )}
 
                   {/* Source Link */}
+
+                  <a
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 hover:text-cyan-100 font-bold px-6 py-3 rounded-lg border border-cyan-400/40 hover:border-cyan-300 transition-all duration-200 shadow-lg hover:shadow-cyan-500/30"
                   
-                    href={article.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 hover:text-cyan-100 font-bold px-6 py-3 rounded-lg border border-cyan-400/40 hover:border-cyan-300 transition-all duration-200 shadow-lg hover:shadow-cyan-500/30"
-                  <a>
-                    Read Full Article →
-                  </a>
+                  >
+                  Read Full Article →
+                </a>
                 </div>
               ))}
-            </div>
+          </div>
 
-            {/* Stats Footer */}
-            <div className="mt-10 text-center bg-black/30 backdrop-blur-md p-4 rounded-xl border border-white/30">
-              <p className="text-white/90 font-medium">
-                Scraped {newsData.sourcesScraped} of {newsData.totalSourcesFound} sources
-                {minYear && <span className="text-cyan-300"> • Filtered from {minYear}</span>}
-              </p>
-              {Object.keys(newsData.errors).length > 0 && (
-                <p className="text-yellow-300 mt-2 font-semibold">
-                  ⚠️ {Object.keys(newsData.errors).length} sources failed to scrape
-                </p>
-              )}
-            </div>
-          </>
+        {/* Stats Footer */}
+        <div className="mt-10 text-center bg-black/30 backdrop-blur-md p-4 rounded-xl border border-white/30">
+          <p className="text-white/90 font-medium">
+            Scraped {newsData.sourcesScraped} of {newsData.totalSourcesFound} sources
+            {minYear && <span className="text-cyan-300"> • Filtered from {minYear}</span>}
+          </p>
+          {Object.keys(newsData.errors).length > 0 && (
+            <p className="text-yellow-300 mt-2 font-semibold">
+              ⚠️ {Object.keys(newsData.errors).length} sources failed to scrape
+            </p>
+          )}
+        </div>
+      </>
         )}
-      </div>
-    </section>
+    </div>
+    </section >
   );
 }
