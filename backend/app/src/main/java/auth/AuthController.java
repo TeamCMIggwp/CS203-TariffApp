@@ -2,10 +2,14 @@ package auth;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -103,6 +107,7 @@ public class AuthController {
     // Graceful GET support for browser navigations: clear cookie and redirect to login
     @GetMapping("/logout")
     public void logoutGet(@CookieValue(name = "refresh_token", required = false) String refreshToken,
+                          @RequestParam(name = "returnTo", defaultValue = "/login") String returnTo,
                           HttpServletResponse res) throws java.io.IOException {
         if (refreshToken != null && !refreshToken.isBlank()) {
             authService.logout(refreshToken);
@@ -112,7 +117,7 @@ public class AuthController {
             (cookieSecure ? "; Secure" : "");
         res.addHeader("Set-Cookie", clear);
         res.setStatus(303);
-        res.setHeader("Location", frontendBase + "/login");
+        res.setHeader("Location", frontendBase + returnTo);
     }
 
     // --- Dev-only helpers to align password hashes quickly ---
@@ -162,4 +167,67 @@ public class AuthController {
     }
 
     // Using simple Map bodies above; nested records not required.
+
+    // --- Profile Endpoints ---
+    @GetMapping("/me")
+    public ResponseEntity<?> me(@org.springframework.web.bind.annotation.RequestHeader(name="Authorization", required = false) String authHeader) {
+        try {
+            var parsed = authService.parseToken(authHeader);
+            try {
+                var profile = authService.getProfile(parsed.userId());
+                return ResponseEntity.ok(profile);
+            } catch (BadSqlGrammarException e) {
+                // Schema/table not available; fall back to token-derived minimal profile
+                return ResponseEntity.ok(java.util.Map.of(
+                    "userId", parsed.userId(),
+                    "email", null,
+                    "name", null,
+                    "role", parsed.role(),
+                    "source", "token"
+                ));
+            } catch (EmptyResultDataAccessException e) {
+                return ResponseEntity.status(404).body(java.util.Map.of("message", "User not found"));
+            }
+        } catch (AuthService.Unauthorized ex) {
+            return ResponseEntity.status(401).body(java.util.Map.of("message", ex.getMessage()));
+        } catch (DataAccessException ex) {
+            // Unexpected data access error; avoid leaking stack as 500 HTML
+            return ResponseEntity.status(502).body(java.util.Map.of("message", "Profile store unavailable"));
+        }
+    }
+
+    public record UpdateProfileRequest(String name, String email) {}
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateProfile(
+        @org.springframework.web.bind.annotation.RequestHeader(name="Authorization", required = false) String authHeader,
+        @RequestBody UpdateProfileRequest req) {
+        try {
+            var parsed = authService.parseToken(authHeader);
+            try {
+                var result = authService.updateProfile(parsed.userId(), req != null ? req.name() : null, req != null ? req.email() : null);
+                return ResponseEntity.ok(result);
+            } catch (BadSqlGrammarException ex) {
+                // Profile persistence not available in this deployment
+                return ResponseEntity.status(501).body(java.util.Map.of("message", "Profile update not supported by backend"));
+            }
+        } catch (AuthService.Unauthorized ex) {
+            return ResponseEntity.status(401).body(java.util.Map.of("message", ex.getMessage()));
+        } catch (DataAccessException ex) {
+            return ResponseEntity.status(502).body(java.util.Map.of("message", "Profile store unavailable"));
+        }
+    }
+
+    public record ChangePasswordRequest(String currentPassword, String newPassword) {}
+    @PutMapping("/password")
+    public ResponseEntity<?> changePassword(
+        @org.springframework.web.bind.annotation.RequestHeader(name="Authorization", required = false) String authHeader,
+        @RequestBody ChangePasswordRequest req) {
+        try {
+            var parsed = authService.parseToken(authHeader);
+            var result = authService.changePassword(parsed.userId(), req != null ? req.currentPassword() : null, req != null ? req.newPassword() : null);
+            return ResponseEntity.ok(result);
+        } catch (AuthService.Unauthorized ex) {
+            return ResponseEntity.status(401).body(java.util.Map.of("message", ex.getMessage()));
+        }
+    }
 }

@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import React from "react"
 import dynamic from "next/dynamic"
 import { FloatingDock } from "@/components/ui/floating-dock"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
 import {
   IconAdjustmentsCog,
   IconChartHistogram,
@@ -13,6 +14,7 @@ import {
   IconHistory,
   IconCalculator,
   IconUser,
+  IconLogout,
 } from "@tabler/icons-react"
 import "./globals.css"
 
@@ -456,6 +458,7 @@ const links = [
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [showAdmin, setShowAdmin] = React.useState(false);
+  const [isAuth, setIsAuth] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -465,10 +468,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       .then((data) => {
         if (cancelled) return;
         const roles: string[] = Array.isArray(data?.roles) ? data.roles.map((r: string) => r.toLowerCase()) : [];
-        setShowAdmin(data?.authenticated && roles.includes("admin"));
+        const authed = !!data?.authenticated;
+        setIsAuth(authed);
+        setShowAdmin(authed && roles.includes("admin"));
       })
       .catch(() => {
-        if (!cancelled) setShowAdmin(false);
+        if (!cancelled) {
+          setIsAuth(false);
+          setShowAdmin(false);
+        }
       });
     return () => {
       cancelled = true;
@@ -477,6 +485,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   const navLinks = React.useMemo(() => {
     const base = [...links];
+    // Replace Login with My Profile if authenticated
+    const loginIdx = base.findIndex((l) => l.title === "Login");
+    if (isAuth && loginIdx !== -1) {
+      base[loginIdx] = {
+        title: "My Profile",
+        icon: <IconUser className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+        href: "/profile",
+      };
+      // Add Logout entry right after Profile
+      base.splice(loginIdx + 1, 0, {
+        title: "Logout",
+        icon: <IconLogout className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+        href: "/logout",
+      });
+    }
     if (showAdmin) {
       base.splice(6, 0, {
         title: "Admin",
@@ -488,14 +511,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       ...link,
       href: link.href === pathname ? "#" : link.href,
     }));
-  }, [pathname, showAdmin]);
+  }, [pathname, showAdmin, isAuth]);
 
   return (
     <html lang="en">
       <body className="font-sans relative bg-white text-white">
         {/* Globe Background */}
         <div className="fixed top-0 left-0 w-screen h-screen z-0 pointer-events-none">
-          <World data={sampleArcs} globeConfig={globeConfig} />
+          <ErrorBoundary fallback={null}>
+            <World data={sampleArcs} globeConfig={globeConfig} />
+          </ErrorBoundary>
         </div>
 
         {/* Page Content */}

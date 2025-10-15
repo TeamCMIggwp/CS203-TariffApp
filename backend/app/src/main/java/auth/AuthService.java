@@ -6,11 +6,11 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.interfaces.DecodedJWT;
+import com.auth0.jwt.interfaces.JWTVerifier;
 
 @Service
 public class AuthService {
@@ -41,6 +43,101 @@ public class AuthService {
 
     public AuthService(@Qualifier("authJdbcTemplate") JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+    }
+
+    public record ParsedToken(String userId, String role) {}
+
+    public ParsedToken parseToken(String bearerToken) {
+        if (bearerToken == null || bearerToken.isBlank()) throw new Unauthorized("Missing token");
+        String token = bearerToken.startsWith("Bearer ") ? bearerToken.substring(7) : bearerToken;
+        Algorithm alg = Algorithm.HMAC256(jwtSecret);
+        JWTVerifier verifier = JWT.require(alg)
+            .withIssuer(jwtIssuer)
+            .withAudience(jwtAudience)
+            .build();
+        DecodedJWT jwt = verifier.verify(token);
+        String userId = jwt.getClaim("userId").asString();
+        String role = jwt.getClaim("role").asString();
+        if (userId == null || userId.isBlank()) throw new Unauthorized("Invalid token");
+        return new ParsedToken(userId, role != null ? role : "user");
+    }
+
+    public Map<String, Object> getProfile(String userId) {
+        try {
+            var m = jdbc.queryForMap("SELECT id, email, name, role FROM accounts.users WHERE id = ?", userId);
+            return Map.of(
+                "userId", (String)m.get("id"),
+                "email", (String)m.get("email"),
+                "name", (String)m.getOrDefault("name", null),
+                "role", (String)m.getOrDefault("role", "user")
+            );
+        } catch (EmptyResultDataAccessException e) {
+            throw new Unauthorized("User not found");
+        }
+    }
+
+    public Map<String, Object> updateProfile(String userId, String name, String email) {
+        int updated = 0;
+        if (email != null && !email.isBlank()) {
+            // ensure uniqueness
+            Integer exists = jdbc.queryForObject("SELECT COUNT(1) FROM accounts.users WHERE LOWER(email)=LOWER(?) AND id<>?", Integer.class, email, userId);
+            if (exists != null && exists > 0) {
+                return Map.of("updated", 0, "message", "Email already in use");
+            }
+            updated += jdbc.update("UPDATE accounts.users SET email = ? WHERE id = ?", email, userId);
+        }
+        if (name != null && !name.isBlank()) {
+            try {
+                updated += jdbc.update("UPDATE accounts.users SET name = ? WHERE id = ?", name, userId);
+            } catch (BadSqlGrammarException ignore) {
+                // name column may not exist in some schemas
+            }
+        }
+        var profile = getProfile(userId);
+        return Map.of("updated", updated, "profile", profile);
+    }
+
+    public Map<String, Object> changePassword(String userId, String currentPassword, String newPassword) {
+        if (currentPassword == null || newPassword == null || newPassword.isBlank()) {
+            return Map.of("updated", 0, "message", "Missing password(s)");
+        }
+        // Fetch hash by user id
+        String passwordHash = null;
+        String algorithm = null;
+        try {
+            var m = jdbc.queryForMap("SELECT password_hash, algorithm FROM accounts.user_passwords WHERE user_id = ?", userId);
+            passwordHash = (String)m.get("password_hash");
+            algorithm = (String)m.get("algorithm");
+        } catch (EmptyResultDataAccessException nf) {
+            // try legacy
+            try {
+                var m = jdbc.queryForMap("SELECT password_hash, password_algorithm FROM accounts.accounts WHERE user_id = ? AND provider='credentials'", userId);
+                passwordHash = (String)m.get("password_hash");
+                algorithm = (String)m.get("password_algorithm");
+            } catch (EmptyResultDataAccessException nf2) {
+                return Map.of("updated", 0, "message", "No existing password found");
+            }
+        }
+        boolean matched = false;
+        String algo = algorithm != null ? algorithm.toLowerCase() : null;
+        if (passwordHash != null) {
+            try {
+                if ((algo != null && algo.contains("argon2")) || passwordHash.startsWith("$argon2")) matched = argon2.matches(currentPassword, passwordHash);
+                else if ((algo != null && algo.contains("bcrypt")) || passwordHash.startsWith("$2a$") || passwordHash.startsWith("$2b$") || passwordHash.startsWith("$2y$")) matched = bcrypt.matches(currentPassword, passwordHash);
+                else {
+                    try { matched = argon2.matches(currentPassword, passwordHash); } catch (IllegalArgumentException ignore) {}
+                    if (!matched) { try { matched = bcrypt.matches(currentPassword, passwordHash); } catch (IllegalArgumentException ignore) {} }
+                }
+            } catch (IllegalArgumentException ignore) { matched = false; }
+        }
+        if (!matched) return Map.of("updated", 0, "message", "Current password is incorrect");
+        String newHash = argon2.encode(newPassword);
+        // upsert
+        int n = jdbc.update("UPDATE accounts.user_passwords SET password_hash = ?, algorithm='argon2id' WHERE user_id = ?", newHash, userId);
+        if (n == 0) {
+            jdbc.update("INSERT INTO accounts.user_passwords (user_id, password_hash, algorithm) VALUES (?, ?, 'argon2id')", userId, newHash);
+        }
+        return Map.of("updated", 1);
     }
 
     public ResponseEntity<?> signup(SignupRequest req) {

@@ -67,7 +67,13 @@ export async function GET(req: Request) {
       // Fallback to access_token cookie for cross-site deployments
       const cookieHeader = req.headers.get("cookie") || "";
       const match = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/);
-      if (match) accessToken = decodeURIComponent(match[1]);
+      if (match) {
+        try {
+          accessToken = decodeURIComponent(match[1]);
+        } catch {
+          accessToken = match[1];
+        }
+      }
     }
 
     if (!accessToken) {
@@ -93,27 +99,32 @@ export async function GET(req: Request) {
       tokenRoles = rolesFromPayload(decodeJwt(accessToken));
     } catch {}
 
-    // Ask backend for user info; do not validate roles on the client
-    const res = await fetch(`${BACKEND_URL}/auth/me`, {
-      headers: { authorization: `Bearer ${accessToken}` },
-      cache: "no-store",
-    });
-
-    if (!res.ok) {
-      // Fall back to decoded roles if backend cannot be reached or denies
+    // If BACKEND_URL is not provided at runtime (e.g., Amplify), skip backend call and rely on token-derived roles
+    const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) {
       return NextResponse.json({ authenticated: true, roles: tokenRoles }, { status: 200 });
     }
 
-    const me: unknown = await res.json();
-    const meRecord = isRecord(me) ? me : undefined;
-    const roles = normalizeRoles([
-      ...extractRolesFromUnknown(meRecord?.role),
-      ...extractRolesFromUnknown(meRecord?.roles),
-      ...extractRolesFromUnknown(meRecord?.authorities),
-    ]);
-    // Merge with token-derived roles to be forgiving about backend shape
-    const merged = Array.from(new Set([...(roles || []), ...(tokenRoles || [])]));
-    return NextResponse.json({ authenticated: true, roles: merged }, { status: 200 });
+    try {
+      const res = await fetch(`${backendUrl}/auth/me`, {
+        headers: { authorization: `Bearer ${accessToken}` },
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        return NextResponse.json({ authenticated: true, roles: tokenRoles }, { status: 200 });
+      }
+      const me: unknown = await res.json();
+      const meRecord = isRecord(me) ? me : undefined;
+      const roles = normalizeRoles([
+        ...extractRolesFromUnknown(meRecord?.role),
+        ...extractRolesFromUnknown(meRecord?.roles),
+        ...extractRolesFromUnknown(meRecord?.authorities),
+      ]);
+      const merged = Array.from(new Set([...(roles || []), ...(tokenRoles || [])]));
+      return NextResponse.json({ authenticated: true, roles: merged }, { status: 200 });
+    } catch {
+      return NextResponse.json({ authenticated: true, roles: tokenRoles }, { status: 200 });
+    }
   } catch {
     // Do not fail hard; if we had a token, try to show at least token-derived roles
     try {
