@@ -23,24 +23,12 @@ function buildAuthHeader(req: Request): string | undefined {
 export async function GET(req: Request) {
   const auth = buildAuthHeader(req);
   if (!auth) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
-  if (!backendUrl) {
-    // No backend configured at runtime: return minimal token-derived profile if possible
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : undefined;
-    if (token) {
-      try {
-        const payload = decodeJwt(token) as JWTPayload & Record<string, unknown>;
-        const email = (payload.email as string) || (payload.preferred_username as string) || (payload.sub as string) || undefined;
-        const name = (payload.name as string) || (payload.given_name as string) || undefined;
-        if (email || name) {
-          return NextResponse.json({ email, name, source: "token" }, { status: 200 });
-        }
-      } catch {}
-    }
-    return NextResponse.json({ message: "Profile unavailable (no backend configured)" }, { status: 200 });
-  }
+  const backendEnv = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
+  const targetMe = backendEnv
+    ? `${backendEnv}/auth/me`
+    : new URL('/backend/auth/me', req.url).toString();
   try {
-    const r = await fetch(`${backendUrl}/auth/me`, { headers: { authorization: auth }, cache: "no-store" });
+    const r = await fetch(targetMe, { headers: { authorization: auth }, cache: "no-store" });
     if (r.ok) {
       const data = await r.json().catch(() => ({}));
       return NextResponse.json(data, { status: r.status });
@@ -79,12 +67,12 @@ export async function PUT(req: Request) {
   const auth = buildAuthHeader(req);
   if (!auth) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   const body = await req.json().catch(() => ({}));
-  const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
-  if (!backendUrl) {
-    return NextResponse.json({ message: "Profile update not supported by backend (not configured)" }, { status: 501 });
-  }
+  const backendEnv = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
+  const targetProfile = backendEnv
+    ? `${backendEnv}/auth/profile`
+    : new URL('/backend/auth/profile', req.url).toString();
   try {
-    const r = await fetch(`${backendUrl}/auth/profile`, {
+    const r = await fetch(targetProfile, {
       method: "PUT",
       headers: { "content-type": "application/json", authorization: auth },
       body: JSON.stringify({ name: body?.name, email: body?.email }),
