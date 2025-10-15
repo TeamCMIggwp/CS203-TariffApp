@@ -16,6 +16,7 @@ import {
   IconUser,
   IconLogout,
 } from "@tabler/icons-react"
+import { Newspaper } from "lucide-react"
 import "./globals.css"
 
 const World = dynamic(() => import("@/components/ui/globe").then((m) => m.World), {
@@ -444,7 +445,7 @@ const links = [
   // Admin link is conditionally added based on session (see RootLayout)
   {
     title: "News",
-    icon: <IconChartHistogram className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+    icon: <Newspaper className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
     href: "/news",
   },
   {
