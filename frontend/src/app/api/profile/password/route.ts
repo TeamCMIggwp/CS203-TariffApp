@@ -31,7 +31,7 @@ export async function PUT(req: Request) {
     });
     const data = await r.json().catch(() => ({}));
     return NextResponse.json(data, { status: r.status });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ message: "Password service unavailable" }, { status: 502 });
   }
 }

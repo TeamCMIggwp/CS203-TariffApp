@@ -21,7 +21,6 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: unknown) {
     if (process.env.NODE_ENV !== 'production') {
-      // eslint-disable-next-line no-console
       console.error('ErrorBoundary caught:', error);
     }
   }

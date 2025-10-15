@@ -42,18 +42,19 @@ export async function GET(req: Request) {
       } catch {}
     }
     // Do not propagate 5xx to the browser; return 200 with an error payload to keep UI flow smooth
-    let payload: any = { message: "Profile unavailable" };
+  type MessagePayload = { message: string } | { message?: string };
+  let payload: MessagePayload | undefined = { message: "Profile unavailable" };
     try {
       const ct = r.headers.get("content-type") || "";
       if (ct.includes("application/json")) {
-        payload = await r.json();
+  payload = (await r.json()) as MessagePayload;
       } else {
         const text = await r.text();
-        payload = { message: text || payload.message };
+  payload = { message: text || (payload?.message ?? "Profile unavailable") };
       }
     } catch {}
-    return NextResponse.json(payload, { status: 200 });
-  } catch (e) {
+  return NextResponse.json((payload as MessagePayload) ?? { message: "Profile unavailable" }, { status: 200 });
+  } catch {
     return NextResponse.json({ message: "Profile service unavailable" }, { status: 502 });
   }
 }
@@ -71,9 +72,9 @@ export async function PUT(req: Request) {
     // Some servers respond with 404/405 or HTML/text body like "No static resource auth/profile"
     if (!r.ok) {
       const ct = r.headers.get("content-type") || "";
-      let payload: any = undefined;
+      let payload: { message?: string } | undefined = undefined;
       if (ct.includes("application/json")) {
-        payload = await r.json().catch(() => undefined);
+        payload = (await r.json().catch(() => undefined)) as { message?: string } | undefined;
       } else {
         const text = await r.text().catch(() => "");
         if (text && /no static resource/i.test(text)) {
@@ -89,7 +90,7 @@ export async function PUT(req: Request) {
     }
     const data = await r.json().catch(() => ({}));
     return NextResponse.json(data, { status: r.status });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ message: "Profile update service unavailable" }, { status: 502 });
   }
 }

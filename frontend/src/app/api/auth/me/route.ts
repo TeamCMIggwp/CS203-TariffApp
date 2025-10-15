@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
 import { decodeJwt, type JWTPayload } from "jose";
 
-const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
-
-type PrimitiveRole = string;
 type RoleLikeObject = { authority?: unknown; role?: unknown; name?: unknown };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
 
-function asString(v: unknown): string | undefined {
-  return typeof v === "string" ? v : undefined;
-}
+//
 
 function extractRoleFromObject(o: unknown): string | undefined {
   if (!isRecord(o)) return undefined;
