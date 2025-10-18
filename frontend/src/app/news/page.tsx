@@ -24,19 +24,35 @@ interface ScrapeResult {
   errors: { [key: string]: string };
 }
 
+interface NewsFromDB {
+  newsLink: string;
+  remarks: string | null;
+  timestamp: string;
+}
+
+interface EnrichedArticle extends ScrapedData {
+  isInDatabase: boolean;
+  remarks: string | null;
+}
+
 export default function NewsPage() {
   const [query, setQuery] = useState("rice tariff");
   const [maxResults, setMaxResults] = useState(10);
   const [minYear, setMinYear] = useState(2024);
   const [newsData, setNewsData] = useState<ScrapeResult | null>(null);
+  const [enrichedArticles, setEnrichedArticles] = useState<EnrichedArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [editingRemarks, setEditingRemarks] = useState<{ [key: number]: string }>({});
+  const [updatingRemarks, setUpdatingRemarks] = useState<{ [key: number]: boolean }>({});
+  const [addingToDatabase, setAddingToDatabase] = useState<{ [key: number]: boolean }>({});
 
   const fetchNewsData = async (searchQuery: string, max: number, year: number) => {
     setLoading(true);
     setError(false);
-
+    
     try {
+      // Step 1: Scrape news from official sources
       const response = await fetch('https://teamcmiggwp.duckdns.org/api/scraper/search-and-scrape', {
         method: 'POST',
         headers: {
@@ -57,8 +73,66 @@ export default function NewsPage() {
         return;
       }
 
-      const data = await response.json();
-      setNewsData(data);
+      const scrapedData: ScrapeResult = await response.json();
+      setNewsData(scrapedData);
+
+      // Step 2: For each scraped article, check if it exists in database
+      const enriched: EnrichedArticle[] = await Promise.all(
+        scrapedData.data.map(async (article) => {
+          try {
+            // Check if this link exists in database
+            const checkResponse = await fetch('https://teamcmiggwp.duckdns.org/api/v1/news/exists', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                newsLink: article.url
+              }),
+              cache: 'no-store'
+            });
+
+            if (checkResponse.ok) {
+              const { exists } = await checkResponse.json();
+              
+              // If exists, fetch the full record to get remarks
+              if (exists) {
+                const getResponse = await fetch('https://teamcmiggwp.duckdns.org/api/v1/news/get', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    newsLink: article.url
+                  }),
+                  cache: 'no-store'
+                });
+
+                if (getResponse.ok) {
+                  const dbEntry: NewsFromDB = await getResponse.json();
+                  return {
+                    ...article,
+                    isInDatabase: true,
+                    remarks: dbEntry.remarks
+                  };
+                }
+              }
+            }
+          } catch (dbError) {
+            console.error('Error checking database for:', article.url, dbError);
+          }
+
+          // Default: not in database
+          return {
+            ...article,
+            isInDatabase: false,
+            remarks: null
+          };
+        })
+      );
+      
+      setEnrichedArticles(enriched);
+
     } catch (err) {
       console.error('Error fetching news:', err);
       setError(true);
@@ -74,6 +148,103 @@ export default function NewsPage() {
     }
   };
 
+  const handleRemarksChange = (index: number, value: string) => {
+    setEditingRemarks(prev => ({ ...prev, [index]: value }));
+  };
+
+  const updateRemarksToDatabase = async (index: number, article: EnrichedArticle) => {
+    const remarksToUpdate = editingRemarks[index] !== undefined 
+      ? editingRemarks[index] 
+      : (article.remarks || '');
+
+    setUpdatingRemarks(prev => ({ ...prev, [index]: true }));
+
+    try {
+      const response = await fetch('https://teamcmiggwp.duckdns.org/api/v1/news', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          newsLink: article.url,
+          remarks: remarksToUpdate
+        }),
+        cache: 'no-store'
+      });
+
+      if (response.ok) {
+        // Update local state to reflect the change
+        const updatedArticles = [...enrichedArticles];
+        updatedArticles[index] = {
+          ...updatedArticles[index],
+          remarks: remarksToUpdate
+        };
+        setEnrichedArticles(updatedArticles);
+        
+        // Clear editing state for this article
+        const newEditingRemarks = { ...editingRemarks };
+        delete newEditingRemarks[index];
+        setEditingRemarks(newEditingRemarks);
+
+        alert('Remarks updated successfully!');
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to update remarks: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error updating remarks:', error);
+      alert('Failed to update remarks. Please try again.');
+    } finally {
+      setUpdatingRemarks(prev => ({ ...prev, [index]: false }));
+    }
+  };
+
+  const addSourceToDatabase = async (index: number, article: EnrichedArticle) => {
+    const remarksToAdd = editingRemarks[index] || null;
+
+    setAddingToDatabase(prev => ({ ...prev, [index]: true }));
+
+    try {
+      const response = await fetch('https://teamcmiggwp.duckdns.org/api/v1/news', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          newsLink: article.url,
+          remarks: remarksToAdd
+        }),
+        cache: 'no-store'
+      });
+
+      if (response.ok) {
+        // Update local state to mark article as in database
+        const updatedArticles = [...enrichedArticles];
+        updatedArticles[index] = {
+          ...updatedArticles[index],
+          isInDatabase: true,
+          remarks: remarksToAdd
+        };
+        setEnrichedArticles(updatedArticles);
+        
+        // Clear editing state for this article
+        const newEditingRemarks = { ...editingRemarks };
+        delete newEditingRemarks[index];
+        setEditingRemarks(newEditingRemarks);
+
+        alert('Source added to database successfully!');
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to add source: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error adding source to database:', error);
+      alert('Failed to add source. Please try again.');
+    } finally {
+      setAddingToDatabase(prev => ({ ...prev, [index]: false }));
+    }
+  };
+
   // Error state
   if (error || (newsData && !newsData.completed)) {
     return (
@@ -83,7 +254,7 @@ export default function NewsPage() {
             <IconAlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-white mb-2">Failed to Load News</h2>
             <p className="text-white/90">Unable to fetch tariff news at this time</p>
-            <button
+            <button 
               onClick={() => setError(false)}
               className="mt-4 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 font-bold px-6 py-2 rounded-lg border border-cyan-400/40"
             >
@@ -96,7 +267,7 @@ export default function NewsPage() {
   }
 
   // No data state
-  if (newsData && newsData.data.length === 0) {
+  if (newsData && enrichedArticles.length === 0) {
     return (
       <section className="py-20 min-h-screen relative z-10">
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -114,13 +285,13 @@ export default function NewsPage() {
   return (
     <section className="py-20 min-h-screen relative z-10">
       <div className="max-w-6xl mx-auto px-4">
-
+        
         {/* Header with Search */}
         <div className="text-center mb-10 bg-black/30 backdrop-blur-md p-6 rounded-2xl border border-white/30">
           <h1 className="text-5xl font-extrabold text-white mb-6 drop-shadow-lg">
             Latest Tariff News
           </h1>
-
+          
           {/* Search Form */}
           <form onSubmit={handleSearch} className="max-w-4xl mx-auto mb-6">
             {/* Query Input */}
@@ -189,12 +360,32 @@ export default function NewsPage() {
           {newsData && (
             <>
               <p className="text-cyan-300 text-sm font-semibold">
-                Query: {newsData.query}
+                Query: "{newsData.query}"
               </p>
               <p className="text-white/90 text-lg font-medium mt-2">
                 Scraped from official sources • {newsData.sourcesScraped} articles found
                 {minYear && <span className="text-cyan-300"> • From {minYear} onwards</span>}
               </p>
+              {/* Stats moved to top */}
+              <div className="mt-4 bg-black/40 backdrop-blur-md p-3 rounded-xl border border-white/30">
+                <p className="text-white/90 font-medium">
+                  Scraped {newsData.sourcesScraped} of {newsData.totalSourcesFound} sources
+                  {minYear && <span className="text-cyan-300"> • Filtered from {minYear}</span>}
+                  {enrichedArticles.length > 0 && (
+                    <>
+                      {' • '}
+                      <span className="text-green-300">
+                        {enrichedArticles.filter(a => a.isInDatabase).length} already in database
+                      </span>
+                    </>
+                  )}
+                </p>
+                {Object.keys(newsData.errors).length > 0 && (
+                  <p className="text-yellow-300 mt-2 font-semibold text-sm">
+                    ⚠️ {Object.keys(newsData.errors).length} sources failed to scrape
+                  </p>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -213,10 +404,10 @@ export default function NewsPage() {
         )}
 
         {/* News Articles */}
-        {newsData && !loading && (
+        {newsData && !loading && enrichedArticles.length > 0 && (
           <>
-            <div className="space-y-6">
-              {newsData.data.map((article, index) => (
+            <div className="space-y-6 mt-6">
+              {enrichedArticles.map((article, index) => (
                 <div
                   key={index}
                   className="bg-black/50 backdrop-blur-xl rounded-2xl p-8 border-2 border-white/30 shadow-2xl hover:shadow-cyan-500/20 hover:border-cyan-400/50 transition-all duration-300"
@@ -227,9 +418,16 @@ export default function NewsPage() {
                       <IconNews className="w-7 h-7 text-cyan-300 flex-shrink-0" />
                     </div>
                     <div className="flex-1">
-                      <h2 className="text-3xl font-bold text-white mb-3 leading-tight">
-                        {article.title}
-                      </h2>
+                      <div className="flex items-center gap-3 mb-3">
+                        <h2 className="text-3xl font-bold text-white leading-tight">
+                          {article.title}
+                        </h2>
+                        {article.isInDatabase && (
+                          <span className="bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-xs font-semibold border border-green-400/40 flex-shrink-0">
+                            ✓ In Database
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-3 text-sm">
                         <span className="bg-cyan-500/30 text-cyan-100 px-4 py-1.5 rounded-full font-semibold border border-cyan-400/40">
                           {article.sourceDomain}
@@ -268,43 +466,102 @@ export default function NewsPage() {
                       <div className="space-y-3">
                         {article.relevantText.slice(0, 2).map((text, idx) => (
                           <p key={idx} className="text-white/90 text-sm leading-relaxed pl-4 border-l-2 border-cyan-400/50">
-                            {text.substring(0, 200)}...
+                            "{text.substring(0, 200)}..."
                           </p>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Source Link */}
-
-                  <a
-                  href={article.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 hover:text-cyan-100 font-bold px-6 py-3 rounded-lg border border-cyan-400/40 hover:border-cyan-300 transition-all duration-200 shadow-lg hover:shadow-cyan-500/30"
-                  
-                  >
-                  Read Full Article →
-                </a>
+                  {/* Source Link and Remarks */}
+                  <div className="flex flex-col lg:flex-row gap-4 items-stretch">
+                    <a
+                      href={article.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 hover:text-cyan-100 font-bold px-6 py-3 rounded-lg border border-cyan-400/40 hover:border-cyan-300 transition-all duration-200 shadow-lg hover:shadow-cyan-500/30 w-fit"
+                    >
+                      Read Full Article →
+                    </a>
+                    
+                    {/* Remarks Section */}
+                    <div className="flex-1 min-w-0 flex flex-col gap-2">
+                      {article.isInDatabase ? (
+                        <>
+                          {/* Editable Remarks Textarea - In Database */}
+                          <textarea
+                            value={editingRemarks[index] !== undefined ? editingRemarks[index] : (article.remarks || '')}
+                            onChange={(e) => handleRemarksChange(index, e.target.value)}
+                            placeholder="No remarks added yet"
+                            className="flex-1 bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-4 text-yellow-100 text-sm placeholder-yellow-300/50 focus:outline-none focus:border-yellow-400/60 transition-all resize-none min-h-[100px]"
+                          />
+                          {/* Update Button */}
+                          <button
+                            onClick={() => updateRemarksToDatabase(index, article)}
+                            disabled={updatingRemarks[index]}
+                            className="self-end bg-yellow-500/20 hover:bg-yellow-500/30 disabled:bg-gray-500/20 text-yellow-300 hover:text-yellow-100 disabled:text-gray-400 font-bold px-6 py-2 rounded-lg border border-yellow-400/40 hover:border-yellow-300 disabled:border-gray-400/40 transition-all duration-200 disabled:cursor-not-allowed"
+                          >
+                            {updatingRemarks[index] ? (
+                              <>
+                                <div className="inline-block w-4 h-4 border-2 border-yellow-300/30 border-t-yellow-300 rounded-full animate-spin mr-2"></div>
+                                Updating...
+                              </>
+                            ) : (
+                              'Update remarks to database'
+                            )}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          {/* Editable Remarks Textarea - Not in Database */}
+                          <textarea
+                            value={editingRemarks[index] || ''}
+                            onChange={(e) => handleRemarksChange(index, e.target.value)}
+                            placeholder="No remarks added yet"
+                            className="flex-1 bg-white/5 border border-white/20 rounded-lg p-4 text-white/90 text-sm placeholder-white/40 focus:outline-none focus:border-cyan-400/60 transition-all resize-none min-h-[100px]"
+                          />
+                          {/* Add to Database Button */}
+                          <button
+                            onClick={() => addSourceToDatabase(index, article)}
+                            disabled={addingToDatabase[index]}
+                            className="self-end bg-cyan-500/20 hover:bg-cyan-500/30 disabled:bg-gray-500/20 text-cyan-300 hover:text-cyan-100 disabled:text-gray-400 font-bold px-6 py-2 rounded-lg border border-cyan-400/40 hover:border-cyan-300 disabled:border-gray-400/40 transition-all duration-200 disabled:cursor-not-allowed"
+                          >
+                            {addingToDatabase[index] ? (
+                              <>
+                                <div className="inline-block w-4 h-4 border-2 border-cyan-300/30 border-t-cyan-300 rounded-full animate-spin mr-2"></div>
+                                Adding...
+                              </>
+                            ) : (
+                              'Add source to database'
+                            )}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
-          </div>
+            </div>
 
-        {/* Stats Footer */}
-        <div className="mt-10 text-center bg-black/30 backdrop-blur-md p-4 rounded-xl border border-white/30">
-          <p className="text-white/90 font-medium">
-            Scraped {newsData.sourcesScraped} of {newsData.totalSourcesFound} sources
-            {minYear && <span className="text-cyan-300"> • Filtered from {minYear}</span>}
-          </p>
-          {Object.keys(newsData.errors).length > 0 && (
-            <p className="text-yellow-300 mt-2 font-semibold">
-              ⚠️ {Object.keys(newsData.errors).length} sources failed to scrape
-            </p>
-          )}
-        </div>
-      </>
+            {/* Stats Footer */}
+            <div className="mt-10 text-center bg-black/30 backdrop-blur-md p-4 rounded-xl border border-white/30">
+              <p className="text-white/90 font-medium">
+                Scraped {newsData.sourcesScraped} of {newsData.totalSourcesFound} sources
+                {minYear && <span className="text-cyan-300"> • Filtered from {minYear}</span>}
+                {' • '}
+                <span className="text-green-300">
+                  {enrichedArticles.filter(a => a.isInDatabase).length} already in database
+                </span>
+              </p>
+              {Object.keys(newsData.errors).length > 0 && (
+                <p className="text-yellow-300 mt-2 font-semibold">
+                  ⚠️ {Object.keys(newsData.errors).length} sources failed to scrape
+                </p>
+              )}
+            </div>
+          </>
         )}
-    </div>
-    </section >
+      </div>
+    </section>
   );
 }
