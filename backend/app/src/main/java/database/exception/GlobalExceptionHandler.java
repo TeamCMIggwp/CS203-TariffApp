@@ -18,6 +18,8 @@ import java.util.Map;
 public class GlobalExceptionHandler {
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     
+    // Tariff Exception Handlers
+    
     @ExceptionHandler(TariffAlreadyExistsException.class)
     public ResponseEntity<ErrorResponse> handleTariffAlreadyExists(
             TariffAlreadyExistsException ex, WebRequest request) {
@@ -47,6 +49,40 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
+    
+    // News Exception Handlers
+    
+    @ExceptionHandler(NewsAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleNewsAlreadyExists(
+            NewsAlreadyExistsException ex, WebRequest request) {
+        logger.warn("News already exists: {}", ex.getMessage());
+        
+        ErrorResponse error = new ErrorResponse(
+            LocalDateTime.now(),
+            HttpStatus.CONFLICT.value(),
+            "Conflict",
+            ex.getMessage(),
+            request.getDescription(false).replace("uri=", "")
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+    
+    @ExceptionHandler(NewsNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNewsNotFound(
+            NewsNotFoundException ex, WebRequest request) {
+        logger.warn("News not found: {}", ex.getMessage());
+        
+        ErrorResponse error = new ErrorResponse(
+            LocalDateTime.now(),
+            HttpStatus.NOT_FOUND.value(),
+            "Not Found",
+            ex.getMessage(),
+            request.getDescription(false).replace("uri=", "")
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+    
+    // General Exception Handlers
     
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ValidationErrorResponse> handleValidationExceptions(
