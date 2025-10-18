@@ -81,43 +81,31 @@ export default function NewsPage() {
       const enriched: EnrichedArticle[] = await Promise.all(
         scrapedData.data.map(async (article) => {
           try {
-            // Check if this link exists in database
-            const checkResponse = await fetch('https://teamcmiggwp.duckdns.org/api/v1/news/exists', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                newsLink: article.url
-              }),
-              cache: 'no-store'
-            });
+            // Check if this link exists in database using GET with query parameter
+            const encodedUrl = encodeURIComponent(article.url);
+            const checkResponse = await fetch(
+              `https://teamcmiggwp.duckdns.org/api/v1/database/news?newsLink=${encodedUrl}`,
+              {
+                method: 'GET',
+                cache: 'no-store'
+              }
+            );
 
             if (checkResponse.ok) {
-              const { exists } = await checkResponse.json();
-              
-              // If exists, fetch the full record to get remarks
-              if (exists) {
-                const getResponse = await fetch('https://teamcmiggwp.duckdns.org/api/v1/news/get', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    newsLink: article.url
-                  }),
-                  cache: 'no-store'
-                });
-
-                if (getResponse.ok) {
-                  const dbEntry: NewsFromDB = await getResponse.json();
-                  return {
-                    ...article,
-                    isInDatabase: true,
-                    remarks: dbEntry.remarks
-                  };
-                }
-              }
+              // If exists, we got the full record with remarks
+              const dbEntry: NewsFromDB = await checkResponse.json();
+              return {
+                ...article,
+                isInDatabase: true,
+                remarks: dbEntry.remarks
+              };
+            } else if (checkResponse.status === 404) {
+              // Not found in database
+              return {
+                ...article,
+                isInDatabase: false,
+                remarks: null
+              };
             }
           } catch (dbError) {
             console.error('Error checking database for:', article.url, dbError);
