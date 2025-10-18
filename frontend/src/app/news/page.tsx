@@ -1,6 +1,6 @@
 'use client';
 
-import { IconNews, IconDatabase, IconAlertCircle, IconSearch, IconCalendar, IconListNumbers } from "@tabler/icons-react";
+import { IconNews, IconDatabase, IconAlertCircle, IconSearch, IconCalendar, IconListNumbers, IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 
 // TypeScript interfaces based on your backend
@@ -46,6 +46,7 @@ export default function NewsPage() {
   const [editingRemarks, setEditingRemarks] = useState<{ [key: number]: string }>({});
   const [updatingRemarks, setUpdatingRemarks] = useState<{ [key: number]: boolean }>({});
   const [addingToDatabase, setAddingToDatabase] = useState<{ [key: number]: boolean }>({});
+  const [deletingFromDatabase, setDeletingFromDatabase] = useState<{ [key: number]: boolean }>({});
 
   const fetchNewsData = async (searchQuery: string, max: number, year: number) => {
     setLoading(true);
@@ -242,6 +243,54 @@ export default function NewsPage() {
       alert('Failed to add source. Please try again.');
     } finally {
       setAddingToDatabase(prev => ({ ...prev, [index]: false }));
+    }
+  };
+
+  const deleteSourceFromDatabase = async (index: number, article: EnrichedArticle) => {
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete this source from the database?\n\n"${article.title}"`)) {
+      return;
+    }
+
+    setDeletingFromDatabase(prev => ({ ...prev, [index]: true }));
+
+    try {
+      const response = await fetch('https://teamcmiggwp.duckdns.org/api/v1/news', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          newsLink: article.url
+        }),
+        cache: 'no-store'
+      });
+
+      if (response.ok) {
+        // Update local state to mark article as not in database
+        const updatedArticles = [...enrichedArticles];
+        updatedArticles[index] = {
+          ...updatedArticles[index],
+          isInDatabase: false,
+          remarks: null
+        };
+        setEnrichedArticles(updatedArticles);
+        
+        // Clear editing state for this article
+        const newEditingRemarks = { ...editingRemarks };
+        delete newEditingRemarks[index];
+        setEditingRemarks(newEditingRemarks);
+
+        alert('Source deleted from database successfully!');
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to delete source: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting source from database:', error);
+      alert('Failed to delete source. Please try again.');
+    } finally {
+      setDeletingFromDatabase(prev => ({ ...prev, [index]: false }));
     }
   };
 
@@ -495,21 +544,40 @@ export default function NewsPage() {
                             placeholder="No remarks added yet"
                             className="flex-1 bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-4 text-yellow-100 text-sm placeholder-yellow-300/50 focus:outline-none focus:border-yellow-400/60 transition-all resize-none min-h-[100px]"
                           />
-                          {/* Update Button */}
-                          <button
-                            onClick={() => updateRemarksToDatabase(index, article)}
-                            disabled={updatingRemarks[index]}
-                            className="self-end bg-yellow-500/20 hover:bg-yellow-500/30 disabled:bg-gray-500/20 text-yellow-300 hover:text-yellow-100 disabled:text-gray-400 font-bold px-6 py-2 rounded-lg border border-yellow-400/40 hover:border-yellow-300 disabled:border-gray-400/40 transition-all duration-200 disabled:cursor-not-allowed"
-                          >
-                            {updatingRemarks[index] ? (
-                              <>
-                                <div className="inline-block w-4 h-4 border-2 border-yellow-300/30 border-t-yellow-300 rounded-full animate-spin mr-2"></div>
-                                Updating...
-                              </>
-                            ) : (
-                              'Update remarks to database'
-                            )}
-                          </button>
+                          {/* Update and Delete Buttons */}
+                          <div className="flex gap-2 self-end">
+                            <button
+                              onClick={() => updateRemarksToDatabase(index, article)}
+                              disabled={updatingRemarks[index]}
+                              className="bg-yellow-500/20 hover:bg-yellow-500/30 disabled:bg-gray-500/20 text-yellow-300 hover:text-yellow-100 disabled:text-gray-400 font-bold px-6 py-2 rounded-lg border border-yellow-400/40 hover:border-yellow-300 disabled:border-gray-400/40 transition-all duration-200 disabled:cursor-not-allowed"
+                            >
+                              {updatingRemarks[index] ? (
+                                <>
+                                  <div className="inline-block w-4 h-4 border-2 border-yellow-300/30 border-t-yellow-300 rounded-full animate-spin mr-2"></div>
+                                  Updating...
+                                </>
+                              ) : (
+                                'Update remarks'
+                              )}
+                            </button>
+                            <button
+                              onClick={() => deleteSourceFromDatabase(index, article)}
+                              disabled={deletingFromDatabase[index]}
+                              className="bg-red-500/20 hover:bg-red-500/30 disabled:bg-gray-500/20 text-red-300 hover:text-red-100 disabled:text-gray-400 font-bold px-6 py-2 rounded-lg border border-red-400/40 hover:border-red-300 disabled:border-gray-400/40 transition-all duration-200 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                              {deletingFromDatabase[index] ? (
+                                <>
+                                  <div className="inline-block w-4 h-4 border-2 border-red-300/30 border-t-red-300 rounded-full animate-spin"></div>
+                                  Deleting...
+                                </>
+                              ) : (
+                                <>
+                                  <IconTrash className="w-4 h-4" />
+                                  Delete from database
+                                </>
+                              )}
+                            </button>
+                          </div>
                         </>
                       ) : (
                         <>
@@ -517,7 +585,7 @@ export default function NewsPage() {
                           <textarea
                             value={editingRemarks[index] || ''}
                             onChange={(e) => handleRemarksChange(index, e.target.value)}
-                            placeholder="No remarks added yet"
+                            placeholder="Add remarks (optional)"
                             className="flex-1 bg-white/5 border border-white/20 rounded-lg p-4 text-white/90 text-sm placeholder-white/40 focus:outline-none focus:border-cyan-400/60 transition-all resize-none min-h-[100px]"
                           />
                           {/* Add to Database Button */}

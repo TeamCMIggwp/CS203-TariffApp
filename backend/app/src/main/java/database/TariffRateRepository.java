@@ -42,31 +42,67 @@ public class TariffRateRepository {
     }
 
     /**
-     * Get tariff rate
+     * Get tariff by composite key
      */
-    public Double getTariffRate(String reporter, String partner, Integer product, String year) {
+    public TariffRateEntity getTariff(String reporter, String partner, Integer product, String year) {
         try {
-            logger.debug("Querying tariff rate for: reporter={}, partner={}, product={}, year={}",
+            logger.debug("Querying tariff for: reporter={}, partner={}, product={}, year={}",
                     reporter, partner, product, year);
 
             String sql = """
-                SELECT `rate` FROM `wto_tariffs`.`TariffRates`
+                SELECT `country_id`, `partner_country_id`, `product_id`, `year`, `rate`, `unit`
+                FROM `wto_tariffs`.`TariffRates`
                 WHERE `country_id` = ? AND `partner_country_id` = ? 
                   AND `product_id` = ? AND `year` = ?
             """;
             
             Integer yearInt = Integer.valueOf(year);
-            Double rate = jdbcTemplate.queryForObject(sql, Double.class,
-                reporter, partner, product, yearInt);
-
-            logger.debug("Found tariff rate: {}", rate);
-            return rate;
+            
+            return jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
+                TariffRateEntity tariff = new TariffRateEntity();
+                tariff.setCountryIsoNumeric(rs.getString("country_id"));
+                tariff.setPartnerIsoNumeric(rs.getString("partner_country_id"));
+                tariff.setProductHsCode(rs.getInt("product_id"));
+                tariff.setYear(String.valueOf(rs.getInt("year")));
+                tariff.setRate(rs.getDouble("rate"));
+                tariff.setUnit(rs.getString("unit"));
+                return tariff;
+            }, reporter, partner, product, yearInt);
 
         } catch (EmptyResultDataAccessException e) {
-            logger.info("No tariff rate found");
+            logger.info("No tariff found");
             return null;
         } catch (DataAccessException e) {
-            logger.error("Database error while retrieving tariff rate: {}", e.getMessage(), e);
+            logger.error("Database error while retrieving tariff: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    /**
+     * Get all tariffs
+     */
+    public java.util.List<TariffRateEntity> getAllTariffs() {
+        try {
+            logger.debug("Querying all tariffs");
+
+            String sql = """
+                SELECT `country_id`, `partner_country_id`, `product_id`, `year`, `rate`, `unit`
+                FROM `wto_tariffs`.`TariffRates`
+            """;
+            
+            return jdbcTemplate.query(sql, (rs, rowNum) -> {
+                TariffRateEntity tariff = new TariffRateEntity();
+                tariff.setCountryIsoNumeric(rs.getString("country_id"));
+                tariff.setPartnerIsoNumeric(rs.getString("partner_country_id"));
+                tariff.setProductHsCode(rs.getInt("product_id"));
+                tariff.setYear(String.valueOf(rs.getInt("year")));
+                tariff.setRate(rs.getDouble("rate"));
+                tariff.setUnit(rs.getString("unit"));
+                return tariff;
+            });
+
+        } catch (DataAccessException e) {
+            logger.error("Database error while retrieving all tariffs: {}", e.getMessage(), e);
             throw e;
         }
     }
@@ -145,6 +181,33 @@ public class TariffRateRepository {
             
         } catch (DataAccessException e) {
             logger.error("Error updating tariff: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    /**
+     * Delete tariff by composite key
+     */
+    public int delete(String reporter, String partner, Integer product, String year) {
+        try {
+            logger.info("Deleting tariff: reporter={}, partner={}, product={}, year={}",
+                    reporter, partner, product, year);
+            
+            Integer yearInt = Integer.valueOf(year);
+            
+            String sql = """
+                DELETE FROM `wto_tariffs`.`TariffRates`
+                WHERE `country_id` = ? AND `partner_country_id` = ? 
+                  AND `product_id` = ? AND `year` = ?
+            """;
+            
+            int rowsDeleted = jdbcTemplate.update(sql, reporter, partner, product, yearInt);
+            
+            logger.info("Deleted {} rows", rowsDeleted);
+            return rowsDeleted;
+            
+        } catch (DataAccessException e) {
+            logger.error("Error deleting tariff: {}", e.getMessage(), e);
             throw e;
         }
     }

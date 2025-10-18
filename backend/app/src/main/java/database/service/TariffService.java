@@ -1,6 +1,7 @@
 package database.service;
 
 import database.TariffRateRepository;
+import database.TariffRateEntity;
 import database.dto.CreateTariffRequest;
 import database.dto.UpdateTariffRequest;
 import database.dto.TariffResponse;
@@ -12,6 +13,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class TariffService {
@@ -100,14 +104,39 @@ public class TariffService {
         logger.info("Retrieving tariff for: reporter={}, partner={}, product={}, year={}",
                 reporter, partner, product, year);
         
-        Double rate = repository.getTariffRate(reporter, partner, product, year);
+        TariffRateEntity entity = repository.getTariff(reporter, partner, product, year);
         
-        if (rate == null) {
+        if (entity == null) {
             throw new TariffNotFoundException(reporter, partner, product, year);
         }
         
-        // Note: Unit is not retrieved in current getTariffRate method
-        // You may want to enhance the repository to return full entity
-        return new TariffResponse(reporter, partner, product, year, rate, "percent");
+        return new TariffResponse(
+            entity.getCountryIsoNumeric(),
+            entity.getPartnerIsoNumeric(),
+            entity.getProductHsCode(),
+            entity.getYear(),
+            entity.getRate(),
+            entity.getUnit()
+        );
+    }
+    
+    /**
+     * Get all tariffs
+     */
+    public List<TariffResponse> getAllTariffs() {
+        logger.info("Retrieving all tariffs");
+        
+        List<TariffRateEntity> entities = repository.getAllTariffs();
+        
+        return entities.stream()
+                .map(entity -> new TariffResponse(
+                    entity.getCountryIsoNumeric(),
+                    entity.getPartnerIsoNumeric(),
+                    entity.getProductHsCode(),
+                    entity.getYear(),
+                    entity.getRate(),
+                    entity.getUnit()
+                ))
+                .collect(Collectors.toList());
     }
 }
