@@ -1,12 +1,12 @@
 package database.tariffs.service;
 
-import database.tariffs.dto.CreateTariffRequest;
-import database.tariffs.dto.TariffResponse;
-import database.tariffs.dto.UpdateTariffRequest;
+import database.tariffs.repository.TariffRateRepository;
 import database.tariffs.entity.TariffRateEntity;
+import database.tariffs.dto.CreateTariffRequest;
+import database.tariffs.dto.UpdateTariffRequest;
+import database.tariffs.dto.TariffResponse;
 import database.tariffs.exception.TariffAlreadyExistsException;
 import database.tariffs.exception.TariffNotFoundException;
-import database.tariffs.repository.TariffRateRepository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -138,5 +138,28 @@ public class TariffService {
                     entity.getUnit()
                 ))
                 .collect(Collectors.toList());
+    }
+    
+    /**
+     * Delete tariff by composite key
+     */
+    @Transactional
+    public void deleteTariff(String reporter, String partner, 
+                            Integer product, String year) {
+        logger.info("Deleting tariff for: reporter={}, partner={}, product={}, year={}",
+                reporter, partner, product, year);
+        
+        // Check if exists
+        if (!repository.exists(reporter, partner, product, year)) {
+            throw new TariffNotFoundException(reporter, partner, product, year);
+        }
+        
+        int rowsDeleted = repository.delete(reporter, partner, product, year);
+        
+        if (rowsDeleted == 0) {
+            throw new TariffNotFoundException(reporter, partner, product, year);
+        }
+        
+        logger.info("Successfully deleted tariff");
     }
 }

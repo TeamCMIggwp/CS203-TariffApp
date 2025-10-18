@@ -1,9 +1,8 @@
 package database.news.controller;
 
 import database.news.dto.CreateNewsRequest;
-import database.news.dto.GetNewsRequest;
-import database.news.dto.NewsResponse;
 import database.news.dto.UpdateNewsRequest;
+import database.news.dto.NewsResponse;
 import database.news.service.NewsService;
 
 import org.slf4j.Logger;
@@ -14,6 +13,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -22,11 +22,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/database/news")
-@CrossOrigin(origins = {"http://localhost:3000", "https://teamcmiggwp.duckdns.org"})
 @Tag(name = "News Management", description = "RESTful API for managing news articles")
 @Validated
 public class NewsController {
@@ -112,26 +112,8 @@ public class NewsController {
     }
 
     @Operation(
-        summary = "Get news article(s)",
-        description = "Get all news if no body provided, or get specific news article if body contains newsLink",
-        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            required = false,
-            description = "Optional: Provide newsLink to get a specific article. Leave empty to get all news.",
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = GetNewsRequest.class),
-                examples = {
-                    @ExampleObject(
-                        name = "Get specific news",
-                        value = "{\"newsLink\": \"https://www.usitc.gov/rice-report\"}"
-                    ),
-                    @ExampleObject(
-                        name = "Get all news",
-                        value = ""
-                    )
-                }
-            )
-        )
+        summary = "Get specific news article",
+        description = "Get specific news article by providing newsLink as query parameter. Parameter is required."
     )
     @ApiResponses(value = {
         @ApiResponse(
@@ -139,21 +121,19 @@ public class NewsController {
             description = "News retrieved successfully",
             content = @Content(
                 mediaType = "application/json",
-                examples = {
-                    @ExampleObject(
-                        name = "Single news",
-                        value = "{\"newsLink\": \"https://www.usitc.gov/rice-report\", \"remarks\": \"Important report on rice tariffs\", \"timestamp\": \"2025-10-18T10:30:00\"}"
-                    ),
-                    @ExampleObject(
-                        name = "Multiple news",
-                        value = "[{\"newsLink\": \"https://www.usitc.gov/rice-report\", \"remarks\": \"Important report on rice tariffs\", \"timestamp\": \"2025-10-18T10:30:00\"}]"
-                    )
-                }
+                examples = @ExampleObject(
+                    value = "{\"newsLink\": \"https://www.usitc.gov/rice-report\", \"remarks\": \"Important report on rice tariffs\", \"timestamp\": \"2025-10-18T10:30:00\"}"
+                )
             )
         ),
         @ApiResponse(
+            responseCode = "400",
+            description = "Missing required parameter",
+            content = @Content(mediaType = "application/json")
+        ),
+        @ApiResponse(
             responseCode = "404",
-            description = "News not found (when requesting specific news)",
+            description = "News not found",
             content = @Content(
                 mediaType = "application/json",
                 examples = @ExampleObject(
@@ -163,20 +143,12 @@ public class NewsController {
         )
     })
     @GetMapping
-    public ResponseEntity<?> getNews(
-        @io.swagger.v3.oas.annotations.parameters.RequestBody(required = false)
-        @RequestBody(required = false) GetNewsRequest request) {
+    public ResponseEntity<NewsResponse> getNews(
+            @Parameter(description = "News article URL", example = "https://www.usitc.gov/rice-report", required = true)
+            @RequestParam @NotBlank String newsLink) {
         
-        // If no body provided, return all news
-        if (request == null || request.getNewsLink() == null) {
-            logger.info("GET /api/v1/database/news - Retrieving all news");
-            List<NewsResponse> responses = newsService.getAllNews();
-            return ResponseEntity.ok(responses);
-        }
-        
-        // If body provided, return specific news
-        logger.info("GET /api/v1/database/news - Getting news: {}", request.getNewsLink());
-        NewsResponse response = newsService.getNews(request.getNewsLink());
+        logger.info("GET /api/v1/database/news - Getting news: {}", newsLink);
+        NewsResponse response = newsService.getNews(newsLink);
         return ResponseEntity.ok(response);
     }
 
@@ -201,11 +173,13 @@ public class NewsController {
         )
     })
     @DeleteMapping
-    public ResponseEntity<Void> deleteNews(@Valid @RequestBody GetNewsRequest request) {
+    public ResponseEntity<Void> deleteNews(
+            @Parameter(description = "News article URL", example = "https://www.usitc.gov/rice-report", required = true)
+            @RequestParam @NotBlank String newsLink) {
         
-        logger.info("DELETE /api/v1/database/news - Deleting: {}", request.getNewsLink());
+        logger.info("DELETE /api/v1/database/news - Deleting: {}", newsLink);
         
-        newsService.deleteNews(request.getNewsLink());
+        newsService.deleteNews(newsLink);
         return ResponseEntity.noContent().build();
     }
 }

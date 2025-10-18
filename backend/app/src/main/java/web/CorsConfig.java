@@ -19,14 +19,17 @@ public class CorsConfig {
     @Bean
     public FilterRegistrationBean<CorsFilter> corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        // Allow exact origin from config and common localhost patterns for dev
+        
+        // Allow multiple origin patterns
         config.setAllowedOriginPatterns(List.of(
             allowedOrigin,
             "http://localhost:*",
-            "http://127.0.0.1:*"
+            "http://127.0.0.1:*",
+            "https://teamcmiggwp.duckdns.org",  // Add your domain
+            "http://teamcmiggwp.duckdns.org"    // HTTP version too
         ));
+        
         config.setAllowCredentials(true);
-        // Allow all methods/headers to avoid failing OPTIONS preflight on unexpected values
         config.addAllowedMethod("*");
         config.addAllowedHeader("*");
         config.setExposedHeaders(List.of("Set-Cookie", "Authorization", "Location"));

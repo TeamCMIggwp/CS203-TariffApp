@@ -1,9 +1,8 @@
 package database.tariffs.controller;
 
 import database.tariffs.dto.CreateTariffRequest;
-import database.tariffs.dto.GetTariffRequest;
-import database.tariffs.dto.TariffResponse;
 import database.tariffs.dto.UpdateTariffRequest;
+import database.tariffs.dto.TariffResponse;
 import database.tariffs.service.TariffService;
 
 import org.slf4j.Logger;
@@ -14,6 +13,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -22,11 +22,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/database/tariffs")
-@CrossOrigin(origins = { "http://localhost:3000", "https://teamcmiggwp.duckdns.org" })
 @Tag(name = "Tariff Management", description = "RESTful API for managing tariff rates")
 @Validated
 public class TariffController {
@@ -117,48 +118,28 @@ public class TariffController {
     }
 
     @Operation(
-        summary = "Get tariff rate(s)",
-        description = "Get all tariffs if no body provided, or get specific tariff if body contains reporter, partner, product, and year",
-        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            required = false,
-            description = "Optional: Provide reporter, partner, product, and year to get a specific tariff. Leave empty to get all tariffs.",
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = GetTariffRequest.class),
-                examples = {
-                    @ExampleObject(
-                        name = "Get specific tariff",
-                        value = "{\"reporter\": \"840\", \"partner\": \"356\", \"product\": 100630, \"year\": \"2020\"}"
-                    ),
-                    @ExampleObject(
-                        name = "Get all tariffs",
-                        value = ""
-                    )
-                }
-            )
-        )
+        summary = "Get specific tariff rate",
+        description = "Get specific tariff by providing reporter, partner, product, and year as query parameters. All parameters are required."
     )
     @ApiResponses(value = {
         @ApiResponse(
             responseCode = "200",
-            description = "Tariff(s) retrieved successfully",
+            description = "Tariff retrieved successfully",
             content = @Content(
                 mediaType = "application/json",
-                examples = {
-                    @ExampleObject(
-                        name = "Single tariff",
-                        value = "{\"reporter\": \"840\", \"partner\": \"356\", \"product\": 100630, \"year\": \"2020\", \"rate\": 24.0, \"unit\": \"percent\", \"timestamp\": \"2025-10-14T10:30:00\"}"
-                    ),
-                    @ExampleObject(
-                        name = "Multiple tariffs",
-                        value = "[{\"reporter\": \"840\", \"partner\": \"356\", \"product\": 100630, \"year\": \"2020\", \"rate\": 24.0, \"unit\": \"percent\", \"timestamp\": \"2025-10-14T10:30:00\"}]"
-                    )
-                }
+                examples = @ExampleObject(
+                    value = "{\"reporter\": \"840\", \"partner\": \"356\", \"product\": 100630, \"year\": \"2020\", \"rate\": 24.0, \"unit\": \"percent\", \"timestamp\": \"2025-10-14T10:30:00\"}"
+                )
             )
         ),
         @ApiResponse(
+            responseCode = "400",
+            description = "Missing required parameters",
+            content = @Content(mediaType = "application/json")
+        ),
+        @ApiResponse(
             responseCode = "404",
-            description = "Tariff not found (when requesting specific tariff)",
+            description = "Tariff not found",
             content = @Content(
                 mediaType = "application/json",
                 examples = @ExampleObject(
@@ -168,27 +149,64 @@ public class TariffController {
         )
     })
     @GetMapping
-    public ResponseEntity<?> getTariff(
-        @io.swagger.v3.oas.annotations.parameters.RequestBody(required = false)
-        @RequestBody(required = false) GetTariffRequest request) {
+    public ResponseEntity<TariffResponse> getTariff(
+            @Parameter(description = "Reporter country ISO code (3 characters)", example = "840", required = true)
+            @RequestParam @NotNull String reporter,
+            
+            @Parameter(description = "Partner country ISO code (3 characters)", example = "356", required = true)
+            @RequestParam @NotNull String partner,
+            
+            @Parameter(description = "Product HS code", example = "100630", required = true)
+            @RequestParam @NotNull Integer product,
+            
+            @Parameter(description = "Year (4 digits)", example = "2020", required = true)
+            @RequestParam @NotNull @Pattern(regexp = "\\d{4}", message = "Year must be 4 digits") String year) {
         
-        // If no body provided, return all tariffs
-        if (request == null || request.getReporter() == null) {
-            logger.info("GET /api/v1/database/tariffs - Retrieving all tariffs");
-            List<TariffResponse> responses = tariffService.getAllTariffs();
-            return ResponseEntity.ok(responses);
-        }
-        
-        // If body provided, return specific tariff
         logger.info("GET /api/v1/database/tariffs - Getting tariff: reporter={}, partner={}, product={}, year={}",
-                request.getReporter(), request.getPartner(), request.getProduct(), request.getYear());
+                reporter, partner, product, year);
         
-        TariffResponse response = tariffService.getTariff(
-                request.getReporter(),
-                request.getPartner(),
-                request.getProduct(),
-                request.getYear());
-        
+        TariffResponse response = tariffService.getTariff(reporter, partner, product, year);
         return ResponseEntity.ok(response);
+    }
+
+    @Operation(
+        summary = "Delete tariff rate",
+        description = "Deletes a tariff rate by composite key"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "204",
+            description = "Tariff deleted successfully"
+        ),
+        @ApiResponse(
+            responseCode = "404",
+            description = "Tariff not found",
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    value = "{\"timestamp\": \"2025-10-14T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"Tariff not found for: reporter=840, partner=356, product=100630, year=2020\", \"path\": \"/api/v1/database/tariffs\"}"
+                )
+            )
+        )
+    })
+    @DeleteMapping
+    public ResponseEntity<Void> deleteTariff(
+            @Parameter(description = "Reporter country ISO code (3 characters)", example = "840", required = true)
+            @RequestParam @NotNull String reporter,
+            
+            @Parameter(description = "Partner country ISO code (3 characters)", example = "356", required = true)
+            @RequestParam @NotNull String partner,
+            
+            @Parameter(description = "Product HS code", example = "100630", required = true)
+            @RequestParam @NotNull Integer product,
+            
+            @Parameter(description = "Year (4 digits)", example = "2020", required = true)
+            @RequestParam @NotNull @Pattern(regexp = "\\d{4}", message = "Year must be 4 digits") String year) {
+        
+        logger.info("DELETE /api/v1/database/tariffs - Deleting tariff: reporter={}, partner={}, product={}, year={}",
+                reporter, partner, product, year);
+        
+        tariffService.deleteTariff(reporter, partner, product, year);
+        return ResponseEntity.noContent().build();
     }
 }
