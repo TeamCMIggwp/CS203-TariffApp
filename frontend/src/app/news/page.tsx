@@ -360,7 +360,7 @@ export default function NewsPage() {
           {newsData && (
             <>
               <p className="text-cyan-300 text-sm font-semibold">
-                Query: "{newsData.query}"
+                Query: &quot;{newsData.query}&quot;
               </p>
               <p className="text-white/90 text-lg font-medium mt-2">
                 Scraped from official sources • {newsData.sourcesScraped} articles found
@@ -466,7 +466,7 @@ export default function NewsPage() {
                       <div className="space-y-3">
                         {article.relevantText.slice(0, 2).map((text, idx) => (
                           <p key={idx} className="text-white/90 text-sm leading-relaxed pl-4 border-l-2 border-cyan-400/50">
-                            "{text.substring(0, 200)}..."
+                            &quot;{text.substring(0, 200)}...&quot;
                           </p>
                         ))}
                       </div>
