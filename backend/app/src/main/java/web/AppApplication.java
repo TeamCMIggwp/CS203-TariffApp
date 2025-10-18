@@ -40,34 +40,34 @@ public class AppApplication implements WebMvcConfigurer {
         registry.addInterceptor(apiCallLogger);
     }
 
-    // /**
-    //  * Global CORS configuration for all controllers
-    //  */
-    // @Override
-    // public void addCorsMappings(CorsRegistry registry) {
-    //     registry.addMapping("/**")
-    //             .allowedOriginPatterns("*")
-    //             .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-    //             .allowedHeaders("*")
-    //             .allowCredentials(true)
-    //             .maxAge(3600);
-    // }
+    /**
+     * Global CORS configuration for all controllers
+     */
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**")
+                .allowedOriginPatterns("*")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("*")
+                .allowCredentials(true)
+                .maxAge(3600);
+    }
 
-    // /**
-    //  * Alternative/Additional CORS configuration bean
-    //  */
-    // @Bean
-    // public CorsConfigurationSource corsConfigurationSource() {
-    //     CorsConfiguration configuration = new CorsConfiguration();
-    //     configuration.setAllowedOriginPatterns(Arrays.asList("*"));
-    //     configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-    //     configuration.setAllowedHeaders(Arrays.asList("*"));
-    //     configuration.setAllowCredentials(true);
-    //     configuration.setMaxAge(3600L);
+    /**
+     * Alternative/Additional CORS configuration bean
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
 
-    //     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    //     source.registerCorsConfiguration("/**", configuration);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
 
-    //     return source;
-    // }
+        return source;
+    }
 }
