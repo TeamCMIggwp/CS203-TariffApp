@@ -1,12 +1,12 @@
-package database.service;
+package database.tariffs.service;
 
-import database.TariffRateRepository;
-import database.TariffRateEntity;
-import database.dto.CreateTariffRequest;
-import database.dto.UpdateTariffRequest;
-import database.dto.TariffResponse;
-import database.exception.TariffAlreadyExistsException;
-import database.exception.TariffNotFoundException;
+import database.tariffs.dto.CreateTariffRequest;
+import database.tariffs.dto.TariffResponse;
+import database.tariffs.dto.UpdateTariffRequest;
+import database.tariffs.entity.TariffRateEntity;
+import database.tariffs.exception.TariffAlreadyExistsException;
+import database.tariffs.exception.TariffNotFoundException;
+import database.tariffs.repository.TariffRateRepository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

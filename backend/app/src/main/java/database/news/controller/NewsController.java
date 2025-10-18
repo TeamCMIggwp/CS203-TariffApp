@@ -1,9 +1,10 @@
-package database;
+package database.news.controller;
 
-import database.dto.CreateNewsRequest;
-import database.dto.UpdateNewsRequest;
-import database.dto.NewsResponse;
-import database.service.NewsService;
+import database.news.dto.CreateNewsRequest;
+import database.news.dto.GetNewsRequest;
+import database.news.dto.NewsResponse;
+import database.news.dto.UpdateNewsRequest;
+import database.news.service.NewsService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,10 +23,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/news")
+@RequestMapping("/api/v1/database/news")
 @CrossOrigin(origins = {"http://localhost:3000", "https://teamcmiggwp.duckdns.org"})
 @Tag(name = "News Management", description = "RESTful API for managing news articles")
 @Validated
@@ -62,7 +62,7 @@ public class NewsController {
             content = @Content(
                 mediaType = "application/json",
                 examples = @ExampleObject(
-                    value = "{\"timestamp\": \"2025-10-18T10:30:00\", \"status\": 409, \"error\": \"Conflict\", \"message\": \"News already exists for link: https://www.usitc.gov/rice-report\", \"path\": \"/api/v1/news\"}"
+                    value = "{\"timestamp\": \"2025-10-18T10:30:00\", \"status\": 409, \"error\": \"Conflict\", \"message\": \"News already exists for link: https://www.usitc.gov/rice-report\", \"path\": \"/api/v1/database/news\"}"
                 )
             )
         )
@@ -70,7 +70,7 @@ public class NewsController {
     @PostMapping
     public ResponseEntity<NewsResponse> createNews(@Valid @RequestBody CreateNewsRequest request) {
         
-        logger.info("POST /api/v1/news - Creating news: {}", request);
+        logger.info("POST /api/v1/database/news - Creating news: {}", request);
         
         NewsResponse response = newsService.createNews(request);
         
@@ -96,7 +96,7 @@ public class NewsController {
             content = @Content(
                 mediaType = "application/json",
                 examples = @ExampleObject(
-                    value = "{\"timestamp\": \"2025-10-18T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"News not found for link: https://example.com\", \"path\": \"/api/v1/news\"}"
+                    value = "{\"timestamp\": \"2025-10-18T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"News not found for link: https://example.com\", \"path\": \"/api/v1/database/news\"}"
                 )
             )
         )
@@ -104,7 +104,7 @@ public class NewsController {
     @PutMapping
     public ResponseEntity<NewsResponse> updateNews(@Valid @RequestBody UpdateNewsRequest request) {
         
-        logger.info("PUT /api/v1/news - Updating news: {}", request.getNewsLink());
+        logger.info("PUT /api/v1/database/news - Updating news: {}", request.getNewsLink());
         
         NewsResponse response = newsService.updateNews(request.getNewsLink(), request);
         
@@ -112,54 +112,72 @@ public class NewsController {
     }
 
     @Operation(
-        summary = "Get news article",
-        description = "Retrieves a specific news article by link"
+        summary = "Get news article(s)",
+        description = "Get all news if no body provided, or get specific news article if body contains newsLink",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = false,
+            description = "Optional: Provide newsLink to get a specific article. Leave empty to get all news.",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = GetNewsRequest.class),
+                examples = {
+                    @ExampleObject(
+                        name = "Get specific news",
+                        value = "{\"newsLink\": \"https://www.usitc.gov/rice-report\"}"
+                    ),
+                    @ExampleObject(
+                        name = "Get all news",
+                        value = ""
+                    )
+                }
+            )
+        )
     )
     @ApiResponses(value = {
         @ApiResponse(
             responseCode = "200",
-            description = "News found",
+            description = "News retrieved successfully",
             content = @Content(
                 mediaType = "application/json",
-                schema = @Schema(implementation = NewsResponse.class)
+                examples = {
+                    @ExampleObject(
+                        name = "Single news",
+                        value = "{\"newsLink\": \"https://www.usitc.gov/rice-report\", \"remarks\": \"Important report on rice tariffs\", \"timestamp\": \"2025-10-18T10:30:00\"}"
+                    ),
+                    @ExampleObject(
+                        name = "Multiple news",
+                        value = "[{\"newsLink\": \"https://www.usitc.gov/rice-report\", \"remarks\": \"Important report on rice tariffs\", \"timestamp\": \"2025-10-18T10:30:00\"}]"
+                    )
+                }
             )
         ),
         @ApiResponse(
             responseCode = "404",
-            description = "News not found"
-        )
-    })
-    @PostMapping("/get")
-    public ResponseEntity<NewsResponse> getNews(@RequestBody Map<String, String> body) {
-        
-        String newsLink = body.get("newsLink");
-        logger.info("POST /api/v1/news/get - Getting news: {}", newsLink);
-        
-        NewsResponse response = newsService.getNews(newsLink);
-        return ResponseEntity.ok(response);
-    }
-
-    @Operation(
-        summary = "Get all news articles",
-        description = "Retrieves all news articles from the database"
-    )
-    @ApiResponses(value = {
-        @ApiResponse(
-            responseCode = "200",
-            description = "News list retrieved successfully",
+            description = "News not found (when requesting specific news)",
             content = @Content(
                 mediaType = "application/json",
-                schema = @Schema(implementation = NewsResponse.class)
+                examples = @ExampleObject(
+                    value = "{\"timestamp\": \"2025-10-18T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"News not found for link: https://example.com\", \"path\": \"/api/v1/database/news\"}"
+                )
             )
         )
     })
     @GetMapping
-    public ResponseEntity<List<NewsResponse>> getAllNews() {
+    public ResponseEntity<?> getNews(
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(required = false)
+        @RequestBody(required = false) GetNewsRequest request) {
         
-        logger.info("GET /api/v1/news - Retrieving all news");
+        // If no body provided, return all news
+        if (request == null || request.getNewsLink() == null) {
+            logger.info("GET /api/v1/database/news - Retrieving all news");
+            List<NewsResponse> responses = newsService.getAllNews();
+            return ResponseEntity.ok(responses);
+        }
         
-        List<NewsResponse> responses = newsService.getAllNews();
-        return ResponseEntity.ok(responses);
+        // If body provided, return specific news
+        logger.info("GET /api/v1/database/news - Getting news: {}", request.getNewsLink());
+        NewsResponse response = newsService.getNews(request.getNewsLink());
+        return ResponseEntity.ok(response);
     }
 
     @Operation(
@@ -173,30 +191,21 @@ public class NewsController {
         ),
         @ApiResponse(
             responseCode = "404",
-            description = "News not found"
+            description = "News not found",
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    value = "{\"timestamp\": \"2025-10-18T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"News not found for link: https://example.com\", \"path\": \"/api/v1/database/news\"}"
+                )
+            )
         )
     })
     @DeleteMapping
-    public ResponseEntity<Void> deleteNews(@RequestBody Map<String, String> body) {
+    public ResponseEntity<Void> deleteNews(@Valid @RequestBody GetNewsRequest request) {
         
-        String newsLink = body.get("newsLink");
-        logger.info("DELETE /api/v1/news - Deleting: {}", newsLink);
+        logger.info("DELETE /api/v1/database/news - Deleting: {}", request.getNewsLink());
         
-        newsService.deleteNews(newsLink);
+        newsService.deleteNews(request.getNewsLink());
         return ResponseEntity.noContent().build();
-    }
-
-    @Operation(
-        summary = "Check if news exists",
-        description = "Checks if a news article exists in the database"
-    )
-    @PostMapping("/exists")
-    public ResponseEntity<Map<String, Boolean>> checkNewsExists(@RequestBody Map<String, String> body) {
-        
-        String newsLink = body.get("newsLink");
-        logger.info("POST /api/v1/news/exists - Checking: {}", newsLink);
-        
-        boolean exists = newsService.newsExists(newsLink);
-        return ResponseEntity.ok(Map.of("exists", exists));
     }
 }

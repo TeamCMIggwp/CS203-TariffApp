@@ -1,4 +1,4 @@
-package database;
+package database.news.repository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,6 +7,8 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+
+import database.news.entity.NewsEntity;
 
 @Repository
 public class NewsRepository {

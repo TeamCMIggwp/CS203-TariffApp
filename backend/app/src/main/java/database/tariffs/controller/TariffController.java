@@ -1,10 +1,10 @@
-package database;
+package database.tariffs.controller;
 
-import database.dto.CreateTariffRequest;
-import database.dto.UpdateTariffRequest;
-import database.dto.GetTariffRequest;
-import database.dto.TariffResponse;
-import database.service.TariffService;
+import database.tariffs.dto.CreateTariffRequest;
+import database.tariffs.dto.GetTariffRequest;
+import database.tariffs.dto.TariffResponse;
+import database.tariffs.dto.UpdateTariffRequest;
+import database.tariffs.service.TariffService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,7 +118,25 @@ public class TariffController {
 
     @Operation(
         summary = "Get tariff rate(s)",
-        description = "Get all tariffs if no body provided, or get specific tariff if body contains reporter, partner, product, and year"
+        description = "Get all tariffs if no body provided, or get specific tariff if body contains reporter, partner, product, and year",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = false,
+            description = "Optional: Provide reporter, partner, product, and year to get a specific tariff. Leave empty to get all tariffs.",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = GetTariffRequest.class),
+                examples = {
+                    @ExampleObject(
+                        name = "Get specific tariff",
+                        value = "{\"reporter\": \"840\", \"partner\": \"356\", \"product\": 100630, \"year\": \"2020\"}"
+                    ),
+                    @ExampleObject(
+                        name = "Get all tariffs",
+                        value = ""
+                    )
+                }
+            )
+        )
     )
     @ApiResponses(value = {
         @ApiResponse(
@@ -126,16 +144,33 @@ public class TariffController {
             description = "Tariff(s) retrieved successfully",
             content = @Content(
                 mediaType = "application/json",
-                schema = @Schema(implementation = TariffResponse.class)
+                examples = {
+                    @ExampleObject(
+                        name = "Single tariff",
+                        value = "{\"reporter\": \"840\", \"partner\": \"356\", \"product\": 100630, \"year\": \"2020\", \"rate\": 24.0, \"unit\": \"percent\", \"timestamp\": \"2025-10-14T10:30:00\"}"
+                    ),
+                    @ExampleObject(
+                        name = "Multiple tariffs",
+                        value = "[{\"reporter\": \"840\", \"partner\": \"356\", \"product\": 100630, \"year\": \"2020\", \"rate\": 24.0, \"unit\": \"percent\", \"timestamp\": \"2025-10-14T10:30:00\"}]"
+                    )
+                }
             )
         ),
         @ApiResponse(
             responseCode = "404",
-            description = "Tariff not found (when requesting specific tariff)"
+            description = "Tariff not found (when requesting specific tariff)",
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    value = "{\"timestamp\": \"2025-10-14T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"Tariff not found for: reporter=840, partner=356, product=100630, year=2020\", \"path\": \"/api/v1/database/tariffs\"}"
+                )
+            )
         )
     })
     @GetMapping
-    public ResponseEntity<?> getTariff(@RequestBody(required = false) GetTariffRequest request) {
+    public ResponseEntity<?> getTariff(
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(required = false)
+        @RequestBody(required = false) GetTariffRequest request) {
         
         // If no body provided, return all tariffs
         if (request == null || request.getReporter() == null) {

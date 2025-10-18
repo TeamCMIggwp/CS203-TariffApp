@@ -1,18 +1,24 @@
-package database.dto;
+package database.news.dto;
 
-import jakarta.validation.constraints.*;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.LocalDateTime;
 
-public class CreateNewsRequest {
+public class NewsResponse {
     
-    @NotBlank(message = "News link is required")
-    @Size(max = 200, message = "News link must not exceed 200 characters")
     @JsonProperty("newsLink")
     private String newsLink;
     
-    @Size(max = 100, message = "Remarks must not exceed 100 characters")
     @JsonProperty("remarks")
     private String remarks;
+    
+    @JsonProperty("timestamp")
+    private LocalDateTime timestamp;
+    
+    public NewsResponse(String newsLink, String remarks) {
+        this.newsLink = newsLink;
+        this.remarks = remarks;
+        this.timestamp = LocalDateTime.now();
+    }
     
     // Getters and Setters
     public String getNewsLink() { 
@@ -31,11 +37,11 @@ public class CreateNewsRequest {
         this.remarks = remarks; 
     }
     
-    @Override
-    public String toString() {
-        return "CreateNewsRequest{" +
-                "newsLink='" + newsLink + '\'' +
-                ", remarks='" + remarks + '\'' +
-                '}';
+    public LocalDateTime getTimestamp() { 
+        return timestamp; 
+    }
+    
+    public void setTimestamp(LocalDateTime timestamp) { 
+        this.timestamp = timestamp; 
     }
 }

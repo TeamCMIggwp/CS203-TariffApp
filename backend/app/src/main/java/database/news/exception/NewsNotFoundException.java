@@ -1,4 +1,4 @@
-package database.exception;
+package database.news.exception;
 
 public class NewsNotFoundException extends RuntimeException {
     private String newsLink;

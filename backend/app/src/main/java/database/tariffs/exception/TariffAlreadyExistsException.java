@@ -1,4 +1,4 @@
-package database.exception;
+package database.tariffs.exception;
 
 public class TariffAlreadyExistsException extends RuntimeException {
     private String reporter;

@@ -1,4 +1,4 @@
-package database;
+package database.tariffs.entity;
 
 public class TariffRateEntity {
 

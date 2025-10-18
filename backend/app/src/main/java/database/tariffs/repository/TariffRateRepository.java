@@ -1,4 +1,4 @@
-package database;
+package database.tariffs.repository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -10,6 +10,8 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+
+import database.tariffs.entity.TariffRateEntity;
 
 @Repository
 public class TariffRateRepository {

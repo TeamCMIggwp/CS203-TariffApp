@@ -1,4 +1,4 @@
-package database.dto;
+package database.news.dto;
 
 import jakarta.validation.constraints.*;
 import com.fasterxml.jackson.annotation.JsonProperty;

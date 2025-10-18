@@ -1,4 +1,4 @@
-package database.exception;
+package database.news.exception;
 
 public class NewsAlreadyExistsException extends RuntimeException {
     private String newsLink;

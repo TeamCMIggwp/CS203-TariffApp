@@ -1,12 +1,12 @@
-package database.service;
+package database.news.service;
 
-import database.NewsRepository;
-import database.NewsEntity;
-import database.dto.CreateNewsRequest;
-import database.dto.UpdateNewsRequest;
-import database.dto.NewsResponse;
-import database.exception.NewsAlreadyExistsException;
-import database.exception.NewsNotFoundException;
+import database.news.dto.CreateNewsRequest;
+import database.news.dto.NewsResponse;
+import database.news.dto.UpdateNewsRequest;
+import database.news.entity.NewsEntity;
+import database.news.exception.NewsAlreadyExistsException;
+import database.news.exception.NewsNotFoundException;
+import database.news.repository.NewsRepository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,4 +1,4 @@
-package database;
+package database.news.entity;
 
 public class NewsEntity {
 

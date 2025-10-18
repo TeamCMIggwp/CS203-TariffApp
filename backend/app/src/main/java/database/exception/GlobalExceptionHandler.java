@@ -7,6 +7,12 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+
+import database.news.exception.NewsAlreadyExistsException;
+import database.news.exception.NewsNotFoundException;
+import database.tariffs.exception.TariffAlreadyExistsException;
+import database.tariffs.exception.TariffNotFoundException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
