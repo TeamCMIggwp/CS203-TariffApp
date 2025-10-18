@@ -69,23 +69,41 @@ public class TariffController {
             @ApiResponse(responseCode = "200", description = "Tariff updated successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = TariffResponse.class))),
             @ApiResponse(responseCode = "404", description = "Tariff not found", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = "{\"timestamp\": \"2025-10-14T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"Tariff not found for: reporter=840, partner=356, product=100630, year=2020\", \"path\": \"/api/v1/tariffs/840/356/100630/2020\"}")))
     })
-    @PutMapping("/{reporter}/{partner}/{product}/{year}")
-    public ResponseEntity<TariffResponse> updateTariff(
-            @Parameter(description = "Reporter country ISO code", example = "840") @PathVariable String reporter,
+    // @PutMapping("/{reporter}/{partner}/{product}/{year}")
+    // public ResponseEntity<TariffResponse> updateTariff(
+    // @Parameter(description = "Reporter country ISO code", example = "840")
+    // @PathVariable String reporter,
 
-            @Parameter(description = "Partner country ISO code", example = "356") @PathVariable String partner,
+    // @Parameter(description = "Partner country ISO code", example = "356")
+    // @PathVariable String partner,
 
-            @Parameter(description = "Product HS code", example = "100630") @PathVariable Integer product,
+    // @Parameter(description = "Product HS code", example = "100630")
+    // @PathVariable Integer product,
 
-            @Parameter(description = "Year", example = "2020") @PathVariable String year,
+    // @Parameter(description = "Year", example = "2020")
+    // @PathVariable String year,
 
-            @Valid @RequestBody UpdateTariffRequest request) {
+    // @Valid @RequestBody UpdateTariffRequest request) {
 
-        logger.info("PUT /api/v1/tariffs/{}/{}/{}/{} - Updating tariff",
-                reporter, partner, product, year);
+    // logger.info("PUT /api/v1/tariffs/{}/{}/{}/{} - Updating tariff",
+    // reporter, partner, product, year);
+
+    // TariffResponse response = tariffService.updateTariff(
+    // reporter, partner, product, year, request
+    // );
+
+    // return ResponseEntity.ok(response);
+    // }
+    @PutMapping
+    public ResponseEntity<TariffResponse> updateTariff(@Valid @RequestBody UpdateTariffRequest request) {
+        logger.info("PUT /api/v1/tariffs - Updating tariff: {}", request);
 
         TariffResponse response = tariffService.updateTariff(
-                reporter, partner, product, year, request);
+                request.getReporter(),
+                request.getPartner(),
+                request.getProduct(),
+                request.getYear(),
+                request);
 
         return ResponseEntity.ok(response);
     }
