@@ -1,6 +1,5 @@
 "use client"
 
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger, } from "@/components/ui/accordion"
 import { useState } from "react"
 import { motion, useMotionValue } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,17 +8,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
-
-type MetricValue = string | number;
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts"
+import { BarChart3, Sparkles } from "lucide-react"
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
+type MetricValue = string | number
 
 type GeminiApiResponse = {
-  summary?: string;
-  insights?: string[];
-  metrics?: Record<string, MetricValue>;
-  recommendations?: string[];
-  confidence?: string;
-} | string | null;
-
+  summary?: string
+  insights?: string[]
+  metrics?: Record<string, MetricValue>
+  recommendations?: string[]
+  confidence?: string
+} | string | null
 
 export default function CalculatorSection() {
   const calculatorY = useMotionValue(0)
@@ -30,147 +30,133 @@ export default function CalculatorSection() {
   const [year, setYear] = useState("2020")
   const [calculatedTariff, setCalculatedTariff] = useState<number | null>(null)
 
-  // States for API Integration
   const [apiResponse, setApiResponse] = useState<GeminiApiResponse | string | null>(null)
   const [isCalculatingTariff, setIsCalculatingTariff] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [inputError, setInputError] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
-
   const [tariffPercentage, setTariffPercentage] = useState<string | null>(null)
+  const [aiFinished, setAiFinished] = useState(false)
 
-  // Function to call API
+  const [showAIAnalysis, setShowAIAnalysis] = useState(false)
+  const [showCharts, setShowCharts] = useState(false)
+
   const callGeminiApi = async (data: string, prompt?: string) => {
     try {
       setIsAnalyzing(true)
       setApiError(null)
 
       const url = 'https://teamcmiggwp.duckdns.org/api/v1/gemini/analyses'
-
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ data, prompt })
       })
-
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
 
       const result = await response.json()
-
-      if (result?.success && result?.analysis) {
-        setApiResponse(result.analysis)
-      } else {
-        setApiResponse("No analysis data returned from API.")
-      }
+      if (result?.success && result?.analysis) setApiResponse(result.analysis)
+      else setApiResponse("No analysis data returned from API.")
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
-      setApiError(errorMessage)
-      console.error('API Error:', errorMessage)
+      setApiError(err instanceof Error ? err.message : "Unknown error occurred")
+      console.error("API Error:", err)
     } finally {
       setIsAnalyzing(false)
     }
   }
 
-
   const calculateTariff = async () => {
-    if (!fromCountry || !toCountry || !product || !value || !year) {
-      setInputError("Please fill in all required fields.");
-      return;
-    }
-
-    setInputError(null);
-    setApiError(null);
-    setTariffPercentage(null);
-    setCalculatedTariff(null);
-    setApiResponse(null);
-
-    setIsCalculatingTariff(true);
-    setIsAnalyzing(false);
-
-    try {
-      const dummyApiUrl = `https://teamcmiggwp.duckdns.org/api/v1/wits/tariff-rates/${toCountry}/${fromCountry}/${product}/${year}`;
-
-      const dummyResponse = await fetch(dummyApiUrl, { credentials: 'include' });
-      if (!dummyResponse.ok) throw new Error("API call failed");
-
-      const data = await dummyResponse.json();
-      const parsedPercentage = parseFloat(data.minRate); // or maxRate if you prefer
-
-      if (!isNaN(parsedPercentage)) {
-        setTariffPercentage(`${parsedPercentage.toFixed(2)}%`);
-        const goodsValue = parseFloat(value);
-        const tariffAmount = (parsedPercentage / 100) * goodsValue;
-        setCalculatedTariff(tariffAmount);
-      } else {
-        setTariffPercentage("MFN");
-        setCalculatedTariff(null);
-      }
-
-
-    } catch {
-      setTariffPercentage("MFN");
-      setCalculatedTariff(null);
-    } finally {
-      setIsCalculatingTariff(false);
-    }
-
-    // Call Gemini API afterwards
-    const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`;
-    const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors, 000 is world";
-
-    setIsAnalyzing(true);
-    await callGeminiApi(apiData, prompt);
-    setIsAnalyzing(false);
+  if (!fromCountry || !toCountry || !product || !value || !year) {
+    setInputError("Please fill in all required fields.")
+    return
   }
+
+  setInputError(null)
+  setApiError(null)
+  setTariffPercentage(null)
+  setCalculatedTariff(null)
+  setApiResponse(null)
+  setIsCalculatingTariff(true)
+  setIsAnalyzing(true)
+  setAiFinished(false)
+
+  try {
+    const apiUrl = `https://teamcmiggwp.duckdns.org/api/v1/wits/tariff-rates/${toCountry}/${fromCountry}/${product}/${year}`
+    const response = await fetch(apiUrl, { credentials: 'include' })
+
+    let parsedPercentage: number | null = null
+
+    if (response.ok) {
+      const data = await response.json()
+      parsedPercentage = parseFloat(data.minRate)
+    } else if (response.status === 404) {
+      // If API returns 404, treat as MFN
+      parsedPercentage = null
+    } else {
+      throw new Error(`API call failed with status ${response.status}`)
+    }
+
+    if (parsedPercentage !== null && !isNaN(parsedPercentage)) {
+      setTariffPercentage(`${parsedPercentage.toFixed(2)}%`)
+      const goodsValue = parseFloat(value)
+      setCalculatedTariff((parsedPercentage / 100) * goodsValue)
+    } else {
+      setTariffPercentage("MFN")
+      setCalculatedTariff(null)
+    }
+
+    // Prepare AI data
+    const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`
+    const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors, 000 is world"
+    await callGeminiApi(apiData, prompt)
+    setAiFinished(true)
+
+  } catch (err) {
+    setApiError(err instanceof Error ? err.message : "Unknown error occurred")
+    // Still show MFN in case of unexpected error
+    if (!tariffPercentage) setTariffPercentage("MFN")
+    setCalculatedTariff(null)
+  } finally {
+    setIsCalculatingTariff(false)
+    setIsAnalyzing(false)
+  }
+}
 
 
   const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
-
   const getCountryName = (code: string) => {
-    const country = countries.find((c) => c.code === code)
+    const country = countries.find(c => c.code === code)
     return country ? country.name : code
   }
+
+  const dummyChartData = [
+    { product: "Wheat", tariff: 5.2 },
+    { product: "Rice", tariff: 12.5 },
+    { product: "Corn", tariff: 8.1 },
+    { product: "Soybeans", tariff: 10.0 },
+    { product: "Barley", tariff: 6.3 },
+  ]
 
   return (
     <motion.section style={{ y: calculatorY }} className="calculator-section py-20">
       <div className="max-w-4xl mx-auto px-4">
-        <Card className="calculator-card">
+        {/* Calculator Card */}
+        <Card className="calculator-card shadow-lg">
           <CardHeader>
             <CardTitle className="calculator-title">Agricultural Tariff Calculator</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
               {/* From Country */}
               <div className="space-y-2">
-                <Label htmlFor="from-country" className="calculator-label">
-                  From Country (Exporter)
-                </Label>
+                <Label htmlFor="from-country">From Country (Exporter)</Label>
                 <Select value={fromCountry} onValueChange={setFromCountry}>
-                  <SelectTrigger className="calculator-select">
-                    <SelectValue placeholder="Select exporting country">
-                      {fromCountry
-                        ? countries.find((c) => c.code === fromCountry)?.name
-                        : "Select exporting country"}
-                    </SelectValue>
+                  <SelectTrigger>
+                    <SelectValue>{getCountryName(fromCountry)}</SelectValue>
                   </SelectTrigger>
-                  <SelectContent className="calculator-select-content">
-                    {countries.map((country) => (
-                      <SelectItem
-                        key={country.code}
-                        value={country.code}
-                        className="calculator-select-item"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">{country.name}</span>
-                          <span className="text-xs text-gray-600 mt-0.5">
-                            code: {country.code}
-                          </span>
-                        </div>
-                      </SelectItem>
+                  <SelectContent>
+                    {countries.map(c => (
+                      <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -178,277 +164,232 @@ export default function CalculatorSection() {
 
               {/* To Country */}
               <div className="space-y-2">
-                <Label htmlFor="to-country" className="calculator-label">
-                  To Country (Importer)
-                </Label>
+                <Label htmlFor="to-country">To Country (Importer)</Label>
                 <Select value={toCountry} onValueChange={setToCountry}>
-                  <SelectTrigger className="calculator-select">
-                    {/* Show ONLY the country name in the trigger */}
-                    <SelectValue placeholder="Select importing country">
-                      {toCountry
-                        ? countries.find((c) => c.code === toCountry)?.name
-                        : "Select importing country"}
-                    </SelectValue>
+                  <SelectTrigger>
+                    <SelectValue>{getCountryName(toCountry)}</SelectValue>
                   </SelectTrigger>
-                  <SelectContent className="calculator-select-content">
-                    {countries.map((country) => (
-                      <SelectItem
-                        key={country.code}
-                        value={country.code}
-                        className="calculator-select-item"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">{country.name}</span>
-                          <span className="text-xs text-gray-600 mt-0.5">
-                            code: {country.code}
-                          </span>
-                        </div>
-                      </SelectItem>
+                  <SelectContent>
+                    {countries.map(c => (
+                      <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Product Type */}
+              {/* Product */}
               <div className="space-y-2">
-                <Label htmlFor="product" className="calculator-label">
-                  Agricultural Product
-                </Label>
+                <Label htmlFor="product">Agricultural Product</Label>
                 <Select value={product} onValueChange={setProduct}>
-                  <SelectTrigger className="calculator-select">
-                    {/* Show ONLY the product name in the trigger */}
-                    <SelectValue placeholder="Select product type">
-                      {product
-                        ? agriculturalProducts.find((p) => p.hs_code === product)?.name
-                        : "Select product type"}
-                    </SelectValue>
+                  <SelectTrigger>
+                    <SelectValue>{agriculturalProducts.find(p => p.hs_code === product)?.name}</SelectValue>
                   </SelectTrigger>
-                  <SelectContent className="calculator-select-content">
-                    {agriculturalProducts.map((prod) => (
-                      <SelectItem
-                        key={prod.hs_code}
-                        value={prod.hs_code}
-                        className="calculator-select-item"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">{prod.name}</span>
-                          <span className="text-xs text-gray-600 mt-0.5">
-                            code: {prod.hs_code}
-                          </span>
-                        </div>
-                      </SelectItem>
+                  <SelectContent>
+                    {agriculturalProducts.map(p => (
+                      <SelectItem key={p.hs_code} value={p.hs_code}>{p.name} ({p.hs_code})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Value of Goods */}
+              {/* Value */}
               <div className="space-y-2">
-                <Label htmlFor="value" className="calculator-label">
-                  Value of Goods ({selectedCurrency})
-                </Label>
-                <Input
-                  id="value"
-                  type="number"
-                  placeholder="Enter value"
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  className="calculator-input"
-                />
+                <Label htmlFor="value">Value of Goods ({selectedCurrency})</Label>
+                <Input type="number" value={value} onChange={e => setValue(e.target.value)} placeholder="Enter value" />
               </div>
 
               {/* Year */}
               <div className="space-y-2">
-                <Label htmlFor="year" className="calculator-label">
-                  Year
-                </Label>
+                <Label htmlFor="year">Year</Label>
                 <Select value={year} onValueChange={setYear}>
-                  <SelectTrigger className="calculator-select">
-                    <SelectValue placeholder="Select year" />
+                  <SelectTrigger>
+                    <SelectValue>{year}</SelectValue>
                   </SelectTrigger>
-                  <SelectContent className="calculator-select-content">
-                    {[2025, 2024, 2023, 2022, 2021, 2020].map((yr) => (
-                      <SelectItem key={yr} value={String(yr)} className="calculator-select-item">
-                        {yr}
-                      </SelectItem>
+                  <SelectContent>
+                    {[2025, 2024, 2023, 2022, 2021, 2020].map(y => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            {/* Calculate Button */}
-            <div className="flex justify-center pt-6">
+            <Button
+              onClick={calculateTariff}
+              disabled={!fromCountry || !toCountry || !product || !value || isCalculatingTariff || isAnalyzing}
+              className="w-full py-4"
+            >
+              {isCalculatingTariff ? "Calculating..." : isAnalyzing ? "Analyzing..." : "Calculate Tariff"}
+            </Button>
+
+            {inputError && <div className="bg-red-600 text-white p-4 rounded-lg">{inputError}</div>}
+          </CardContent>
+        </Card>
+
+        {/* Only show results after AI analysis finishes */}
+        {aiFinished && tariffPercentage && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="calculator-results mt-8 space-y-6">
+            <h3 className="text-2xl font-bold text-white mb-4">Tariff Calculation Results</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white">
+              <div>
+                <p className="text-gray-300">Trade Route:</p>
+                <p className="font-semibold">{getCountryName(fromCountry)} → {getCountryName(toCountry)}</p>
+              </div>
+              <div>
+                <p className="text-gray-300">Product:</p>
+                <p className="font-semibold">{agriculturalProducts.find(p => p.hs_code === product)?.name || product}</p>
+              </div>
+              <div>
+                <p className="text-gray-300">Goods Value:</p>
+                <p className="font-semibold">{selectedCurrency} {Number.parseFloat(value).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-gray-300">Tariff Percentage:</p>
+                <p className="font-semibold">{tariffPercentage}</p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-gray-300">Estimated Tariff:</p>
+                <p className="font-semibold">
+                  {calculatedTariff !== null
+                    ? `${selectedCurrency} ${calculatedTariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                    : "MFN"}
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid gap-4 md:grid-cols-2 mt-6">
               <Button
-                onClick={calculateTariff}
-                disabled={!fromCountry || !toCountry || !product || !value || isCalculatingTariff || isAnalyzing}
-                className="calculator-button"
+                onClick={() => { setShowAIAnalysis(!showAIAnalysis); setShowCharts(false); }}
+                size="lg"
+                className={`py-6 border-2 transition-all ${
+                  showAIAnalysis ? 'bg-primary text-white border-primary hover:bg-primary/90' : 'bg-white text-black border-white hover:bg-gray-100'
+                }`}
               >
-                {isCalculatingTariff ? "Calculating..." : isAnalyzing ? "Analyzing..." : "Calculate Tariff"}
+                <Sparkles className="w-5 h-5 mr-2" />
+                <div className="text-left">
+                  <div className="font-semibold">AI Analysis</div>
+                  <div className="text-xs opacity-80">View intelligent insights and recommendations</div>
+                </div>
+              </Button>
+
+              <Button
+                onClick={() => { setShowCharts(!showCharts); setShowAIAnalysis(false); }}
+                size="lg"
+                className={`py-6 border-2 transition-all ${
+                  showCharts ? 'bg-primary text-white border-primary hover:bg-primary/90' : 'bg-white text-black border-white hover:bg-gray-100'
+                }`}
+              >
+                <BarChart3 className="w-5 h-5 mr-2" />
+                <div className="text-left">
+                  <div className="font-semibold">Charts & Diagrams</div>
+                  <div className="text-xs opacity-80">Visualize tariff comparisons</div>
+                </div>
               </Button>
             </div>
 
-            {/* Input Error Message */}
-            {inputError && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-red-600 p-4 rounded-lg text-white"
-              >
-                <strong>Error:</strong> {inputError}
-              </motion.div>
+            {showAIAnalysis && apiResponse && typeof apiResponse === "object" && !Array.isArray(apiResponse) && (
+  <Card className="shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500 border-primary">
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2">
+        <Sparkles className="w-5 h-5" />
+        Gemini API Analysis
+      </CardTitle>
+
+    </CardHeader>
+    <CardContent className="space-y-4">
+      <div className="prose prose-sm dark:prose-invert max-w-none">
+
+        {/* Summary */}
+        {apiResponse.summary && (
+          <>
+            <h4 className="font-semibold text-lg mb-2">Summary</h4>
+            <p>{apiResponse.summary}</p>
+          </>
+        )}
+
+        {/* Key Metrics as a clean list */}
+        {apiResponse.metrics && (
+          <>
+            <h4 className="font-semibold text-lg mt-4 mb-2">Key Metrics</h4>
+            <ul className="space-y-1 list-disc pl-4">
+              {Object.entries(apiResponse.metrics).map(([key, value], idx) => (
+                <li key={idx}>
+                  <strong>{key.replace(/_/g, " ")}:</strong> {value}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {/* Insights */}
+        {apiResponse.insights && apiResponse.insights.length > 0 && (
+          <>
+            <h4 className="font-semibold text-lg mt-4 mb-2">Insights</h4>
+            <ul className="space-y-2 list-disc pl-4">
+              {apiResponse.insights.map((insight, idx) => (
+                <li key={idx}>
+                  {insight.split("**").map((part, i) =>
+                    i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {/* Recommendations */}
+        {apiResponse.recommendations && apiResponse.recommendations.length > 0 && (
+          <>
+            <h4 className="font-semibold text-lg mt-4 mb-2">Recommendations</h4>
+            <ul className="space-y-2 list-disc pl-4">
+              {apiResponse.recommendations.map((rec, idx) => (
+                <li key={idx}>
+                  {rec.split("**").map((part, i) =>
+                    i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {/* Confidence */}
+        {apiResponse.confidence && (
+          <>
+            <h4 className="font-semibold text-lg mt-4 mb-2">Confidence</h4>
+            <p>{apiResponse.confidence}</p>
+          </>
+        )}
+
+      </div>
+    </CardContent>
+  </Card>
+)}
+
+
+            {/* Charts */}
+            {showCharts && (
+              <Card className="shadow-lg border-primary p-4 mt-4 bg-white dark:bg-gray-900">
+                <h4 className="text-lg font-semibold mb-2">Tariff Comparisons</h4>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={dummyChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="product" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="tariff" fill="hsl(var(--chart-1))" />
+                  </BarChart>
+                </ResponsiveContainer>
+                <p className="text-center text-sm text-muted-foreground mt-2">
+                  This bar chart compares tariffs for different agricultural products.
+                </p>
+              </Card>
             )}
-
-            {/* Results */}
-            {tariffPercentage && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="calculator-results">
-                <h3 className="text-xl font-bold text-white mb-4">Tariff Calculation Results</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white">
-                  <div>
-                    <p className="text-gray-300">Trade Route:</p>
-                    <p className="font-semibold">
-                      {getCountryName(fromCountry)} → {getCountryName(toCountry)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-300">Product:</p>
-                    <p className="font-semibold">
-                      {agriculturalProducts.find((p) => p.hs_code === product)?.name || product}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-300">Goods Value:</p>
-                    <p className="font-semibold">
-                      {selectedCurrency} {Number.parseFloat(value).toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-300">Tariff Percentage:</p>
-                    <p className="font-semibold">
-                      {tariffPercentage}
-                    </p>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <p className="text-gray-300">Estimated Tariff:</p>
-                    <p className="font-semibold">
-                      {calculatedTariff !== null
-                        ? `${selectedCurrency} ${calculatedTariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                        : "MFN"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Gemini AI Analysis */}
-                {apiResponse && (
-                  <div className="mt-8 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 rounded-xl text-white shadow-lg">
-                    <h3 className="text-3xl font-extrabold mb-6 tracking-wide">
-                      Gemini AI Analysis
-                    </h3>
-
-                    <Accordion type="multiple" className="space-y-3">
-                      {typeof apiResponse === "string" ? (
-                        <AccordionItem value="raw">
-                          <AccordionTrigger className="text-lg font-semibold text-white/90">
-                            Analysis Text
-                          </AccordionTrigger>
-                          <AccordionContent className="text-white/80 leading-relaxed">
-                            <p className="whitespace-pre-wrap">{apiResponse}</p>
-                          </AccordionContent>
-                        </AccordionItem>
-                      ) : (
-                        <>
-                          {apiResponse.metrics && (
-                            <AccordionItem value="metrics">
-                              <AccordionTrigger className="text-lg font-semibold text-white/90">
-                                Metrics
-                              </AccordionTrigger>
-                              <AccordionContent className="text-white/80 leading-relaxed">
-                                <ul className="list-disc list-inside space-y-1">
-                                  {Object.entries(apiResponse.metrics).map(([key, value]) => (
-                                    <li key={key}>
-                                      <strong>{key}:</strong> {value}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </AccordionContent>
-                            </AccordionItem>
-                          )}
-
-                          {apiResponse.summary && (
-                            <AccordionItem value="summary">
-                              <AccordionTrigger className="text-lg font-semibold text-white/90">
-                                Summary
-                              </AccordionTrigger>
-                              <AccordionContent className="text-white/80 leading-relaxed">
-                                <p className="font-semibold">{apiResponse.summary}</p>
-                              </AccordionContent>
-                            </AccordionItem>
-                          )}
-
-                          {apiResponse.insights && (
-                            <AccordionItem value="insights">
-                              <AccordionTrigger className="text-lg font-semibold text-white/90">
-                                Insights
-                              </AccordionTrigger>
-                              <AccordionContent className="text-white/80 leading-relaxed">
-                                <ul className="list-disc list-inside space-y-1">
-                                  {apiResponse.insights.map((insight, idx) => (
-                                    <li key={idx} className="font-semibold">
-                                      {insight}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </AccordionContent>
-                            </AccordionItem>
-                          )}
-
-                          {apiResponse.recommendations && (
-                            <AccordionItem value="recommendations">
-                              <AccordionTrigger className="text-lg font-semibold text-white/90">
-                                Recommendations
-                              </AccordionTrigger>
-                              <AccordionContent className="text-white/80 leading-relaxed">
-                                <ul className="list-disc list-inside space-y-1">
-                                  {apiResponse.recommendations.map((rec, idx) => (
-                                    <li key={idx} className="font-semibold">
-                                      {rec}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </AccordionContent>
-                            </AccordionItem>
-                          )}
-
-                          {apiResponse.confidence && (
-                            <AccordionItem value="confidence">
-                              <AccordionTrigger className="text-lg font-semibold text-white/90">
-                                Confidence
-                              </AccordionTrigger>
-                              <AccordionContent className="text-white/80 leading-relaxed">
-                                <p className="font-semibold">{apiResponse.confidence}</p>
-                              </AccordionContent>
-                            </AccordionItem>
-                          )}
-                        </>
-                      )}
-                    </Accordion>
-                  </div>
-                )}
-
-
-                {/* API Error Message */}
-                {apiError && (
-                  <div className="mt-6 bg-red-600 p-4 rounded-lg">
-                    <h4 className="text-white font-semibold mb-2">API Error</h4>
-                    <p className="text-white">{apiError}</p>
-                  </div>
-                )}
-
-              </motion.div>
-            )}
-          </CardContent>
-        </Card>
+          </motion.div>
+        )}
       </div>
     </motion.section>
   )
