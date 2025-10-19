@@ -9,7 +9,7 @@ import java.util.Map;
 @Service
 public class ExchangeRateServiceImpl implements ExchangeRateService {
 
-    @Value("${exchange.api.key}")
+    @Value("${exchange.api.key:dummy}")
     private String apiKey;
 
     private final RestTemplate restTemplate = new RestTemplate();
