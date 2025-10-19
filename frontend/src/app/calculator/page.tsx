@@ -45,7 +45,7 @@ export default function CalculatorSection() {
       setIsAnalyzing(true)
       setApiError(null)
 
-  const baseUrl = '/gemini/analyze'
+      const baseUrl = '/gemini/analyze'
       const params = new URLSearchParams()
       params.append('data', data)
       if (prompt) params.append('prompt', prompt)
@@ -86,58 +86,55 @@ export default function CalculatorSection() {
 
   const calculateTariff = async () => {
     if (!fromCountry || !toCountry || !product || !value || !year) {
-      setInputError("Please fill in all required fields.")
-      return
+      setInputError("Please fill in all required fields.");
+      return;
     }
 
-    setInputError(null)
-    setApiError(null)
-    setTariffPercentage(null)
-    setCalculatedTariff(null)
-    setApiResponse(null)
+    setInputError(null);
+    setApiError(null);
+    setTariffPercentage(null);
+    setCalculatedTariff(null);
+    setApiResponse(null);
 
-    setIsCalculatingTariff(true)
-    setIsAnalyzing(false)
+    setIsCalculatingTariff(true);
+    setIsAnalyzing(false);
 
     try {
-  const dummyApiUrl = `/api/wits/tariffs/min-rate?reporter=${toCountry}&partner=${fromCountry}&product=${product}&year=${year}`;
+      const dummyApiUrl = `https://teamcmiggwp.duckdns.org/api/v1/wits/tariff-rates/${toCountry}/${fromCountry}/${product}/${year}`;
 
-  const dummyResponse = await fetch(dummyApiUrl, { credentials: 'include' });
+      const dummyResponse = await fetch(dummyApiUrl, { credentials: 'include' });
+      if (!dummyResponse.ok) throw new Error("API call failed");
 
-      if (!dummyResponse.ok) {
-        throw new Error("Dummy API call failed");
-      }
+      const data = await dummyResponse.json();
+      const parsedPercentage = parseFloat(data.minRate); // or maxRate if you prefer
 
-      const dummyText = await dummyResponse.text();
-
-      const match = dummyText.match(/([\d.]+)%?/)
-      const parsedPercentage = match ? parseFloat(match[1]) : null
-
-      if (parsedPercentage !== null && !isNaN(parsedPercentage)) {
-        setTariffPercentage(`${parsedPercentage.toFixed(2)}%`)
-        const goodsValue = parseFloat(value)
-        const tariffAmount = (parsedPercentage / 100) * goodsValue
-        setCalculatedTariff(tariffAmount)
+      if (!isNaN(parsedPercentage)) {
+        setTariffPercentage(`${parsedPercentage.toFixed(2)}%`);
+        const goodsValue = parseFloat(value);
+        const tariffAmount = (parsedPercentage / 100) * goodsValue;
+        setCalculatedTariff(tariffAmount);
       } else {
-        setTariffPercentage("MFN")
-        setCalculatedTariff(null)
+        setTariffPercentage("MFN");
+        setCalculatedTariff(null);
       }
+
 
     } catch {
-      setTariffPercentage("MFN")
-      setCalculatedTariff(null)
+      setTariffPercentage("MFN");
+      setCalculatedTariff(null);
     } finally {
-      setIsCalculatingTariff(false)
+      setIsCalculatingTariff(false);
     }
 
-    setIsAnalyzing(true)
+    // Call Gemini API afterwards
+    const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`;
+    const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors, 000 is world";
 
-    const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`
-    const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors, 000 is world"
-
-    await callGeminiApi(apiData, prompt)
-    setIsAnalyzing(false)
+    setIsAnalyzing(true);
+    await callGeminiApi(apiData, prompt);
+    setIsAnalyzing(false);
   }
+
 
   const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
 
