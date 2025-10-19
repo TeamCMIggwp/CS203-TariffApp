@@ -45,35 +45,25 @@ export default function CalculatorSection() {
       setIsAnalyzing(true)
       setApiError(null)
 
-      const baseUrl = '/gemini/analyze'
-      const params = new URLSearchParams()
-      params.append('data', data)
-      if (prompt) params.append('prompt', prompt)
-
-      const url = `${baseUrl}?${params.toString()}`
+      const url = 'https://teamcmiggwp.duckdns.org/api/v1/gemini/analyses'
 
       const response = await fetch(url, {
-        method: 'GET',
+        method: 'POST',
         headers: {
           'Accept': 'application/json',
-        }
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ data, prompt })
       })
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
 
       const result = await response.json()
 
-      // Save raw text or structured result to display
       if (result?.success && result?.analysis) {
-        if (result.analysisType === "structured") {
-          // store JSON object directly
-          setApiResponse(result.analysis);
-        } else {
-          // fallback to plain text
-          setApiResponse(result.analysis);
-        }
+        setApiResponse(result.analysis)
       } else {
-        setApiResponse("No analysis data returned from API.");
+        setApiResponse("No analysis data returned from API.")
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
@@ -83,6 +73,7 @@ export default function CalculatorSection() {
       setIsAnalyzing(false)
     }
   }
+
 
   const calculateTariff = async () => {
     if (!fromCountry || !toCountry || !product || !value || !year) {
