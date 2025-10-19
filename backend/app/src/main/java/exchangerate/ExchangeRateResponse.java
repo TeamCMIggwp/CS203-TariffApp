@@ -4,7 +4,7 @@ import java.util.Map;
 
 public class ExchangeRateResponse {
     private String baseCurrency;
-    private Map<String, Double> conversionRates;
+    private Map<String, BigDecimal> conversionRates;
 
     public ExchangeRateResponse(String baseCurrency, Map<String, Double> conversionRates) {
         this.baseCurrency = baseCurrency;
