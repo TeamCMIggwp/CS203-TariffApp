@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,6 +26,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.util.List;
+
 
 @RestController
 @RequestMapping("/api/v1/tariffs")
@@ -209,4 +211,64 @@ public class TariffController {
         tariffService.deleteTariff(reporter, partner, product, year);
         return ResponseEntity.noContent().build();
     }
+
+    @Operation(
+    summary = "Get all tariff rates",
+    description = "Returns the tariff rates that are currently in database. No parameters required."
+)
+@ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "Tariffs retrieved successfully",
+        content = @Content(
+            mediaType = "application/json",
+            array = @ArraySchema(schema = @Schema(implementation = TariffResponse.class)),
+            examples = @ExampleObject(value = """
+            [
+              {
+                "reporter": "840",
+                "partner": "356",
+                "product": 100630,
+                "year": "2020",
+                "rate": 24.0,
+                "unit": "percent",
+                "timestamp": "2025-10-14T10:30:00Z"
+              },
+              {
+                "reporter": "702",
+                "partner": "156",
+                "product": 271019",
+                "year": "2020",
+                "rate": 5.0,
+                "unit": "percent",
+                "timestamp": "2025-10-14T10:30:00Z"
+              }
+            ]
+            """)
+        )
+    ),
+    @ApiResponse(
+        responseCode = "500",
+        description = "Server error",
+        content = @Content(
+            mediaType = "application/json",
+            examples = @ExampleObject(value = """
+            {
+              "timestamp": "2025-10-14T10:30:00Z",
+              "status": 500,
+              "error": "Internal Server Error",
+              "message": "Unexpected error while retrieving current tariffs",
+              "path": "/api/v1/tariffs/current"
+            }
+            """)
+        )
+    )
+})
+@GetMapping("/current")
+public ResponseEntity<List<TariffResponse>> getCurrentTariffs() {
+    List<TariffResponse> tariffs = tariffService.getAllTariffs(); 
+    return ResponseEntity.ok(tariffs);
+}
+
+    
 }

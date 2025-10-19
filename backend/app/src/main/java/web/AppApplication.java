@@ -21,7 +21,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
                                             "database", 
                                             "auth", 
                                             "config",
-                                            "scraper"
+                                            "scraper",
+                                            "exchangerate"
                                         })
 public class AppApplication implements WebMvcConfigurer {
 
