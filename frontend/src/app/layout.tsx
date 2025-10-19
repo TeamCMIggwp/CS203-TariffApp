@@ -433,9 +433,9 @@ const links = [
     href: "/rates",
   },
   {
-    title: "Maps",
+    title: "Map",
     icon: <IconMap className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
-    href: "/maps",
+    href: "/map",
   },
   {
     title: "Predictor",
