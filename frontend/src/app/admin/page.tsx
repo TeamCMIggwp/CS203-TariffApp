@@ -56,54 +56,74 @@ export default function AdminPage() {
         setErrorMessage("");
         setSuccessMessage("");
 
-    const response = await fetch("/api/database/update", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            credentials: "include",
-            body: JSON.stringify({
-              partnerIsoNumeric: fromCountryIso,   
-              countryIsoNumeric: toCountryIso,     
-              productHsCode: hsCode,              
-              year: year,
-              rate: rateValue
-            })
+      let response = await fetch("/api/v1/tariffs", {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          partnerIsoNumeric: fromCountryIso,   
+          countryIsoNumeric: toCountryIso,     
+          productHsCode: hsCode,              
+          year: year,
+          rate: rateValue,
+          unit: "percent"
+        })
+      });
+
+      // If tariff not found (404), fallback to POST
+      if (response.status === 404) {
+        response = await fetch("/api/v1/tariffs", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            countryIsoNumeric: toCountryIso,
+            partnerIsoNumeric: fromCountryIso,
+            productHsCode: hsCode,
+            year: year,
+            rate: rateValue,
+            unit: "percent"
+          })
         });
+      }
 
-        if (!response.ok) {
-            // Try to parse JSON error message, otherwise read raw text, else fallback to generic
-            const ct = response.headers.get("content-type") || "";
-            let errorText = `Failed to update tariff rate (HTTP ${response.status})`;
-            try {
-              if (ct.includes("application/json")) {
-                const errorData = await response.json();
-                errorText = errorData.message || errorText;
-              } else {
-                const text = await response.text();
-                if (text) errorText = text.slice(0, 500);
-              }
-            } catch {
-              // ignore parse errors
+      if (!response.ok) {
+          // Try to parse JSON error message, otherwise read raw text, else fallback to generic
+          const ct = response.headers.get("content-type") || "";
+          let errorText = `Failed to update tariff rate (HTTP ${response.status})`;
+          try {
+            if (ct.includes("application/json")) {
+              const errorData = await response.json();
+              errorText = errorData.message || errorText;
+            } else {
+              const text = await response.text();
+              if (text) errorText = text.slice(0, 500);
             }
-            throw new Error(errorText);
-        }
+          } catch {
+            // ignore parse errors
+          }
+          throw new Error(errorText);
+      }
 
-        // Ensure backend returned JSON; avoid JSON parse errors on unexpected HTML
-        const contentType = response.headers.get("content-type") || "";
-        if (!contentType.includes("application/json")) {
-          const text = await response.text();
-          throw new Error(text?.slice(0, 200) || "Unexpected non-JSON response from server");
-        }
-        const data = await response.json();
-        setSuccessMessage(data.message || "Tariff rate updated successfully");
-        
-        // Clear form after successful update
-        setFromCountry("");
-        setToCountry("");
-        setProduct("");
-        setYear("");
-        setTariffRate("");
+      // Ensure backend returned JSON; avoid JSON parse errors on unexpected HTML
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        const text = await response.text();
+        throw new Error(text?.slice(0, 200) || "Unexpected non-JSON response from server");
+      }
+      const data = await response.json();
+      setSuccessMessage(data.message || "Tariff rate updated successfully");
+      
+      // Clear form after successful update
+      setFromCountry("");
+      setToCountry("");
+      setProduct("");
+      setYear("");
+      setTariffRate("");
 
     } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "An unknown error occurred");

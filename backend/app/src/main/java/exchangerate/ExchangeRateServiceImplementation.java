@@ -5,9 +5,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
-public class ExchangeRateServiceImpl implements ExchangeRateService {
+public class ExchangeRateServiceImplementation implements ExchangeRateService {
 
     @Value("${exchange.api.key:dummy}")
     private String apiKey;
@@ -24,11 +25,14 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
             throw new RuntimeException("Failed to fetch exchange rates");
         }
 
-        Map<String, Double> rates = (Map<String, Double>) response.get("conversion_rates");
+        Map<String, Object> raw = (Map<String, Object>) response.get("conversion_rates");
+        Map<String, Double> rates = raw.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> ((Number) e.getValue()).doubleValue()));
 
         return new ExchangeRateResponse(
                 (String) response.get("base_code"),
-                rates
-        );
+                rates);
     }
 }
