@@ -56,8 +56,8 @@ export default function AdminPage() {
         setErrorMessage("");
         setSuccessMessage("");
 
-    const response = await fetch("/api/database/update", {
-            method: "POST",
+    const response = await fetch("/api/v1/tariffs", {
+            method: "PUT",
             headers: {
                 "Content-Type": "application/json"
             },
@@ -67,7 +67,8 @@ export default function AdminPage() {
               countryIsoNumeric: toCountryIso,     
               productHsCode: hsCode,              
               year: year,
-              rate: rateValue
+              rate: rateValue,
+              unit: "percent"
             })
         });
 
