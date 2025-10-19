@@ -213,8 +213,8 @@ public class TariffController {
     }
 
     @Operation(
-    summary = "Get current tariff rates",
-    description = "Returns the tariff rates that are currently effective. No parameters required."
+    summary = "Get all tariff rates",
+    description = "Returns the tariff rates that are currently in database. No parameters required."
 )
 @ApiResponses({
     @ApiResponse(
