@@ -27,7 +27,7 @@ import jakarta.validation.constraints.Pattern;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/database/tariffs")
+@RequestMapping("/api/v1/tariffs")
 @Tag(name = "Tariff Management", description = "RESTful API for managing tariff rates")
 @Validated
 public class TariffController {
