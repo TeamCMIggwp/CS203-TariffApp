@@ -7,7 +7,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Map;
 
 @Service
-public class ExchangeRateServiceImpl implements ExchangeRateService {
+public class ExchangeRateServiceImplementation implements ExchangeRateService {
 
     @Value("${exchange.api.key:dummy}")
     private String apiKey;
@@ -24,6 +24,7 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
             throw new RuntimeException("Failed to fetch exchange rates");
         }
 
+        @SuppressWarnings("unchecked")
         Map<String, Double> rates = (Map<String, Double>) response.get("conversion_rates");
 
         return new ExchangeRateResponse(
