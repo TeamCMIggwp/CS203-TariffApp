@@ -26,7 +26,7 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/database/news")
+@RequestMapping("/api/v1/news")
 @Tag(name = "News Management", description = "RESTful API for managing news articles")
 @Validated
 public class NewsController {
