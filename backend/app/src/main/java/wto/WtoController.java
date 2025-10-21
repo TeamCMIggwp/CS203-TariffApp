@@ -1,145 +1,107 @@
 package wto;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import wto.dto.*;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+/**
+ * RESTful controller for fetching WTO time-series observations.
+ *
+ * Canonical resource:
+ *   GET /api/v1/indicators/{indicator}/observations
+ *
+ * Frontend passes the indicator in the path and ONLY the relevant query params:
+ *
+ * HSP group (e.g., HS_P_0070):
+ *   Required: r, pc, ps
+ *   Optional: p, fmt (default json), mode (optional; set if you want "full")
+ *   Example:
+ *     /api/v1/indicators/HS_P_0070/observations?r=840&pc=100630&ps=2018-2024&fmt=json&mode=full
+ *
+ * TPA group (TP_A_0160 / TP_A_0170):
+ *   Required: r, ps
+ *   Optional: fmt (default json)
+ *   Example:
+ *     /api/v1/indicators/TP_A_0170/observations?r=840&ps=2015-2024
+ *
+ * TPB group (TP_B_0180 / TP_B_0190):
+ *   Required: r
+ *   Optional: fmt (default json); mode defaults to "full" if omitted
+ *   Example:
+ *     /api/v1/indicators/TP_B_0180/observations?r=840&mode=full
+ */
 @RestController
-@Tag(name = "WTO Data", description = "World Trade Organization tariff and trade data for rice products")
+@RequestMapping("/api/v1/indicators")
 public class WtoController {
-    private final WtoApiService wto;
 
-    public WtoController(WtoApiService wto) { 
-        this.wto = wto; 
+    private final WtoApiService svc;
+
+    public WtoController(WtoApiService svc) {
+        this.svc = svc;
     }
 
-    @GetMapping("/api/wto/ricedata")
-    @Operation(
-        summary = "Get WTO rice tariff data",
-        description = """
-            Retrieves preferential tariff data for all rice products from the WTO API.
-            This endpoint returns hardcoded data for rice product codes: 100610, 100620, 100630, 100640 (including broken rice).
-            
-            The data includes:
-            - Preferential tariff rates between countries
-            - Product classifications (HS codes)
-            - Trade agreements (e.g., MERCOSUR)
-            - Annual tariff rates and values
-            
-            **Example URL:** https://teamcmiggwp.duckdns.org/api/wto/ricedata
-            
-            **cURL Example:**
+    @GetMapping("/{indicator}/observations")
+    public ResponseEntity<?> getObservations(
+            @PathVariable String indicator,
+            @RequestParam(required = false) String r,
+            @RequestParam(required = false) String p,
+            @RequestParam(required = false) String pc,
+            @RequestParam(required = false) String ps,
+            @RequestParam(defaultValue = "json") String fmt,
+            @RequestParam(required = false) String mode
+    ) {
+        String i = indicator.trim().toUpperCase();
 
-            curl -X GET "https://teamcmiggwp.duckdns.org/api/wto/ricedata" -H "accept: application/json"
+        // ---------- TPA group: TP_A_0160 / TP_A_0170 ----------
+        if (i.equals("TP_A_0160") || i.equals("TP_A_0170")) {
+            if (isBlank(r) || isBlank(ps)) {
+                return unprocessable("Required params for " + i + ": r, ps");
+            }
+            WtoTPARequest req = new WtoTPARequest();
+            req.setIndicator(i);
+            req.setReporter(r);
+            req.setPeriod(ps);
+            req.setFormat(fmt);
+            return svc.callWtoApi(req.toQuery());
+        }
 
-            """
-    )
-    @ApiResponses(value = {
-        @ApiResponse(
-            responseCode = "200",
-            description = "Successfully retrieved rice tariff data",
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(type = "string"),
-                examples = @ExampleObject(
-                    name = "Success Response",
-                    value = """
-                        {
-                          "Dataset": [
-                            {
-                              "IndicatorCategoryCode": "TPA_PRF_HS",
-                              "IndicatorCategory": "Preferential tariffs",
-                              "IndicatorCode": "HS_P_0070",
-                              "Indicator": "Lowest preferential tariff - simple average ad valorem tariff at HS 6-digit",
-                              "ReportingEconomyCode": "068",
-                              "ReportingEconomy": "Bolivia, Plurinational State of",
-                              "PartnerEconomyCode": "032",
-                              "PartnerEconomy": "Argentina",
-                              "ProductOrSectorClassificationCode": "HS",
-                              "ProductOrSectorClassification": "Harmonized System",
-                              "ProductOrSectorCode": "100640",
-                              "ProductOrSector": "Broken rice",
-                              "PeriodCode": "A",
-                              "Period": "Annual",
-                              "FrequencyCode": "A",
-                              "Frequency": "Annual",
-                              "UnitCode": "PCT",
-                              "Unit": "Percent",
-                              "Year": 2020,
-                              "ValueFlagCode": "PREF",
-                              "ValueFlag": "Preferential scheme",
-                              "TextValue": "Free-trade agreement duty rate for the Southern Common Market (MERCOSUR)",
-                              "Value": 0.0
-                            },
-                            {
-                              "IndicatorCategoryCode": "TPA_PRF_HS",
-                              "IndicatorCategory": "Preferential tariffs",
-                              "IndicatorCode": "HS_P_0070",
-                              "Indicator": "Lowest preferential tariff - simple average ad valorem tariff at HS 6-digit",
-                              "ReportingEconomyCode": "068",
-                              "ReportingEconomy": "Bolivia, Plurinational State of",
-                              "PartnerEconomyCode": "076",
-                              "PartnerEconomy": "Brazil",
-                              "ProductOrSectorClassificationCode": "HS",
-                              "ProductOrSectorClassification": "Harmonized System",
-                              "ProductOrSectorCode": "100640",
-                              "ProductOrSector": "Broken rice",
-                              "PeriodCode": "A",
-                              "Period": "Annual",
-                              "FrequencyCode": "A",
-                              "Frequency": "Annual",
-                              "UnitCode": "PCT",
-                              "Unit": "Percent",
-                              "Year": 2020,
-                              "ValueFlagCode": "PREF",
-                              "ValueFlag": "Preferential scheme",
-                              "TextValue": "Free-trade agreement duty rate for the Southern Common Market (MERCOSUR)",
-                              "Value": 0.0
-                            }
-                          ]
-                        }
-                        """,
-                    description = "WTO rice tariff data with preferential rates"
-                )
-            )
-        ),
-        @ApiResponse(
-            responseCode = "401",
-            description = "Unauthorized - Invalid or missing WTO API key",
-            content = @Content(
-                mediaType = "application/json",
-                examples = @ExampleObject(
-                    value = """
-                        {
-                          "error": "Unauthorized access to WTO API"
-                        }
-                        """
-                )
-            )
-        ),
-        @ApiResponse(
-            responseCode = "500",
-            description = "Internal server error - Failed to retrieve data from WTO API",
-            content = @Content(
-                mediaType = "application/json",
-                examples = @ExampleObject(
-                    value = """
-                        {
-                          "error": "Failed to communicate with WTO API"
-                        }
-                        """
-                )
-            )
-        )
-    })
-    public ResponseEntity<String> indicators() {
-        return wto.getAllRiceData();
+        // ---------- TPB group: TP_B_0180 / TP_B_0190 ----------
+        if (i.equals("TP_B_0180") || i.equals("TP_B_0190")) {
+            if (isBlank(r)) {
+                return unprocessable("Required param for " + i + ": r");
+            }
+            if (isBlank(mode)) mode = "full"; // default per your spec for TPB
+            WtoTPBRequest req = new WtoTPBRequest();
+            req.setIndicator(i);
+            req.setReporter(r);
+            req.setFormat(fmt);
+            req.setMode(mode);
+            return svc.callWtoApi(req.toQuery());
+        }
+
+        // ---------- Default: treat as HSP group (e.g., HS_P_0070) ----------
+        if (isBlank(r) || isBlank(pc) || isBlank(ps)) {
+            return unprocessable("Required params for " + i + " (HSP): r, pc, ps");
+        }
+        // Only set mode if provided (you can default it to "full" here if you want)
+        WtoHSPRequest req = new WtoHSPRequest();
+        req.setIndicator(i);
+        req.setReporter(r);
+        req.setPartner(p);       // optional
+        req.setProductCode(pc);
+        req.setPeriod(ps);
+        req.setFormat(fmt);
+        if (!isBlank(mode)) req.setMode(mode);
+
+        return svc.callWtoApi(req.toQuery());
+    }
+
+    // -------- Helpers --------
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
+    }
+
+    private static ResponseEntity<String> unprocessable(String msg) {
+        return ResponseEntity.unprocessableEntity().body(msg);
     }
 }

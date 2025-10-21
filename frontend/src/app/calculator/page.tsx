@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts"
 import { BarChart3, Sparkles } from "lucide-react"
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
+
 type MetricValue = string | number
 
 type GeminiApiResponse = {
@@ -79,6 +79,8 @@ export default function CalculatorSection() {
   setIsCalculatingTariff(true)
   setIsAnalyzing(true)
   setAiFinished(false)
+  setShowAIAnalysis(false)
+setShowCharts(false)
 
   try {
     const apiUrl = `https://teamcmiggwp.duckdns.org/api/v1/wits/tariff-rates/${toCountry}/${fromCountry}/${product}/${year}`
