@@ -5,6 +5,10 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class WtoApiService {
@@ -13,17 +17,25 @@ public class WtoApiService {
     @Value("${wto.api.key:#{environment.WTO_API_KEY}}")
     private String apiKey;
 
-    public ResponseEntity<String> getAllRiceData() {
-        String url = "https://api.wto.org/timeseries/v1/data?i=HS_P_0070&r=all&p=default&ps=default&pc=100610,100620,100630,100640&spc=false&fmt=json&mode=full&dec=default&off=0&max=500&head=H&lang=1&meta=false";
+    private static final String BASE_URL = "https://api.wto.org/timeseries/v1/data";
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Ocp-Apim-Subscription-Key", apiKey);
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-
+    public ResponseEntity<String> callWtoApi(Map<String, String> params) {
         try {
-            return rest.exchange(url, HttpMethod.GET, entity, String.class);
-        } catch (HttpStatusCodeException ex) {
-            return ResponseEntity.status(ex.getStatusCode()).body(ex.getResponseBodyAsString());
+            UriComponentsBuilder b = UriComponentsBuilder.fromHttpUrl(BASE_URL);
+            params.forEach((k, v) -> { if (v != null && !v.isBlank()) b.queryParam(k, v); });
+            if (apiKey != null && !apiKey.isBlank()) {
+                b.queryParam("subscription-key", apiKey);
+            }
+            String url = b.toUriString();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+            return rest.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        } catch (HttpStatusCodeException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Unexpected error: " + e.getMessage());
         }
     }
 }
