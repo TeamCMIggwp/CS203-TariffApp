@@ -69,6 +69,7 @@ export const countries = [
   { code: "304", name: "Greenland" },
   { code: "320", name: "Guatemala" },
   { code: "324", name: "Guinea" },
+  { code: "624", name: "Guinea-Bissau"},
   { code: "328", name: "Guyana" },
   { code: "332", name: "Haiti" },
   { code: "340", name: "Honduras" },
