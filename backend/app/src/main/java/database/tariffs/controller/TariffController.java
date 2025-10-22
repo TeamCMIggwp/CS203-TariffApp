@@ -26,9 +26,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.util.List;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-
-@SecurityRequirement(name = "basicAuth")
 
 @RestController
 @RequestMapping("/api/v1/tariffs")
