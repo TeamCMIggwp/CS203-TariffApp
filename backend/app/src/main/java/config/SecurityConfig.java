@@ -68,18 +68,14 @@ public class SecurityConfig {
         );
     }
 
-    @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
-
-    // Tighten CORS to your FE origins
-   public CorsConfigurationSource corsConfigurationSourceSecurity() {
+    @Bean(name = "corsConfigurationSourceSecurity") // any unique name
+public CorsConfigurationSource corsConfigurationSourceSecurity() {
     CorsConfiguration cfg = new CorsConfiguration();
-
     cfg.setAllowedOrigins(List.of(
         "https://teamcmiggwp.duckdns.org",
         "http://localhost:8080",
         "http://localhost:3000"
     ));
-
     cfg.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
     cfg.setAllowedHeaders(List.of("Authorization","Content-Type"));
     cfg.setAllowCredentials(true);
