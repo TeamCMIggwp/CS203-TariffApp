@@ -22,12 +22,6 @@ public class WtoController {
         this.svc = svc;
     }
 
-    @Operation(summary = "Health ping", description = "Simple ping to test routing (no WTO call)")
-    @GetMapping("/ping")
-    public Map<String, Object> ping() {
-        return Map.of("ok", true, "ts", System.currentTimeMillis());
-    }
-
     @Operation(
         summary = "Get observations",
         description = """
