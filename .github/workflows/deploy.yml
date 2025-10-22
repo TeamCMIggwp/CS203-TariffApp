@@ -74,6 +74,8 @@ jobs:
           SPRING_DB_URL="${{ secrets.SPRING_DB_URL }}" \
           SPRING_DB_USERNAME="${{ secrets.SPRING_DB_USERNAME }}" \
           SPRING_DB_PASSWORD="${{ secrets.SPRING_DB_PASSWORD }}" \
+          SPRING_SECURITY_USERNAME="${{ secrets.SPRING_SECURITY_USERNAME }}" \
+          SPRING_SECURITY_PASSWORD="${{ secrets.SPRING_SECURITY_PASSWORD }}" \
           JWT_SECRET="${{ secrets.JWT_SECRET }}" \
           JWT_ISSUER="${{ secrets.JWT_ISSUER }}" \
           JWT_AUDIENCE="${{ secrets.JWT_AUDIENCE }}" \

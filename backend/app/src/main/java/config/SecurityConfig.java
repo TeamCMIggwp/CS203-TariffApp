@@ -1,5 +1,6 @@
 package config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -16,6 +17,12 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 @EnableMethodSecurity // optional, for @PreAuthorize if you add it later
 public class SecurityConfig {
+
+    @Value("${#{environment.SPRING_SECURITY_USERNAME}}")
+    private String adminUser;
+
+    @Value("${#{environment.SPRING_SECURITY_PASSWORD}}")
+    private String adminPass;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -57,14 +64,11 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService(PasswordEncoder encoder) {
-        // ADMIN user for write operations. Use env vars in prod.
-        String adminUser = System.getenv().getOrDefault("ADMIN_USER", "admin");
-        String adminPass = System.getenv().getOrDefault("ADMIN_PASS", "change-me-strong");
-
+        
         return new InMemoryUserDetailsManager(
             User.withUsername(adminUser)
                 .password(encoder.encode(adminPass))
-                .roles("ADMIN") // ROLE_ADMIN
+                .roles("ADMIN")
                 .build()
         );
     }
