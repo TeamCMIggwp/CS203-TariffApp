@@ -57,8 +57,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder encoder, @Value("${SPRING_SECURITY_USERNAME}") String adminUser,
-            @Value("${SPRING_SECURITY_PASSWORD}") String adminPass) {
+    public UserDetailsService userDetailsService(PasswordEncoder encoder, @Value("${SPRING_SECURITY_USERNAME:testadmin}") String adminUser,
+            @Value("${SPRING_SECURITY_PASSWORD:testpw}") String adminPass) {
         
         return new InMemoryUserDetailsManager(
             User.withUsername(adminUser)
