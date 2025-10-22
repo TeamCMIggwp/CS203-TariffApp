@@ -18,12 +18,6 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableMethodSecurity // optional, for @PreAuthorize if you add it later
 public class SecurityConfig {
 
-    @Value("${#{environment.SPRING_SECURITY_USERNAME}}")
-    private String adminUser;
-
-    @Value("${#{environment.SPRING_SECURITY_PASSWORD}}")
-    private String adminPass;
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -63,7 +57,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder encoder) {
+    public UserDetailsService userDetailsService(PasswordEncoder encoder, @Value("${SPRING_SECURITY_USERNAME}") String adminUser,
+            @Value("${SPRING_SECURITY_PASSWORD}") String adminPass) {
         
         return new InMemoryUserDetailsManager(
             User.withUsername(adminUser)
