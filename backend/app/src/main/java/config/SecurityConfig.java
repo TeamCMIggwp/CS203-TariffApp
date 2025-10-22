@@ -71,24 +71,19 @@ public class SecurityConfig {
     @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
 
     // Tighten CORS to your FE origins
-   @Bean
-public CorsConfigurationSource corsConfigurationSource() {
+   public CorsConfigurationSource corsConfigurationSourceSecurity() {
     CorsConfiguration cfg = new CorsConfiguration();
 
-    // Put your real frontend origins here
     cfg.setAllowedOrigins(List.of(
-        "https://teamcmiggwp.duckdns.org", // your prod UI (Swagger + any hosted FE)
-        "http://localhost:8080",            // local dev,
-        "http://localhost:3000"             // local React dev
+        "https://teamcmiggwp.duckdns.org",
+        "http://localhost:8080",
+        "http://localhost:3000"
     ));
-
-    // If you prefer patterns (useful with subdomains), use allowedOriginPatterns instead:
-    // cfg.setAllowedOriginPatterns(List.of("https://*.duckdns.org"));
 
     cfg.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
     cfg.setAllowedHeaders(List.of("Authorization","Content-Type"));
-    // If the browser will send credentials (e.g., Basic auth or cookies), set true:
     cfg.setAllowCredentials(true);
+    cfg.setMaxAge(3600L);
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", cfg);
