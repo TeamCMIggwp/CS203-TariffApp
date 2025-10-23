@@ -21,31 +21,46 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // We do NOT register any CorsConfigurationSource bean here to avoid conflicts.
-            // If you need CORS later, add exactly ONE CorsConfigurationSource bean in ONE place.
-            .csrf(csrf -> csrf.disable()) // stateless API
+                // We do NOT register any CorsConfigurationSource bean here to avoid conflicts.
+                // If you need CORS later, add exactly ONE CorsConfigurationSource bean in ONE
+                // place.
+                .csrf(csrf -> csrf.disable()) // stateless API
 
-            .authorizeHttpRequests(auth -> auth
-                // Health + Swagger OPEN
-                .requestMatchers("/actuator/health").permitAll()
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                .authorizeHttpRequests(auth -> auth
+                        // Health + Swagger OPEN
+                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/hello").permitAll()
 
-                // Tariffs: GET = public (read), writes = ADMIN only
-                .requestMatchers(HttpMethod.GET, "/api/v1/tariffs/**").permitAll()
-                .requestMatchers(HttpMethod.POST,   "/api/v1/tariffs/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT,    "/api/v1/tariffs/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PATCH,  "/api/v1/tariffs/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/v1/tariffs/**").hasRole("ADMIN")
+                        // DB
+                        .requestMatchers(HttpMethod.GET, "/api/v1/tariffs/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/tariffs/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/tariffs/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/tariffs/**").hasRole("ADMIN")
 
-                // Your WTO read-only endpoints stay public
-                .requestMatchers(HttpMethod.GET, "/api/v1/indicators/**").permitAll()
+                        // news
+                        .requestMatchers(HttpMethod.GET, "/api/v1/news/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/news/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/news/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/news/**").hasRole("ADMIN")
 
-                // Everything else requires auth
-                .anyRequest().authenticated()
-            )
+                        // wits
+                        .requestMatchers(HttpMethod.GET, "/api/v1/wits/**").permitAll()
 
-            // Simple HTTP Basic auth (works with Swagger "Authorize")
-            .httpBasic(Customizer.withDefaults());
+                        // exchange rates
+                        .requestMatchers(HttpMethod.GET, "/api/v1/exchange").permitAll()
+
+                        // wto
+                        .requestMatchers(HttpMethod.GET, "/api/v1/indicators/**").permitAll()
+
+                        // gemini
+                        .requestMatchers(HttpMethod.GET, "/api/v1/gemini/health").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/gemini/analyses").permitAll()
+
+                )
+
+                // Simple HTTP Basic auth (works with Swagger "Authorize")
+                .httpBasic(Customizer.withDefaults());
 
         return http.build();
     }
@@ -57,14 +72,14 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder encoder, @Value("${SPRING_SECURITY_USERNAME:testadmin}") String adminUser,
+    public UserDetailsService userDetailsService(PasswordEncoder encoder,
+            @Value("${SPRING_SECURITY_USERNAME:testadmin}") String adminUser,
             @Value("${SPRING_SECURITY_PASSWORD:testpw}") String adminPass) {
-        
+
         return new InMemoryUserDetailsManager(
-            User.withUsername(adminUser)
-                .password(encoder.encode(adminPass))
-                .roles("ADMIN")
-                .build()
-        );
+                User.withUsername(adminUser)
+                        .password(encoder.encode(adminPass))
+                        .roles("ADMIN")
+                        .build());
     }
 }
