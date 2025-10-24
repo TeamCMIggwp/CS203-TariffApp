@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { decodeJwt, type JWTPayload } from "jose";
 
-const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
-
 function buildAuthHeader(req: Request): string | undefined {
   const hdr = req.headers.get("authorization");
   if (hdr && hdr.startsWith("Bearer ")) return hdr;
