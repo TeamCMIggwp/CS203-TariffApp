@@ -37,15 +37,18 @@ async function handle(req: Request, params: { slug: string[] }) {
   return new NextResponse(body, { status: upstream.status, headers: outHeaders });
 }
 
-export async function GET(req: Request, context: any) {
-  return handle(req, context?.params ?? { slug: [] });
+type RouteCtx = { params?: { slug?: string[] } } | undefined;
+const getParams = (ctx: RouteCtx): { slug: string[] } => ({ slug: ctx?.params?.slug ?? [] });
+
+export async function GET(req: Request, context: unknown) {
+  return handle(req, getParams(context as RouteCtx));
 }
-export async function POST(req: Request, context: any) {
-  return handle(req, context?.params ?? { slug: [] });
+export async function POST(req: Request, context: unknown) {
+  return handle(req, getParams(context as RouteCtx));
 }
-export async function PUT(req: Request, context: any) {
-  return handle(req, context?.params ?? { slug: [] });
+export async function PUT(req: Request, context: unknown) {
+  return handle(req, getParams(context as RouteCtx));
 }
-export async function DELETE(req: Request, context: any) {
-  return handle(req, context?.params ?? { slug: [] });
+export async function DELETE(req: Request, context: unknown) {
+  return handle(req, getParams(context as RouteCtx));
 }
