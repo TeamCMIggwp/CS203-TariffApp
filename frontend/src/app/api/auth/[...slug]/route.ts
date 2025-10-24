@@ -5,8 +5,8 @@ function backendBase(): string {
   return base.replace(/\/$/, "");
 }
 
-async function proxy(req: Request, ctx: { params: { slug?: string[] } }) {
-  const { slug = [] } = ctx.params || {};
+async function handle(req: Request, params: { slug: string[] }) {
+  const slug = params?.slug ?? [];
   const urlIn = new URL(req.url);
   const target = new URL(`${backendBase()}/auth/${slug.join("/")}`);
   if (urlIn.search) target.search = urlIn.search;
@@ -16,32 +16,36 @@ async function proxy(req: Request, ctx: { params: { slug?: string[] } }) {
   inHeaders.delete("host");
   inHeaders.delete("connection");
   inHeaders.delete("content-length");
-  // Build the upstream request init
+
+  const bodyNeeded = !(req.method === "GET" || req.method === "HEAD");
   const init: RequestInit = {
     method: req.method,
     headers: inHeaders,
-    // Forward body for non-GET/HEAD
-    body: req.method === "GET" || req.method === "HEAD" ? undefined : await req.clone().arrayBuffer(),
-    // credentials not used in server-side fetch; cookies are in headers
+    body: bodyNeeded ? await req.arrayBuffer() : undefined,
     redirect: "manual",
   };
 
   const upstream = await fetch(target, init);
   const body = await upstream.arrayBuffer();
 
-  // Copy headers; ensure Set-Cookie is preserved (single cookie expected)
   const outHeaders = new Headers();
-  // Pass through common headers
   const contentType = upstream.headers.get("content-type");
   if (contentType) outHeaders.set("content-type", contentType);
   const setCookie = upstream.headers.get("set-cookie");
   if (setCookie) outHeaders.append("set-cookie", setCookie);
 
-  // Allow JSON by default
   return new NextResponse(body, { status: upstream.status, headers: outHeaders });
 }
 
-export const GET = proxy;
-export const POST = proxy;
-export const PUT = proxy;
-export const DELETE = proxy;
+export async function GET(req: Request, context: { params: { slug: string[] } }) {
+  return handle(req, context.params);
+}
+export async function POST(req: Request, context: { params: { slug: string[] } }) {
+  return handle(req, context.params);
+}
+export async function PUT(req: Request, context: { params: { slug: string[] } }) {
+  return handle(req, context.params);
+}
+export async function DELETE(req: Request, context: { params: { slug: string[] } }) {
+  return handle(req, context.params);
+}
