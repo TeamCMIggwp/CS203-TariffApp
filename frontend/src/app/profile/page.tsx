@@ -12,7 +12,7 @@ interface ProfileResponse {
 }
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const [, setProfile] = useState<ProfileResponse | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true);

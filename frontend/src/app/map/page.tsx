@@ -17,7 +17,6 @@ export default function MapPage() {
   const [tooltipWidth, setTooltipWidth] = useState<number>(0);
 
   const hoveredCountryName = countries.find(c => c.code === hoveredCountry)?.name || '';
-  const countryName = countries.find(c => c.code === selectedToCountry)?.name || 'Unknown';
 
   useEffect(() => {
   if (tooltipRef.current) {
