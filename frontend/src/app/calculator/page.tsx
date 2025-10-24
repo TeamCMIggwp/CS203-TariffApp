@@ -93,42 +93,25 @@ export default function CalculatorSection() {
     let parsedPercentage: number | null = null
 
     if (response.ok) {
-      const text = await response.text()
-      console.log('Raw response:', text)
+      const data = await response.json()
+      console.log('WTO API Response:', JSON.stringify(data, null, 2))
       
-      if (!text || text.trim() === '') {
-        console.log('Empty response - treating as MFN')
-        parsedPercentage = null
-      } else {
-        try {
-          const data = JSON.parse(text)
-          console.log('WTO API Response:', JSON.stringify(data, null, 2))
-          
-          // Parse WTO API response - Dataset is an array of records
-          if (data.Dataset && Array.isArray(data.Dataset) && data.Dataset.length > 0) {
-            // Get the most recent record (usually the last one, or we can filter by Year)
-            const records = data.Dataset.sort((a: any, b: any) => (b.Year || 0) - (a.Year || 0))
-            const latestRecord = records[0]
-            
-            if (latestRecord && latestRecord.Value !== undefined) {
-              parsedPercentage = parseFloat(latestRecord.Value)
-              console.log('Parsed tariff rate:', parsedPercentage, '%')
-            }
-          } else if (data.Dataset && Array.isArray(data.Dataset) && data.Dataset.length === 0) {
-            // Empty dataset - no tariff data found, treat as MFN
-            console.log('Empty dataset returned - treating as MFN')
-            parsedPercentage = null
-          }
-          
-          // If still no data found, log the structure and treat as MFN
-          if (parsedPercentage === null && (!data.Dataset || !Array.isArray(data.Dataset))) {
-            console.warn('Could not parse tariff rate from response structure. Full response:', data)
-          }
-        } catch (parseError) {
-          console.error('JSON parse error:', parseError)
-          console.log('Failed to parse response as JSON - treating as MFN')
-          parsedPercentage = null
+      // Parse WTO API response - Dataset is an array of records
+      if (data.Dataset && Array.isArray(data.Dataset) && data.Dataset.length > 0) {
+        // Get the most recent record (usually the last one, or we can filter by Year)
+        const records = data.Dataset.sort((a: any, b: any) => (b.Year || 0) - (a.Year || 0))
+        const latestRecord = records[0]
+        
+        if (latestRecord && latestRecord.Value !== undefined) {
+          parsedPercentage = parseFloat(latestRecord.Value)
+          console.log('Parsed tariff rate:', parsedPercentage, '%')
         }
+      }
+      
+      // If still no data found, log the structure
+      if (parsedPercentage === null) {
+        console.warn('Could not parse tariff rate from response structure. Full response:', data)
+        setApiError('Could not parse tariff rate from API response. Check console for details.')
       }
     } else if (response.status === 404 || response.status === 422) {
       // If API returns 404 or 422 (no data), treat as MFN
@@ -146,10 +129,10 @@ export default function CalculatorSection() {
       setCalculatedTariff(null)
     }
 
-    // Prepare AI data
-    const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`
-    const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors, 000 is world"
-    //await callGeminiApi(apiData, prompt)
+  // Prepare AI data
+  const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`
+  const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors, 000 is world"
+  await callGeminiApi(apiData, prompt)
     setAiFinished(true)
 
   } catch (err) {
@@ -265,6 +248,9 @@ export default function CalculatorSection() {
             </Button>
 
             {inputError && <div className="bg-red-600 text-white p-4 rounded-lg">{inputError}</div>}
+            {apiError && !inputError && (
+              <div className="bg-yellow-600 text-white p-4 rounded-lg">{apiError}</div>
+            )}
           </CardContent>
         </Card>
 

@@ -1,4 +1,4 @@
-export default function Page() {
+export default function HistoryPage() {
   const title = "History";
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 text-white p-4">

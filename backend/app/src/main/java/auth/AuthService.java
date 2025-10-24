@@ -192,6 +192,7 @@ public class AuthService {
 
     private void ensureAccountsTable() {
         try {
+            ensureAccountsSchema();
             jdbc.execute("CREATE TABLE IF NOT EXISTS accounts.accounts (\n" +
                 "  provider VARCHAR(32) NOT NULL,\n" +
                 "  provider_account_id VARCHAR(191) NOT NULL,\n" +
@@ -614,11 +615,18 @@ public class AuthService {
 
     private void ensureSessionsTable() {
         try {
+            ensureAccountsSchema();
             jdbc.execute("CREATE TABLE IF NOT EXISTS accounts.sessions (\n" +
                 "  id VARCHAR(64) NOT NULL PRIMARY KEY,\n" +
                 "  user_id VARCHAR(64) NOT NULL,\n" +
                 "  expires_at DATETIME NOT NULL\n" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        } catch (org.springframework.jdbc.BadSqlGrammarException ignore) {}
+    }
+
+    private void ensureAccountsSchema() {
+        try {
+            jdbc.execute("CREATE SCHEMA IF NOT EXISTS accounts");
         } catch (org.springframework.jdbc.BadSqlGrammarException ignore) {}
     }
 

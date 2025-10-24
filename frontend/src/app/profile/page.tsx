@@ -51,7 +51,7 @@ export default function ProfilePage() {
         setName(data.name || '');
         setEmail(data.email || '');
         setError(null);
-      } catch (e) {
+      } catch {
         setError('Failed to load profile.');
       } finally {
         setLoading(false);
