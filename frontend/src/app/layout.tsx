@@ -7,9 +7,8 @@ import { FloatingDock } from "@/components/ui/floating-dock"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
 import {
   IconAdjustmentsCog,
-  IconChartHistogram,
   IconMap,
-  IconReceipt2,
+  IconFileInfo,
   IconHome,
   IconHistory,
   IconCalculator,
@@ -428,25 +427,20 @@ const links = [
     href: "/history",
   },
   {
-    title: "Rates",
-    icon: <IconReceipt2 className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
-    href: "/rates",
-  },
-  {
     title: "Map",
     icon: <IconMap className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
     href: "/map",
-  },
-  {
-    title: "Predictor",
-    icon: <IconChartHistogram className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
-    href: "/predictor",
   },
   // Admin link is conditionally added based on session (see RootLayout)
   {
     title: "News",
     icon: <Newspaper className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
     href: "/news",
+  },
+    {
+    title: "About",
+    icon: <IconFileInfo className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+    href: "/about",
   },
   {
     title: "Login",
