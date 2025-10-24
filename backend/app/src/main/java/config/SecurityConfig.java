@@ -1,85 +1,96 @@
-// package config;
+package config;
 
-// import org.springframework.beans.factory.annotation.Value;
-// import org.springframework.context.annotation.Bean;
-// import org.springframework.context.annotation.Configuration;
-// import org.springframework.http.HttpMethod;
-// import org.springframework.security.config.Customizer;
-// import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
-// import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-// import org.springframework.security.core.userdetails.User;
-// import org.springframework.security.core.userdetails.UserDetailsService;
-// import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-// import org.springframework.security.crypto.password.PasswordEncoder;
-// import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-// import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.util.StringUtils;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import jakarta.servlet.http.HttpServletResponse;
 
-// @Configuration
-// @EnableMethodSecurity // optional, for @PreAuthorize if you add it later
-// public class SecurityConfig {
+@Configuration
+@EnableMethodSecurity // optional, enables @PreAuthorize if needed later
+public class SecurityConfig {
 
-//     @Bean
-//     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-//         http
-//                 // We do NOT register any CorsConfigurationSource bean here to avoid conflicts.
-//                 // If you need CORS later, add exactly ONE CorsConfigurationSource bean in ONE
-//                 // place.
-//                 .csrf(csrf -> csrf.disable()) // stateless API
+	private final JwtAuthenticationFilter jwtFilter;
 
-//                 .authorizeHttpRequests(auth -> auth
-//                         // Health + Swagger OPEN
-//                         .requestMatchers("/actuator/health").permitAll()
-//                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-//                         .requestMatchers("/hello").permitAll()
+	public SecurityConfig(JwtAuthenticationFilter jwtFilter) {
+		this.jwtFilter = jwtFilter;
+	}
 
-//                         // DB
-//                         .requestMatchers(HttpMethod.GET, "/api/v1/tariffs/**").permitAll()
-//                         .requestMatchers(HttpMethod.POST, "/api/v1/tariffs/**").hasRole("ADMIN")
-//                         .requestMatchers(HttpMethod.PUT, "/api/v1/tariffs/**").hasRole("ADMIN")
-//                         .requestMatchers(HttpMethod.DELETE, "/api/v1/tariffs/**").hasRole("ADMIN")
+	@Bean
+	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+		http
+			// CORS is handled by web.CorsConfig; don't configure here to avoid duplicate beans
+			.csrf(csrf -> csrf.disable())
+			.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+			.exceptionHandling(eh -> eh
+				.authenticationEntryPoint((request, response, authException) ->
+					writeJson(response, 401, "Unauthorized", authException != null ? authException.getMessage() : null, request.getRequestURI()))
+				.accessDeniedHandler((request, response, accessDeniedException) ->
+					writeJson(response, 403, "Forbidden", accessDeniedException != null ? accessDeniedException.getMessage() : null, request.getRequestURI()))
+			)
+			.authorizeHttpRequests(auth -> auth
+				// Health + Swagger OPEN
+				.requestMatchers("/actuator/health").permitAll()
+				.requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+				.requestMatchers("/hello").permitAll()
 
-//                         // news
-//                         .requestMatchers(HttpMethod.GET, "/api/v1/news/**").permitAll()
-//                         .requestMatchers(HttpMethod.POST, "/api/v1/news/**").hasRole("ADMIN")
-//                         .requestMatchers(HttpMethod.PUT, "/api/v1/news/**").hasRole("ADMIN")
-//                         .requestMatchers(HttpMethod.DELETE, "/api/v1/news/**").hasRole("ADMIN")
+				// Auth endpoints open (login/signup/refresh/logout/me handled in controller)
+				.requestMatchers("/auth/**").permitAll()
 
-//                         // wits
-//                         .requestMatchers(HttpMethod.GET, "/api/v1/wits/**").permitAll()
+				// Tariffs: GET open; mutating admin-only
+				.requestMatchers(HttpMethod.GET, "/api/v1/tariffs/**").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/tariffs/**").hasRole("ADMIN")
+				.requestMatchers(HttpMethod.PUT, "/api/v1/tariffs/**").hasRole("ADMIN")
+				.requestMatchers(HttpMethod.DELETE, "/api/v1/tariffs/**").hasRole("ADMIN")
 
-//                         // exchange rates
-//                         .requestMatchers(HttpMethod.GET, "/api/v1/exchange").permitAll()
+				// News: GET open; mutating admin-only
+				.requestMatchers(HttpMethod.GET, "/api/v1/news/**").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/news/**").hasRole("ADMIN")
+				.requestMatchers(HttpMethod.PUT, "/api/v1/news/**").hasRole("ADMIN")
+				.requestMatchers(HttpMethod.DELETE, "/api/v1/news/**").hasRole("ADMIN")
 
-//                         // wto
-//                         .requestMatchers(HttpMethod.GET, "/api/v1/indicators/**").permitAll()
+				// WITS and WTO data open
+				.requestMatchers(HttpMethod.GET, "/api/v1/wits/**").permitAll()
+				.requestMatchers(HttpMethod.GET, "/api/v1/indicators/**").permitAll()
 
-//                         // gemini
-//                         .requestMatchers(HttpMethod.GET, "/api/v1/gemini/health").permitAll()
-//                         .requestMatchers(HttpMethod.POST, "/api/v1/gemini/analyses").permitAll()
+				// Exchange rates open
+				.requestMatchers(HttpMethod.GET, "/api/v1/exchange").permitAll()
 
-//                 )
+				// Gemini endpoints (health + analyses) open as before
+				.requestMatchers(HttpMethod.GET, "/api/v1/gemini/health").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/gemini/analyses").permitAll()
 
-//                 // Simple HTTP Basic auth (works with Swagger "Authorize")
-//                 .httpBasic(Customizer.withDefaults());
+				// Everything else requires authentication
+				.anyRequest().authenticated()
+			)
+			// Add our JWT filter
+			.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
-//         return http.build();
-//     }
+		return http.build();
+	}
 
-//     @Bean
-//     public PasswordEncoder passwordEncoder() {
-//         // BCrypt is the Spring-recommended encoder
-//         return new BCryptPasswordEncoder();
-//     }
-
-//     @Bean
-//     public UserDetailsService userDetailsService(PasswordEncoder encoder,
-//             @Value("${SPRING_SECURITY_USERNAME:testadmin}") String adminUser,
-//             @Value("${SPRING_SECURITY_PASSWORD:testpw}") String adminPass) {
-
-//         return new InMemoryUserDetailsManager(
-//                 User.withUsername(adminUser)
-//                         .password(encoder.encode(adminPass))
-//                         .roles("ADMIN")
-//                         .build());
-//     }
-// }
+	private static void writeJson(HttpServletResponse res, int status, String error, String detail, String path) {
+		try {
+			res.setStatus(status);
+			res.setCharacterEncoding(StandardCharsets.UTF_8.name());
+			res.setContentType("application/json");
+			String safeDetail = StringUtils.hasText(detail) ? detail.replace("\"", "\\\"") : null;
+			String body = "{"
+				+ "\"timestamp\":\"" + Instant.now().toString() + "\"," 
+				+ "\"status\":" + status + ","
+				+ "\"error\":\"" + (error != null ? error : "") + "\"," 
+				+ (safeDetail != null ? "\"message\":\"" + safeDetail + "\"," : "")
+				+ "\"path\":\"" + (path != null ? path : "") + "\"}";
+			res.getOutputStream().write(body.getBytes(StandardCharsets.UTF_8));
+		} catch (Exception ignore) {
+			// As a last resort, let default error handling proceed
+		}
+	}
+}
