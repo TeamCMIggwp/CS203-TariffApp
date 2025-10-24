@@ -27,7 +27,7 @@ export default function CalculatorSection() {
   const [toCountry, setToCountry] = useState("840")
   const [product, setProduct] = useState("100630")
   const [value, setValue] = useState("100")
-  const [year, setYear] = useState("2021")
+  const [year, setYear] = useState("2025")
   const [calculatedTariff, setCalculatedTariff] = useState<number | null>(null)
 
   const [apiResponse, setApiResponse] = useState<GeminiApiResponse | string | null>(null)
@@ -86,30 +86,49 @@ export default function CalculatorSection() {
     // Call WTO API with HSP0070 indicator
     // i = indicator, r = reporting economy (importer), p = partner economy (exporter), pc = product code, ps = period
     const apiUrl = `https://teamcmiggwp.duckdns.org/api/v1/indicators/HS_P_0070/observations?i=HS_P_0070&r=${toCountry}&p=${fromCountry}&pc=${product}&ps=${year}&fmt=json`
+    console.log('Calling WTO API:', apiUrl)
     const response = await fetch(apiUrl, { credentials: 'include' })
+    console.log('Response status:', response.status)
 
     let parsedPercentage: number | null = null
 
     if (response.ok) {
-      const data = await response.json()
-      console.log('WTO API Response:', JSON.stringify(data, null, 2))
+      const text = await response.text()
+      console.log('Raw response:', text)
       
-      // Parse WTO API response - Dataset is an array of records
-      if (data.Dataset && Array.isArray(data.Dataset) && data.Dataset.length > 0) {
-        // Get the most recent record (usually the last one, or we can filter by Year)
-        const records = data.Dataset.sort((a: any, b: any) => (b.Year || 0) - (a.Year || 0))
-        const latestRecord = records[0]
-        
-        if (latestRecord && latestRecord.Value !== undefined) {
-          parsedPercentage = parseFloat(latestRecord.Value)
-          console.log('Parsed tariff rate:', parsedPercentage, '%')
+      if (!text || text.trim() === '') {
+        console.log('Empty response - treating as MFN')
+        parsedPercentage = null
+      } else {
+        try {
+          const data = JSON.parse(text)
+          console.log('WTO API Response:', JSON.stringify(data, null, 2))
+          
+          // Parse WTO API response - Dataset is an array of records
+          if (data.Dataset && Array.isArray(data.Dataset) && data.Dataset.length > 0) {
+            // Get the most recent record (usually the last one, or we can filter by Year)
+            const records = data.Dataset.sort((a: any, b: any) => (b.Year || 0) - (a.Year || 0))
+            const latestRecord = records[0]
+            
+            if (latestRecord && latestRecord.Value !== undefined) {
+              parsedPercentage = parseFloat(latestRecord.Value)
+              console.log('Parsed tariff rate:', parsedPercentage, '%')
+            }
+          } else if (data.Dataset && Array.isArray(data.Dataset) && data.Dataset.length === 0) {
+            // Empty dataset - no tariff data found, treat as MFN
+            console.log('Empty dataset returned - treating as MFN')
+            parsedPercentage = null
+          }
+          
+          // If still no data found, log the structure and treat as MFN
+          if (parsedPercentage === null && (!data.Dataset || !Array.isArray(data.Dataset))) {
+            console.warn('Could not parse tariff rate from response structure. Full response:', data)
+          }
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError)
+          console.log('Failed to parse response as JSON - treating as MFN')
+          parsedPercentage = null
         }
-      }
-      
-      // If still no data found, log the structure
-      if (parsedPercentage === null) {
-        console.warn('Could not parse tariff rate from response structure. Full response:', data)
-        setApiError('Could not parse tariff rate from API response. Check console for details.')
       }
     } else if (response.status === 404 || response.status === 422) {
       // If API returns 404 or 422 (no data), treat as MFN
@@ -134,16 +153,17 @@ export default function CalculatorSection() {
     setAiFinished(true)
 
   } catch (err) {
+    console.error('Error in calculateTariff:', err)
     setApiError(err instanceof Error ? err.message : "Unknown error occurred")
     // Still show MFN in case of unexpected error
     if (!tariffPercentage) setTariffPercentage("MFN")
     setCalculatedTariff(null)
+    setAiFinished(true) // Show results even on error
   } finally {
     setIsCalculatingTariff(false)
     setIsAnalyzing(false)
   }
 }
-
 
   const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
   const getCountryName = (code: string) => {
