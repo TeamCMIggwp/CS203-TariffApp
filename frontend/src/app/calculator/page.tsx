@@ -95,13 +95,16 @@ export default function CalculatorSection() {
       console.log('WTO API Response:', JSON.stringify(data, null, 2))
       
       // Parse WTO API response - Dataset is an array of records
+      type WTORecord = { Year?: number; Value?: string | number; [key: string]: unknown }
       if (data.Dataset && Array.isArray(data.Dataset) && data.Dataset.length > 0) {
         // Get the most recent record (usually the last one, or we can filter by Year)
-        const records = data.Dataset.sort((a: any, b: any) => (b.Year || 0) - (a.Year || 0))
+        const records = (data.Dataset as WTORecord[]).sort((a: WTORecord, b: WTORecord) => ((b.Year ?? 0) as number) - ((a.Year ?? 0) as number))
         const latestRecord = records[0]
         
         if (latestRecord && latestRecord.Value !== undefined) {
-          parsedPercentage = parseFloat(latestRecord.Value)
+          const v = latestRecord.Value
+          const num = typeof v === 'number' ? v : parseFloat(String(v))
+          parsedPercentage = Number.isFinite(num) ? num : null
           console.log('Parsed tariff rate:', parsedPercentage, '%')
         }
       }
@@ -127,10 +130,10 @@ export default function CalculatorSection() {
       setCalculatedTariff(null)
     }
 
-    // Prepare AI data
-    const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`
-    const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors, 000 is world"
-    //await callGeminiApi(apiData, prompt)
+  // Prepare AI data
+  const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`
+  const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors, 000 is world"
+  await callGeminiApi(apiData, prompt)
     setAiFinished(true)
 
   } catch (err) {
@@ -245,6 +248,9 @@ export default function CalculatorSection() {
             </Button>
 
             {inputError && <div className="bg-red-600 text-white p-4 rounded-lg">{inputError}</div>}
+            {apiError && !inputError && (
+              <div className="bg-yellow-600 text-white p-4 rounded-lg">{apiError}</div>
+            )}
           </CardContent>
         </Card>
 
