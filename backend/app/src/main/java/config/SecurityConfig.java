@@ -93,6 +93,6 @@ public class SecurityConfig {
 			res.getOutputStream().write(body.getBytes(StandardCharsets.UTF_8));
 		} catch (Exception ignore) {
 			// As a last resort, let default error handling proceed
-		}
+		} 
 	}
 }
