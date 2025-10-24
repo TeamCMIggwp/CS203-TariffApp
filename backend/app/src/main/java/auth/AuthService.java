@@ -41,6 +41,9 @@ public class AuthService {
     @Value("${app.auth.allowPlaintext:false}")
     private boolean allowPlaintext;
 
+    @Value("${google.oauth.clientId:}")
+    private String googleClientId;
+
     public AuthService(@Qualifier("authJdbcTemplate") JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
@@ -60,6 +63,142 @@ public class AuthService {
         String role = jwt.getClaim("role").asString();
         if (userId == null || userId.isBlank()) throw new Unauthorized("Invalid token");
         return new ParsedToken(userId, role != null ? role : "user");
+    }
+
+    /**
+     * Verify a Google ID token (from Google Identity Services), upsert the user and
+     * issue application tokens. Uses Google's tokeninfo endpoint via OkHttp for
+     * verification to avoid an extra dependency.
+     */
+    public LoginResult loginWithGoogleIdToken(String idToken) {
+        if (idToken == null || idToken.isBlank()) throw new Unauthorized("Missing idToken");
+        // Call Google's tokeninfo endpoint
+        var client = new okhttp3.OkHttpClient();
+        var parsed = okhttp3.HttpUrl.parse("https://oauth2.googleapis.com/tokeninfo");
+        if (parsed == null) throw new Unauthorized("Google URL error");
+        var url = parsed.newBuilder().addQueryParameter("id_token", idToken).build();
+        var req = new okhttp3.Request.Builder().url(url).get().build();
+        try (var resp = client.newCall(req).execute()) {
+            if (!resp.isSuccessful()) {
+                throw new Unauthorized("Invalid Google token");
+            }
+            var rb = resp.body();
+            if (rb == null) throw new Unauthorized("Invalid Google response");
+            var bodyStr = rb.string();
+            if (bodyStr == null || bodyStr.isBlank()) throw new Unauthorized("Invalid Google response");
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            @SuppressWarnings("unchecked")
+            var data = (java.util.Map<String, Object>) mapper.readValue(bodyStr, java.util.Map.class);
+
+            String aud = stringVal(data.get("aud"));
+            String iss = stringVal(data.get("iss"));
+            String sub = stringVal(data.get("sub"));
+            String email = stringVal(data.get("email"));
+            String emailVerified = stringVal(data.get("email_verified"));
+            String name = stringVal(data.get("name"));
+
+            if (sub == null || sub.isBlank()) throw new Unauthorized("Invalid Google token (no sub)");
+            if (googleClientId != null && !googleClientId.isBlank()) {
+                if (!googleClientId.equals(aud)) throw new Unauthorized("Google token audience mismatch");
+            }
+            if (iss != null && !(iss.equals("accounts.google.com") || iss.equals("https://accounts.google.com"))) {
+                throw new Unauthorized("Google token issuer invalid");
+            }
+            if (emailVerified != null && !(emailVerified.equals("true") || emailVerified.equals("1"))) {
+                // allow unverified email but warn
+                log.info("Google login for sub {} with unverified email {}", sub, email);
+            }
+
+            // Find or create user
+            String userId = resolveOrCreateGoogleUser(sub, email, name);
+            // Determine role
+            String role = "user";
+            try {
+                var m = jdbc.queryForMap("SELECT role FROM accounts.users WHERE id = ?", userId);
+                role = (String) m.getOrDefault("role", "user");
+            } catch (EmptyResultDataAccessException ignore) {}
+            return issueTokens(userId, role, null);
+        } catch (java.io.IOException e) {
+            throw new Unauthorized("Google verification error");
+        }
+    }
+
+    private static String stringVal(Object o) {
+        return o != null ? String.valueOf(o) : null;
+    }
+
+    private String resolveOrCreateGoogleUser(String sub, String email, String name) {
+        // Try mapping table first
+        try {
+            var m = jdbc.queryForMap(
+                "SELECT user_id FROM accounts.accounts WHERE provider = 'google' AND provider_account_id = ?",
+                sub);
+            return (String) m.get("user_id");
+        } catch (EmptyResultDataAccessException | BadSqlGrammarException ignore) {}
+
+        String userId = null;
+        // If email exists, try to attach to existing user by email
+        if (email != null && !email.isBlank()) {
+            try {
+                userId = jdbc.queryForObject(
+                    "SELECT id FROM accounts.users WHERE LOWER(TRIM(email)) = LOWER(?) LIMIT 1",
+                    String.class, email);
+            } catch (EmptyResultDataAccessException nf) {
+                userId = null;
+            } catch (BadSqlGrammarException ignore) {
+                userId = null;
+            }
+        }
+
+        // Create user if none
+        if (userId == null) {
+            userId = java.util.UUID.randomUUID().toString();
+            boolean inserted = false;
+            try {
+                jdbc.update("INSERT INTO accounts.users (id, email, name, role) VALUES (?, ?, ?, 'user')",
+                    userId, email, name);
+                inserted = true;
+            } catch (BadSqlGrammarException e1) {
+                try {
+                    jdbc.update("INSERT INTO accounts.users (id, email, role) VALUES (?, ?, 'user')",
+                        userId, email);
+                    inserted = true;
+                } catch (BadSqlGrammarException e2) {
+                    try {
+                        jdbc.update("INSERT INTO accounts.Users (id, email) VALUES (?, ?)", userId, email);
+                        inserted = true;
+                    } catch (BadSqlGrammarException e3) {
+                        // give up, will throw below
+                    }
+                }
+            }
+            if (!inserted) throw new Unauthorized("Failed to create user");
+        }
+
+        // Ensure provider mapping exists
+        try {
+            ensureAccountsTable();
+            jdbc.update(
+                "INSERT INTO accounts.accounts (user_id, provider, provider_account_id) VALUES (?, 'google', ?)",
+                userId, sub);
+        } catch (BadSqlGrammarException ignore) {
+            // If table or columns differ, ignore mapping; auth will still work via users table
+        }
+
+        return userId;
+    }
+
+    private void ensureAccountsTable() {
+        try {
+            jdbc.execute("CREATE TABLE IF NOT EXISTS accounts.accounts (\n" +
+                "  provider VARCHAR(32) NOT NULL,\n" +
+                "  provider_account_id VARCHAR(191) NOT NULL,\n" +
+                "  user_id VARCHAR(64) NOT NULL,\n" +
+                "  password_hash TEXT NULL,\n" +
+                "  password_algorithm VARCHAR(32) NULL,\n" +
+                "  PRIMARY KEY (provider, provider_account_id)\n" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        } catch (BadSqlGrammarException ignore) {}
     }
 
     public Map<String, Object> getProfile(String userId) {

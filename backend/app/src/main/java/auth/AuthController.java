@@ -52,6 +52,28 @@ public class AuthController {
         ));
     }
 
+    public static record GoogleLoginRequest(String idToken) {}
+
+    @PostMapping("/google")
+    public ResponseEntity<?> googleLogin(@RequestBody GoogleLoginRequest req, HttpServletResponse res) {
+        if (req == null || req.idToken() == null || req.idToken().isBlank()) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", "idToken required"));
+        }
+        try {
+            var result = authService.loginWithGoogleIdToken(req.idToken());
+            setRefreshCookie(res, result.refreshToken(), result.refreshTtlSeconds());
+            return ResponseEntity.ok(java.util.Map.of(
+                "accessToken", result.accessToken(),
+                "role", result.role()
+            ));
+        } catch (AuthService.Unauthorized ex) {
+            return ResponseEntity.status(401).body(java.util.Map.of("message", ex.getMessage()));
+        } catch (Exception ex) {
+            log.warn("Google login error: {}", ex.toString());
+            return ResponseEntity.status(502).body(java.util.Map.of("message", "Google verification failed"));
+        }
+    }
+
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@CookieValue(name = "refresh_token", required = false) String refreshToken,
                                      HttpServletResponse res) {
