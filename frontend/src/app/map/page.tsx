@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { countries, agriculturalProducts } from '@/lib/tariff-data';
 
 export default function MapPage() {
@@ -13,9 +13,17 @@ export default function MapPage() {
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [showPopup, setShowPopup] = useState(false);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const [tooltipWidth, setTooltipWidth] = useState<number>(0);
 
   const hoveredCountryName = countries.find(c => c.code === hoveredCountry)?.name || '';
   const countryName = countries.find(c => c.code === selectedToCountry)?.name || 'Unknown';
+
+  useEffect(() => {
+  if (tooltipRef.current) {
+    setTooltipWidth(tooltipRef.current.offsetWidth);
+  }
+  }, [hoveredCountryName]);
 
   const handleCountryClick = (countryCode: string) => {
     setSelectedToCountry(countryCode);
@@ -59,7 +67,7 @@ export default function MapPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-white text-black p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-white text-black p-4 pb-32">
       <div className="relative w-full">
         <svg
           onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
@@ -2049,19 +2057,25 @@ export default function MapPage() {
         </svg>
         {/* Tooltip appears next to the mouse */}
         {hoveredCountry && hoveredCountryName && (
-        <div
-            className="fixed bg-white text-base font-semibold border border-gray-500 rounded px-3 py-2 shadow-lg pointer-events-none z-50 transition-opacity duration-150"
-            style={{
-            top: mousePos.y - 20,
-            left: mousePos.x + 12,
-            opacity: hoveredCountry ? 1 : 0,
-            position: 'fixed',
-            }}
-        >
-            {hoveredCountryName}
+            <div
+                ref={tooltipRef}
+                className="fixed bg-white text-base font-semibold border border-gray-500 rounded px-3 py-2 shadow-lg pointer-events-none z-[70] transition-opacity duration-150"
+                style={{
+                top: mousePos.y - 20,
+                left:
+                    mousePos.x < window.innerWidth / 2
+                    ? mousePos.x + 12 // left half, right of cursor
+                    : mousePos.x - 12 - tooltipWidth, // right half, left of cursor
+                opacity: hoveredCountry ? 1 : 0,
+                position: 'fixed',
+                whiteSpace: 'nowrap',
+                visibility: tooltipWidth > 0 ? 'visible' : 'hidden', // prevents flash
+                }}
+            >
+                {hoveredCountryName}
+            </div>
+            )}
         </div>
-        )}
-    </div>
 
         {showPopup && selectedToCountry && (
         <div
