@@ -116,7 +116,9 @@ public class AuthService {
             try {
                 var m = jdbc.queryForMap("SELECT role FROM accounts.users WHERE id = ?", userId);
                 role = (String) m.getOrDefault("role", "user");
-            } catch (EmptyResultDataAccessException ignore) {}
+            } catch (EmptyResultDataAccessException | org.springframework.jdbc.BadSqlGrammarException ignore) {
+                // If table/column not available, default to user
+            }
             return issueTokens(userId, role, null);
         } catch (java.io.IOException e) {
             throw new Unauthorized("Google verification error");
@@ -587,8 +589,15 @@ public class AuthService {
         if (oldRefreshToken != null) {
             jdbc.update("DELETE FROM accounts.sessions WHERE id = ?", oldRefreshToken);
         }
-        jdbc.update("INSERT INTO accounts.sessions (id, user_id, expires_at) VALUES (?, ?, ?)",
-                newSessionId, userId, java.sql.Timestamp.from(newExp));
+        try {
+            jdbc.update("INSERT INTO accounts.sessions (id, user_id, expires_at) VALUES (?, ?, ?)",
+                    newSessionId, userId, java.sql.Timestamp.from(newExp));
+        } catch (org.springframework.jdbc.BadSqlGrammarException e) {
+            // Ensure sessions table exists then retry once
+            ensureSessionsTable();
+            jdbc.update("INSERT INTO accounts.sessions (id, user_id, expires_at) VALUES (?, ?, ?)",
+                    newSessionId, userId, java.sql.Timestamp.from(newExp));
+        }
 
         Algorithm alg = Algorithm.HMAC256(jwtSecret);
         Instant now = Instant.now();
@@ -601,6 +610,16 @@ public class AuthService {
                 .withClaim("role", role)
                 .sign(alg);
         return new LoginResult(accessToken, newSessionId, refreshTtlSeconds, role);
+    }
+
+    private void ensureSessionsTable() {
+        try {
+            jdbc.execute("CREATE TABLE IF NOT EXISTS accounts.sessions (\n" +
+                "  id VARCHAR(64) NOT NULL PRIMARY KEY,\n" +
+                "  user_id VARCHAR(64) NOT NULL,\n" +
+                "  expires_at DATETIME NOT NULL\n" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        } catch (org.springframework.jdbc.BadSqlGrammarException ignore) {}
     }
 
     public record LoginResult(String accessToken, String refreshToken, int refreshTtlSeconds, String role) {}
