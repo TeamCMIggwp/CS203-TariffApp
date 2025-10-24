@@ -62,10 +62,8 @@ export default function LoginPage() {
           return;
         }
         // Call backend via Next rewrite to set refresh cookie
-        const backend = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL;
-        const googleUrl = backend && typeof window !== "undefined" && window.location.hostname !== new URL(backend).hostname
-          ? `${backend}/auth/google`
-          : `/api/auth/google`;
+        // Always route via Next.js rewrite to avoid CORS and ensure cookies land on the frontend domain
+        const googleUrl = `/api/auth/google`;
         const res = await fetch(googleUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
