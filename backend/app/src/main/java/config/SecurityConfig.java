@@ -1,5 +1,8 @@
 package config;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -9,8 +12,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.util.StringUtils;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
+
 import jakarta.servlet.http.HttpServletResponse;
 
 @Configuration
@@ -44,15 +46,15 @@ public class SecurityConfig {
 				// Auth endpoints open (login/signup/refresh/logout/me handled in controller)
 				.requestMatchers("/auth/**").permitAll()
 
-				// Tariffs: GET open; mutating admin-only
+				// Tariffs: GET and POST open; PUT/DELETE admin-only
 				.requestMatchers(HttpMethod.GET, "/api/v1/tariffs/**").permitAll()
-				.requestMatchers(HttpMethod.POST, "/api/v1/tariffs/**").hasRole("ADMIN")
+				.requestMatchers(HttpMethod.POST, "/api/v1/tariffs/**").permitAll()
 				.requestMatchers(HttpMethod.PUT, "/api/v1/tariffs/**").hasRole("ADMIN")
 				.requestMatchers(HttpMethod.DELETE, "/api/v1/tariffs/**").hasRole("ADMIN")
 
-				// News: GET open; mutating admin-only
+				// News: GET and POST open; PUT/DELETE admin-only
 				.requestMatchers(HttpMethod.GET, "/api/v1/news/**").permitAll()
-				.requestMatchers(HttpMethod.POST, "/api/v1/news/**").hasRole("ADMIN")
+				.requestMatchers(HttpMethod.POST, "/api/v1/news/**").permitAll()
 				.requestMatchers(HttpMethod.PUT, "/api/v1/news/**").hasRole("ADMIN")
 				.requestMatchers(HttpMethod.DELETE, "/api/v1/news/**").hasRole("ADMIN")
 
