@@ -23,11 +23,11 @@ type GeminiApiResponse = {
 
 export default function CalculatorSection() {
   const calculatorY = useMotionValue(0)
-  const [fromCountry, setFromCountry] = useState("000")
+  const [fromCountry, setFromCountry] = useState("004")
   const [toCountry, setToCountry] = useState("840")
   const [product, setProduct] = useState("100630")
   const [value, setValue] = useState("100")
-  const [year, setYear] = useState("2020")
+  const [year, setYear] = useState("2021")
   const [calculatedTariff, setCalculatedTariff] = useState<number | null>(null)
 
   const [apiResponse, setApiResponse] = useState<GeminiApiResponse | string | null>(null)
@@ -80,19 +80,39 @@ export default function CalculatorSection() {
   setIsAnalyzing(true)
   setAiFinished(false)
   setShowAIAnalysis(false)
-setShowCharts(false)
+  setShowCharts(false)
 
   try {
-    const apiUrl = `https://teamcmiggwp.duckdns.org/api/v1/wits/tariff-rates/${toCountry}/${fromCountry}/${product}/${year}`
+    // Call WTO API with HSP0070 indicator
+    // i = indicator, r = reporting economy (importer), p = partner economy (exporter), pc = product code, ps = period
+    const apiUrl = `https://teamcmiggwp.duckdns.org/api/v1/indicators/HS_P_0070/observations?i=HS_P_0070&r=${toCountry}&p=${fromCountry}&pc=${product}&ps=${year}&fmt=json`
     const response = await fetch(apiUrl, { credentials: 'include' })
 
     let parsedPercentage: number | null = null
 
     if (response.ok) {
       const data = await response.json()
-      parsedPercentage = parseFloat(data.minRate)
-    } else if (response.status === 404) {
-      // If API returns 404, treat as MFN
+      console.log('WTO API Response:', JSON.stringify(data, null, 2))
+      
+      // Parse WTO API response - Dataset is an array of records
+      if (data.Dataset && Array.isArray(data.Dataset) && data.Dataset.length > 0) {
+        // Get the most recent record (usually the last one, or we can filter by Year)
+        const records = data.Dataset.sort((a: any, b: any) => (b.Year || 0) - (a.Year || 0))
+        const latestRecord = records[0]
+        
+        if (latestRecord && latestRecord.Value !== undefined) {
+          parsedPercentage = parseFloat(latestRecord.Value)
+          console.log('Parsed tariff rate:', parsedPercentage, '%')
+        }
+      }
+      
+      // If still no data found, log the structure
+      if (parsedPercentage === null) {
+        console.warn('Could not parse tariff rate from response structure. Full response:', data)
+        setApiError('Could not parse tariff rate from API response. Check console for details.')
+      }
+    } else if (response.status === 404 || response.status === 422) {
+      // If API returns 404 or 422 (no data), treat as MFN
       parsedPercentage = null
     } else {
       throw new Error(`API call failed with status ${response.status}`)
@@ -110,7 +130,7 @@ setShowCharts(false)
     // Prepare AI data
     const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year || 'N/A'}`
     const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors, 000 is world"
-    await callGeminiApi(apiData, prompt)
+    //await callGeminiApi(apiData, prompt)
     setAiFinished(true)
 
   } catch (err) {
