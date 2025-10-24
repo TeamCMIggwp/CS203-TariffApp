@@ -26,7 +26,8 @@ public class CorsConfig {
             "http://localhost:*",
             "http://127.0.0.1:*",
             "https://teamcmiggwp.duckdns.org",  // Add your domain
-            "http://teamcmiggwp.duckdns.org"    // HTTP version too
+            "http://teamcmiggwp.duckdns.org",   // HTTP version too
+            "https://*.amplifyapp.com"          // Amplify preview/prod domains
         ));
         
         config.setAllowCredentials(true);
