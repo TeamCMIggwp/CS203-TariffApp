@@ -37,15 +37,15 @@ async function handle(req: Request, params: { slug: string[] }) {
   return new NextResponse(body, { status: upstream.status, headers: outHeaders });
 }
 
-export async function GET(req: Request, context: { params: { slug: string[] } }) {
-  return handle(req, context.params);
+export async function GET(req: Request, context: any) {
+  return handle(req, context?.params ?? { slug: [] });
 }
-export async function POST(req: Request, context: { params: { slug: string[] } }) {
-  return handle(req, context.params);
+export async function POST(req: Request, context: any) {
+  return handle(req, context?.params ?? { slug: [] });
 }
-export async function PUT(req: Request, context: { params: { slug: string[] } }) {
-  return handle(req, context.params);
+export async function PUT(req: Request, context: any) {
+  return handle(req, context?.params ?? { slug: [] });
 }
-export async function DELETE(req: Request, context: { params: { slug: string[] } }) {
-  return handle(req, context.params);
+export async function DELETE(req: Request, context: any) {
+  return handle(req, context?.params ?? { slug: [] });
 }
