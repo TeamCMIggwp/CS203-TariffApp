@@ -233,7 +233,7 @@ export default function AdminPage() {
           </CardHeader>
 
           <CardContent className="space-y-6 pt-2 pb-8">
-            <p className="text-center text-sm text-muted-foreground mb-2">
+            <p className="text-center text-sm text-muted-foreground my-6">
               {activeTab === "update"
                 ? "Fill the fields and click Update to add or update a tariff rate."
                 : "Fill the identifying fields and click Delete to remove the tariff entry."}
