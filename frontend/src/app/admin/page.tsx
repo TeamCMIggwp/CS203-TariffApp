@@ -146,15 +146,12 @@ export default function AdminPage() {
       }
 
       const hsCode = parseHsCode(product);
-      if (!hsCode) throw new Error("Invalid product selection");
+      if (!hsCode) throw new Error("Invalid product selection")
 
       setIsDeleting(true);
       setDeleteErrorMessage("");
       setDeleteSuccessMessage("");
 
-      // Map frontend fields -> backend query params:
-      // reporter = importing country (toCountry)
-      // partner  = exporting country (fromCountry)
       const params = new URLSearchParams({
         reporter: toCountry,
         partner: fromCountry,
@@ -172,7 +169,6 @@ export default function AdminPage() {
       if (response.status === 204) {
         setDeleteSuccessMessage("Entry deleted successfully");
       } else {
-        // try to extract message from JSON body if present
         const ct = response.headers.get("content-type") || "";
         let errMsg = `Failed to delete tariff entry (HTTP ${response.status})`;
         try {
@@ -203,40 +199,46 @@ export default function AdminPage() {
   }
 
   return (
-    <section className="calculator-section py-20">
-      <div className="max-w-4xl mx-auto px-4">
+    <section className="calculator-section py-16">
+      <div className="max-w-3xl mx-auto px-4">
         <Card className="calculator-card">
-          <CardHeader className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="calculator-title">Admin Tariff</CardTitle>
+          <CardHeader className="pt-8 pb-4">
+            <CardTitle className="text-center text-2xl font-semibold">Tariff Admin Dashboard</CardTitle>
 
-              {/* Tabs */}
-              <div className="space-x-2">
-                <Button
-                  variant={activeTab === "update" ? "default" : "ghost"}
-                  onClick={() => {
-                    setActiveTab("update");
-                    setDeleteErrorMessage("");
-                    setDeleteSuccessMessage("");
-                  }}
-                >
-                  Update / Add
-                </Button>
-                <Button
-                  variant={activeTab === "delete" ? "destructive" : "ghost"}
-                  onClick={() => {
-                    setActiveTab("delete");
-                    setUpdateErrorMessage("");
-                    setUpdateSuccessMessage("");
-                  }}
-                >
-                  Delete
-                </Button>
-              </div>
+            {/* Tabs centered below title */}
+            <div className="mt-4 flex justify-center space-x-3">
+              <Button
+                variant={activeTab === "update" ? "default" : "ghost"}
+                onClick={() => {
+                  setActiveTab("update")
+                  setDeleteErrorMessage("")
+                  setDeleteSuccessMessage("")
+                }}
+                className="px-4"
+              >
+                Update / Add Tariff Rate
+              </Button>
+              <Button
+                variant={activeTab === "delete" ? "destructive" : "ghost"}
+                onClick={() => {
+                  setActiveTab("delete")
+                  setUpdateErrorMessage("")
+                  setUpdateSuccessMessage("")
+                }}
+                className="px-4"
+              >
+                Delete Tariff Rate
+              </Button>
             </div>
           </CardHeader>
 
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6 pt-2 pb-8">
+            <p className="text-center text-sm text-muted-foreground mb-2">
+              {activeTab === "update"
+                ? "Fill the fields and click Update to add or update a tariff rate."
+                : "Fill the identifying fields and click Delete to remove the tariff entry."}
+            </p>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* From Country */}
               <div className="space-y-2">
@@ -357,19 +359,21 @@ export default function AdminPage() {
             </div>
 
             {/* Messages */}
-            {activeTab === "update" && updateSuccessMessage && (
-              <p className="text-green-500 text-center font-semibold">{updateSuccessMessage}</p>
-            )}
-            {activeTab === "update" && updateErrorMessage && (
-              <p className="text-red-500 text-center font-semibold">{updateErrorMessage}</p>
-            )}
+            <div className="mt-4 text-center">
+              {activeTab === "update" && updateSuccessMessage && (
+                <p className="text-green-500 text-center font-semibold">{updateSuccessMessage}</p>
+              )}
+              {activeTab === "update" && updateErrorMessage && (
+                <p className="text-red-500 text-center font-semibold">{updateErrorMessage}</p>
+              )}
 
-            {activeTab === "delete" && deleteSuccessMessage && (
-              <p className="text-green-500 text-center font-semibold">{deleteSuccessMessage}</p>
-            )}
-            {activeTab === "delete" && deleteErrorMessage && (
-              <p className="text-red-500 text-center font-semibold">{deleteErrorMessage}</p>
-            )}
+              {activeTab === "delete" && deleteSuccessMessage && (
+                <p className="text-green-500 text-center font-semibold">{deleteSuccessMessage}</p>
+              )}
+              {activeTab === "delete" && deleteErrorMessage && (
+                <p className="text-red-500 text-center font-semibold">{deleteErrorMessage}</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
