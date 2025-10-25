@@ -15,9 +15,16 @@ export default function AdminPage() {
   const [year, setYear] = useState("")
   const [tariffRate, setTariffRate] = useState("")
 
+  const [activeTab, setActiveTab] = useState<"update" | "delete">("update")
+
   const [isUpdating, setIsUpdating] = useState(false)
-  const [successMessage, setSuccessMessage] = useState("")
-  const [errorMessage, setErrorMessage] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const [updateSuccessMessage, setUpdateSuccessMessage] = useState("")
+  const [updateErrorMessage, setUpdateErrorMessage] = useState("")
+  const [deleteSuccessMessage, setDeleteSuccessMessage] = useState("")
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState("")
+
 
   const parseCountryCode = (code: string): string | null => {
     return code ? code : null
@@ -53,8 +60,8 @@ export default function AdminPage() {
         }
 
         setIsUpdating(true);
-        setErrorMessage("");
-        setSuccessMessage("");
+        setUpdateErrorMessage("");
+        setUpdateSuccessMessage("");
 
       let response = await fetch("/api/v1/tariffs", {
         method: "PUT",
@@ -116,7 +123,7 @@ export default function AdminPage() {
         throw new Error(text?.slice(0, 200) || "Unexpected non-JSON response from server");
       }
       const data = await response.json();
-      setSuccessMessage(data.message || "Tariff rate updated successfully");
+      setUpdateSuccessMessage(data.message || "Tariff rate updated successfully");
       
       // Clear form after successful update
       setFromCountry("");
@@ -126,20 +133,112 @@ export default function AdminPage() {
       setTariffRate("");
 
     } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "An unknown error occurred");
+        setUpdateErrorMessage(error instanceof Error ? error.message : "An unknown error occurred");
     } finally {
         setIsUpdating(false);
     }
   };
 
+  const handleDelete = async () => {
+    try {
+      if (!fromCountry || !toCountry || !product || !year) {
+        throw new Error("Please fill in all fields for deletion.");
+      }
+
+      const hsCode = parseHsCode(product);
+      if (!hsCode) throw new Error("Invalid product selection")
+
+      setIsDeleting(true);
+      setDeleteErrorMessage("");
+      setDeleteSuccessMessage("");
+
+      const params = new URLSearchParams({
+        reporter: toCountry,
+        partner: fromCountry,
+        product: String(hsCode),
+        year: year
+      });
+
+      const url = `/api/v1/tariffs?${params.toString()}`;
+
+      const response = await fetch(url, {
+        method: "DELETE",
+        credentials: "include"
+      });
+
+      if (response.status === 204) {
+        setDeleteSuccessMessage("Entry deleted successfully");
+      } else {
+        const ct = response.headers.get("content-type") || "";
+        let errMsg = `Failed to delete tariff entry (HTTP ${response.status})`;
+        try {
+          if (ct.includes("application/json")) {
+            const body = await response.json();
+            errMsg = body.message || JSON.stringify(body) || errMsg;
+          } else {
+            const text = await response.text();
+            if (text) errMsg = text.slice(0, 500);
+          }
+        } catch {
+          // ignore parse errors
+        }
+        throw new Error(errMsg);
+      }
+
+      // Clear fields after successful delete
+      setFromCountry("");
+      setToCountry("");
+      setProduct("");
+      setYear("");
+      setTariffRate("");
+    } catch (err) {
+      setDeleteErrorMessage(err instanceof Error ? err.message : "An unknown error occurred");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   return (
-    <section className="calculator-section py-20">
-      <div className="max-w-4xl mx-auto px-4">
+    <section className="calculator-section py-16">
+      <div className="max-w-3xl mx-auto px-4">
         <Card className="calculator-card">
-          <CardHeader>
-            <CardTitle className="calculator-title">Admin Tariff Update</CardTitle>
+          <CardHeader className="pt-8 pb-4">
+            <CardTitle className="text-center text-2xl font-semibold">Tariff Admin Dashboard</CardTitle>
+
+            {/* Tabs centered below title */}
+            <div className="mt-4 flex justify-center space-x-3">
+              <Button
+                variant={activeTab === "update" ? "default" : "ghost"}
+                onClick={() => {
+                  setActiveTab("update")
+                  setDeleteErrorMessage("")
+                  setDeleteSuccessMessage("")
+                }}
+                className="px-4"
+              >
+                Update / Add Tariff Rate
+              </Button>
+              <Button
+                variant={activeTab === "delete" ? "destructive" : "ghost"}
+                onClick={() => {
+                  setActiveTab("delete")
+                  setUpdateErrorMessage("")
+                  setUpdateSuccessMessage("")
+                }}
+                className="px-4"
+              >
+                Delete Tariff Rate
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-6">
+
+          <CardContent className="space-y-6 pt-2 pb-8">
+            <p className="text-center text-sm text-muted-foreground my-6">
+              {activeTab === "update"
+                ? "Fill the fields and click Update to add or update a tariff rate."
+                : "Fill the identifying fields and click Delete to remove the tariff entry."}
+            </p>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* From Country */}
               <div className="space-y-2">
@@ -156,8 +255,8 @@ export default function AdminPage() {
                     {countries.map((country) => (
                       <SelectItem key={country.code} value={country.code} className="calculator-select-item">
                         <div className="flex flex-col">
-                            <span className="font-medium">{country.name}</span>
-                            <span className="text-xs text-gray-600 mt-0.5">code: {country.code}</span>
+                          <span className="font-medium">{country.name}</span>
+                          <span className="text-xs text-gray-600 mt-0.5">code: {country.code}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -180,8 +279,8 @@ export default function AdminPage() {
                     {countries.map((country) => (
                       <SelectItem key={country.code} value={country.code} className="calculator-select-item">
                         <div className="flex flex-col">
-                            <span className="font-medium">{country.name}</span>
-                            <span className="text-xs text-gray-600 mt-0.5">code: {country.code}</span>
+                          <span className="font-medium">{country.name}</span>
+                          <span className="text-xs text-gray-600 mt-0.5">code: {country.code}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -204,8 +303,8 @@ export default function AdminPage() {
                     {agriculturalProducts.map((product) => (
                       <SelectItem key={product.hs_code} value={product.hs_code} className="calculator-select-item">
                         <div className="flex flex-col">
-                            <span className="font-medium">{product.name}</span>
-                            <span className="text-xs text-gray-600 mt-0.5">code: {product.hs_code}</span>
+                          <span className="font-medium">{product.name}</span>
+                          <span className="text-xs text-gray-600 mt-0.5">code: {product.hs_code}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -230,36 +329,51 @@ export default function AdminPage() {
                 </Select>
               </div>
 
-              {/* Tariff Rate */}
-              <div className="space-y-2">
-                <Label className="calculator-label">Tariff Rate (%)</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  placeholder="e.g. 11.12345"
-                  value={tariffRate}
-                  onChange={(e) => setTariffRate(e.target.value)}
-                  className="calculator-input"
-                />
-              </div>
+              {/* Tariff Rate - only shown for update/add */}
+              {activeTab === "update" && (
+                <div className="space-y-2">
+                  <Label className="calculator-label">Tariff Rate (%)</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 11.12345"
+                    value={tariffRate}
+                    onChange={(e) => setTariffRate(e.target.value)}
+                    className="calculator-input"
+                  />
+                </div>
+              )}
             </div>
 
-            {/* Submit Button */}
+            {/* Submit Buttons */}
             <div className="flex justify-center pt-6">
-              <Button onClick={handleSubmit} disabled={isUpdating} className="calculator-button">
-                {isUpdating ? "Updating..." : "Update Database"}
-              </Button>
+              {activeTab === "update" ? (
+                <Button onClick={handleSubmit} disabled={isUpdating} className="calculator-button">
+                  {isUpdating ? "Updating..." : "Update Database"}
+                </Button>
+              ) : (
+                <Button onClick={handleDelete} disabled={isDeleting} className="calculator-button">
+                  {isDeleting ? "Deleting..." : "Delete Entry"}
+                </Button>
+              )}
             </div>
 
-            {/* Success Message */}
-            {successMessage && (
-              <p className="text-green-500 text-center font-semibold">{successMessage}</p>
-            )}
+            {/* Messages */}
+            <div className="mt-4 text-center">
+              {activeTab === "update" && updateSuccessMessage && (
+                <p className="text-green-500 text-center font-semibold">{updateSuccessMessage}</p>
+              )}
+              {activeTab === "update" && updateErrorMessage && (
+                <p className="text-red-500 text-center font-semibold">{updateErrorMessage}</p>
+              )}
 
-            {/* Error Message */}
-            {errorMessage && (
-              <p className="text-red-500 text-center font-semibold">{errorMessage}</p>
-            )}
+              {activeTab === "delete" && deleteSuccessMessage && (
+                <p className="text-green-500 text-center font-semibold">{deleteSuccessMessage}</p>
+              )}
+              {activeTab === "delete" && deleteErrorMessage && (
+                <p className="text-red-500 text-center font-semibold">{deleteErrorMessage}</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
