@@ -8,7 +8,8 @@ function backendBase(): string {
 async function handle(req: Request, params: { slug: string[] }) {
   const slug = params?.slug ?? [];
   const urlIn = new URL(req.url);
-  const target = new URL(`${backendBase()}/auth/${slug.join("/")}`);
+  const path = slug.length ? `/api/v1/tariffs/${slug.join("/")}` : "/api/v1/tariffs";
+  const target = new URL(`${backendBase()}${path}`);
   if (urlIn.search) target.search = urlIn.search;
 
   // Clone headers, forward cookies; drop hop-by-hop headers
@@ -34,6 +35,7 @@ async function handle(req: Request, params: { slug: string[] }) {
   if (setCookie) outHeaders.append("set-cookie", setCookie);
 
   if (noBodyStatus) {
+    // Do not include body or content-type for no-body statuses
     return new NextResponse(null, { status, headers: outHeaders });
   }
 

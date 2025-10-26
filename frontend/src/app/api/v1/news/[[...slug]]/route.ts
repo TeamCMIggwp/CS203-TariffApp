@@ -8,7 +8,8 @@ function backendBase(): string {
 async function handle(req: Request, params: { slug: string[] }) {
   const slug = params?.slug ?? [];
   const urlIn = new URL(req.url);
-  const target = new URL(`${backendBase()}/auth/${slug.join("/")}`);
+  const path = slug.length ? `/api/v1/news/${slug.join("/")}` : "/api/v1/news";
+  const target = new URL(`${backendBase()}${path}`);
   if (urlIn.search) target.search = urlIn.search;
 
   // Clone headers, forward cookies; drop hop-by-hop headers

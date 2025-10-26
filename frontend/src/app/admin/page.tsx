@@ -70,10 +70,11 @@ export default function AdminPage() {
         },
         credentials: "include",
         body: JSON.stringify({
-          partnerIsoNumeric: fromCountryIso,   
-          countryIsoNumeric: toCountryIso,     
-          productHsCode: hsCode,              
-          year: year,
+          // Backend expects: reporter (importer), partner (exporter), product, year, rate, unit
+          reporter: toCountryIso,
+          partner: fromCountryIso,
+          product: hsCode,
+          year: String(year),
           rate: rateValue,
           unit: "percent"
         })
@@ -88,10 +89,10 @@ export default function AdminPage() {
           },
           credentials: "include",
           body: JSON.stringify({
-            countryIsoNumeric: toCountryIso,
-            partnerIsoNumeric: fromCountryIso,
-            productHsCode: hsCode,
-            year: year,
+            reporter: toCountryIso,
+            partner: fromCountryIso,
+            product: hsCode,
+            year: String(year),
             rate: rateValue,
             unit: "percent"
           })
