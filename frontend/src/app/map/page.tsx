@@ -5,9 +5,9 @@ import { countries, agriculturalProducts } from '@/lib/tariff-data';
 
 export default function MapPage() {
   const [selectedToCountry, setSelectedToCountry] = useState<string | null>(null);
-  const [selectedProduct, setSelectedProduct] = useState<string>(agriculturalProducts[0].hs_code);
   const [selectedYear, setSelectedYear] = useState<string>('2023');
-  const [tariffResult, setTariffResult] = useState<string | null>(null);
+  const [tariffResultLines, setTariffResultLines] = useState<
+  { text: string; isNoData?: boolean; isError?: boolean }[] | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
@@ -26,40 +26,126 @@ export default function MapPage() {
 
   const handleCountryClick = (countryCode: string) => {
     setSelectedToCountry(countryCode);
-    setTariffResult(null);
+    setTariffResultLines(null);
     setError(null);
     setShowPopup(true);
   };
 
+    // Recursively search object for numeric "Value" fields.
+  const extractValueFromObj = (obj: any, preferYear?: string): number | null => {
+    if (obj == null) return null;
+
+    // If array: prefer element with matching Year then first numeric Value
+    if (Array.isArray(obj)) {
+      // prefer match by Year
+      for (const el of obj) {
+        if (el && typeof el === "object" && "Value" in el && el.Value != null && !isNaN(Number(el.Value))) {
+          const yearVal = el.Year ?? null;
+          if (preferYear && yearVal != null && String(yearVal) === String(preferYear)) return Number(el.Value);
+        }
+      }
+      // fallback: first numeric value (accept Year=null as valid)
+      for (const el of obj) {
+        const v = extractValueFromObj(el, preferYear);
+        if (v !== null) return v;
+      }
+      return null;
+    }
+
+    // If object: check direct Value
+    if (typeof obj === "object") {
+      if ("Value" in obj && obj.Value != null && !isNaN(Number(obj.Value))) {
+        // treat Year=null/empty as absent (accept the Value)
+        const hasYearField = Object.prototype.hasOwnProperty.call(obj, "Year");
+        const yearVal = obj.Year ?? null;
+        if (hasYearField && yearVal != null && preferYear && String(yearVal) === String(preferYear)) {
+          return Number(obj.Value);
+        }
+        if (!hasYearField || yearVal == null) {
+          return Number(obj.Value);
+        }
+        // otherwise keep searching children for a year-matching Value
+      }
+      for (const k of Object.keys(obj)) {
+        const v = extractValueFromObj(obj[k], preferYear);
+        if (v !== null) return v;
+      }
+    }
+
+    return null;
+  };
+
   const handleShowTariff = async () => {
+    setError(null);
+    setTariffResultLines(null);
+
     if (!selectedToCountry) {
       setError('Please click a country on the map first.');
       return;
     }
-    if (!selectedProduct || !selectedYear) {
-      setError('Please select product and year.');
+    if (!selectedYear) {
+      setError('Please select a year.');
       return;
     }
 
     setLoading(true);
-    setError(null);
-    setTariffResult(null);
-
-    const fromCountry = '000'; // world
-    const apiUrl = `https://teamcmiggwp.duckdns.org/api/v1/wits/tariff-rates/${selectedToCountry}/${fromCountry}/${selectedProduct}/${selectedYear}`;
-
     try {
-      const response = await fetch(apiUrl, { credentials: 'include' });
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      const parsedRate = parseFloat((data.minRate ?? data.min_rate) as string); 
-      if (!isNaN(parsedRate)) {
-        setTariffResult(`${parsedRate.toFixed(2)}%`);
-      } else {
-        setTariffResult('MFN');
-      }
-    } catch (err: unknown) {
-      setError((err as Error).message || 'Error fetching tariff');
+      const API_BASE = 'https://teamcmiggwp.duckdns.org';
+      const indicators = ['TP_A_0160', 'TP_A_0170', 'TP_B_0180', 'TP_B_0190'];
+
+      // Build fetch promises: TPA require ps (period), TPB omit ps
+      const promises = indicators.map(ind => {
+        const isTPA = ind.startsWith('TP_A');
+        const q = new URL(`${API_BASE}/api/v1/indicators/${encodeURIComponent(ind)}/observations`);
+        q.searchParams.set('r', String(selectedToCountry));
+        q.searchParams.set('fmt', 'json');
+        q.searchParams.set('mode', 'full'); // harmless for all
+        if (isTPA) q.searchParams.set('ps', selectedYear); // use same year as single-year range
+        q.searchParams.set('echo', 'false');
+        return fetch(q.toString(), { credentials: 'include' })
+          .then(async (res) => {
+            const text = await res.text();
+            if (!res.ok) {
+              if (res.status === 400 && text.includes('Reporter codes have not been found')) {
+                return { indicator: ind, noData: true };
+              }
+              return { indicator: ind, error: `HTTP ${res.status}: ${text}` };
+            }
+            try {
+              const json = JSON.parse(text);
+              const value = extractValueFromObj(json, selectedYear);
+              // if value missing, treat as no data (server returns JSON but no numeric value)
+              if (value == null) return { indicator: ind, noData: true };
+              return { indicator: ind, value };
+            } catch (e) {
+              // server returned non-JSON (often means API returned empty page) -> treat as no data
+              return { indicator: ind, noData: true };
+            }
+          })
+          .catch(err => ({ indicator: ind, error: err?.message || String(err) }));
+      });
+
+      const results = await Promise.all(promises);
+
+      const lines = results.map(r => {
+        if ('noData' in r && r.noData) {
+          return { text: `${r.indicator}: No data found`, isNoData: true };
+        }
+        if ('error' in r && r.error) {
+          if (String(r.error).includes('Reporter codes have not been found')) {
+            return { text: `${r.indicator}: No data found`, isNoData: true };
+          }
+          return { text: `${r.indicator}: error (${r.error})`, isError: true };
+        }
+        if ('value' in r && r.value != null && !isNaN(Number(r.value))) {
+          return { text: `${r.indicator}: ${Number(r.value).toFixed(2)}%` };
+        }
+        return { text: `${r.indicator}: No data found`, isNoData: true };
+      });
+
+      setTariffResultLines(lines);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
@@ -2078,73 +2164,61 @@ export default function MapPage() {
 
         {showPopup && selectedToCountry && (
         <div
-            className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50"
-            onClick={() => setShowPopup(false)} // close on outside click
+          className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50"
+          onClick={() => setShowPopup(false)}
         >
-            <div
-            className="bg-white p-6 rounded shadow-lg max-w-md w-full relative"
-            onClick={(e) => e.stopPropagation()} // prevent close on inside click
-            >
-            <button
-                onClick={() => setShowPopup(false)}
-                className="absolute top-2 right-2 text-gray-500 hover:text-black text-xl"
-            >
-                &times;
+          <div className="bg-white p-6 rounded shadow-lg max-w-md w-full relative" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setShowPopup(false)} className="absolute top-2 right-2 text-gray-500 hover:text-black text-xl">
+              &times;
             </button>
 
             <h3 className="text-lg font-semibold mb-2">
-                Selected Country: {countries.find(c => c.code === selectedToCountry)?.name}
+              Selected Country: {countries.find(c => c.code === selectedToCountry)?.name}
             </h3>
 
             <div className="mb-4">
-                <label className="block mb-1 font-medium">Product:</label>
-                <select
-                value={selectedProduct}
-                onChange={e => setSelectedProduct(e.target.value)}
-                className="w-full border px-2 py-1 rounded"
-                >
-                {agriculturalProducts.map(prod => (
-                    <option key={prod.hs_code} value={prod.hs_code}>
-                    {prod.name} (HS {prod.hs_code})
-                    </option>
-                ))}
-                </select>
-            </div>
-
-            <div className="mb-4">
-                <label className="block mb-1 font-medium">Year:</label>
-                <select
-                value={selectedYear}
-                onChange={e => setSelectedYear(e.target.value)}
-                className="w-full border px-2 py-1 rounded"
-                >
+              <label className="block mb-1 font-medium">Year:</label>
+              <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="w-full border px-2 py-1 rounded">
                 {[2025, 2024, 2023, 2022, 2021, 2020].map(yr => (
-                    <option key={yr} value={String(yr)}>{yr}</option>
+                  <option key={yr} value={String(yr)}>{yr}</option>
                 ))}
-                </select>
+              </select>
             </div>
 
-            <button
-                onClick={handleShowTariff}
-                disabled={loading}
-                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 w-full"
-            >
-                {loading ? 'Loading...' : 'Show Tariff'}
+            <button onClick={handleShowTariff} disabled={loading} className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 w-full">
+              {loading ? 'Loading...' : 'Show Tariff'}
             </button>
 
-            {tariffResult && (
-                <div className="mt-4 p-3 bg-gray-100 rounded text-center">
-                Tariff Rate: <strong>{tariffResult}</strong>
-                </div>
+            {tariffResultLines && (
+              <div className="mt-4 p-3 bg-gray-100 rounded">
+                <div className="font-medium mb-2 text-center">WTO TP Indicators</div>
+                <ul className="space-y-1 text-center">
+                  {tariffResultLines.map((line, idx) => (
+                    <li
+                      key={idx}
+                      className={
+                        line.isNoData
+                          ? 'font-semibold text-red-600'
+                          : line.isError
+                          ? 'font-semibold text-red-800'
+                          : 'font-semibold text-black'
+                      }
+                    >
+                      {line.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
+
             {error && (
-                <div className="mt-4 p-3 bg-red-100 text-red-800 rounded text-center">
-                Error: {error}
-                </div>
-            )}
-            </div>
+               <div className="mt-4 p-3 bg-red-100 text-red-800 rounded text-center">
+                 Error: {error}
+               </div>
+             )}
+          </div>
         </div>
-        )}
+      )}
     </div>
   );
 }
