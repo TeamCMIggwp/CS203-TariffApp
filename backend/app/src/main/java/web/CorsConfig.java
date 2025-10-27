@@ -19,22 +19,23 @@ public class CorsConfig {
     @Bean
     public FilterRegistrationBean<CorsFilter> corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        
+
         // Allow multiple origin patterns
         config.setAllowedOriginPatterns(List.of(
-            allowedOrigin,
-            "http://localhost:*",
-            "http://127.0.0.1:*",
-            "https://teamcmiggwp.duckdns.org",  // Legacy backend domain
-            "http://teamcmiggwp.duckdns.org",   // HTTP version too
-            "https://*.amplifyapp.com",         // Amplify preview/prod domains
-            // New custom frontend domains
-            "https://www.teamcmiggwpholidaymood.fun",
-            "https://teamcmiggwpholidaymood.fun",
-            "http://www.teamcmiggwpholidaymood.fun",
-            "http://teamcmiggwpholidaymood.fun"
-        ));
-        
+                allowedOrigin,
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "http://127.0.0.1:3000",
+                "http://127.0.0.1:5173",
+                "https://teamcmiggwp.duckdns.org", // Legacy backend domain
+                "http://teamcmiggwp.duckdns.org", // HTTP version too
+                "https://*.amplifyapp.com", // Amplify preview/prod domains
+                // New custom frontend domains
+                "https://www.teamcmiggwpholidaymood.fun",
+                "https://teamcmiggwpholidaymood.fun",
+                "http://www.teamcmiggwpholidaymood.fun",
+                "http://teamcmiggwpholidaymood.fun"));
+
         config.setAllowCredentials(true);
         config.addAllowedMethod("*");
         config.addAllowedHeader("*");
