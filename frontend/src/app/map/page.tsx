@@ -112,13 +112,13 @@ export default function MapPage() {
               }
               return { indicator: ind, error: `HTTP ${res.status}: ${text}` };
             }
-                        try {
+                                                try {
               const json = JSON.parse(text);
               const value = extractValueFromObj(json, selectedYear);
               // if value missing, treat as no data (server returns JSON but no numeric value)
               if (value == null) return { indicator: ind, noData: true };
               return { indicator: ind, value };
-                        } catch (_e) {
+                                                } catch {
               // server returned non-JSON (often means API returned empty page) -> treat as no data
               return { indicator: ind, noData: true };
             }

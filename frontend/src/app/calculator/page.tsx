@@ -42,14 +42,15 @@ export default function CalculatorSection() {
   const [showAIAnalysis, setShowAIAnalysis] = useState(false)
   const [showCharts, setShowCharts] = useState(false)
 
+  // Backend API base URL, configurable via environment for Amplify and local dev
+  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
+
   const callGeminiApi = async (data: string, prompt?: string) => {
     try {
       console.log('   📤 Sending request to Gemini API...')
       console.log('   📝 Data:', data)
       console.log('   📝 Prompt:', prompt)
-      
-  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
-  const url = `${API_BASE}/api/v1/gemini/analyses`
+      const url = `${API_BASE}/api/v1/gemini/analyses`
       const startTime = performance.now()
       
       const response = await fetch(url, {

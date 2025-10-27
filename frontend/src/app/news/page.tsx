@@ -48,13 +48,15 @@ export default function NewsPage() {
   const [addingToDatabase, setAddingToDatabase] = useState<{ [key: number]: boolean }>({});
   const [deletingFromDatabase, setDeletingFromDatabase] = useState<{ [key: number]: boolean }>({});
 
+  // Backend API base URL available across all handlers
+  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
+
   const fetchNewsData = async (searchQuery: string, max: number, year: number) => {
     setLoading(true);
     setError(false);
     
     try {
       // Step 1: Scrape news from official sources
-  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
   const response = await fetch(`${API_BASE}/api/scraper/search-and-scrape`, {
         method: 'POST',
         headers: {
