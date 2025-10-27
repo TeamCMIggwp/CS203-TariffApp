@@ -48,7 +48,8 @@ export default function CalculatorSection() {
       console.log('   📝 Data:', data)
       console.log('   📝 Prompt:', prompt)
       
-      const url = 'https://teamcmiggwp.duckdns.org/api/v1/gemini/analyses'
+  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
+  const url = `${API_BASE}/api/v1/gemini/analyses`
       const startTime = performance.now()
       
       const response = await fetch(url, {
@@ -116,7 +117,7 @@ export default function CalculatorSection() {
       console.log('\n📊 STEP 1: Querying database...')
       const startDb = performance.now()
       const productInt = parseInt(product, 10)
-      const dbUrl = `https://teamcmiggwp.duckdns.org/api/v1/tariffs?reporter=${encodeURIComponent(toCountry)}&partner=${encodeURIComponent(fromCountry)}&product=${productInt}&year=${encodeURIComponent(year)}&tariffTypeId=1`
+  const dbUrl = `${API_BASE}/api/v1/tariffs?reporter=${encodeURIComponent(toCountry)}&partner=${encodeURIComponent(fromCountry)}&product=${productInt}&year=${encodeURIComponent(year)}&tariffTypeId=1`
       console.log('   📍 Database API URL:', dbUrl)
 
       try {
@@ -182,7 +183,7 @@ export default function CalculatorSection() {
       if (!foundInDatabase) {
         console.log('\n🌐 STEP 2: Querying WTO API as fallback...')
         const startWto = performance.now()
-        const wtoUrl = `https://teamcmiggwp.duckdns.org/api/v1/indicators/HS_P_0070/observations?i=HS_P_0070&r=${toCountry}&p=${fromCountry}&pc=${product}&ps=${year}&fmt=json`
+  const wtoUrl = `${API_BASE}/api/v1/indicators/HS_P_0070/observations?i=HS_P_0070&r=${toCountry}&p=${fromCountry}&pc=${product}&ps=${year}&fmt=json`
         console.log('   📍 WTO API URL:', wtoUrl)
         
         try {

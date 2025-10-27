@@ -25,9 +25,14 @@ public class CorsConfig {
             allowedOrigin,
             "http://localhost:*",
             "http://127.0.0.1:*",
-            "https://teamcmiggwp.duckdns.org",  // Add your domain
+            "https://teamcmiggwp.duckdns.org",  // Legacy backend domain
             "http://teamcmiggwp.duckdns.org",   // HTTP version too
-            "https://*.amplifyapp.com"          // Amplify preview/prod domains
+            "https://*.amplifyapp.com",         // Amplify preview/prod domains
+            // New custom frontend domains
+            "https://www.teamcmiggwpholidaymood.fun",
+            "https://teamcmiggwpholidaymood.fun",
+            "http://www.teamcmiggwpholidaymood.fun",
+            "http://teamcmiggwpholidaymood.fun"
         ));
         
         config.setAllowCredentials(true);

@@ -54,7 +54,8 @@ export default function NewsPage() {
     
     try {
       // Step 1: Scrape news from official sources
-      const response = await fetch('https://teamcmiggwp.duckdns.org/api/scraper/search-and-scrape', {
+  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
+  const response = await fetch(`${API_BASE}/api/scraper/search-and-scrape`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -84,7 +85,7 @@ export default function NewsPage() {
             // Check if this link exists in database using GET with query parameter
             const encodedUrl = encodeURIComponent(article.url);
             const checkResponse = await fetch(
-              `https://teamcmiggwp.duckdns.org/api/v1/database/news?newsLink=${encodedUrl}`,
+              `${API_BASE}/api/v1/database/news?newsLink=${encodedUrl}`,
               {
                 method: 'GET',
                 cache: 'no-store'
@@ -149,7 +150,7 @@ export default function NewsPage() {
     setUpdatingRemarks(prev => ({ ...prev, [index]: true }));
 
     try {
-      const response = await fetch('https://teamcmiggwp.duckdns.org/api/v1/news', {
+  const response = await fetch(`${API_BASE}/api/v1/news`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -194,7 +195,7 @@ export default function NewsPage() {
     setAddingToDatabase(prev => ({ ...prev, [index]: true }));
 
     try {
-      const response = await fetch('https://teamcmiggwp.duckdns.org/api/v1/news', {
+  const response = await fetch(`${API_BASE}/api/v1/news`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -243,7 +244,7 @@ export default function NewsPage() {
     setDeletingFromDatabase(prev => ({ ...prev, [index]: true }));
 
     try {
-      const response = await fetch('https://teamcmiggwp.duckdns.org/api/v1/news', {
+  const response = await fetch(`${API_BASE}/api/v1/news`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

@@ -91,7 +91,7 @@ export default function MapPage() {
 
     setLoading(true);
     try {
-      const API_BASE = 'https://teamcmiggwp.duckdns.org';
+    const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080';
       const indicators = ['TP_A_0160', 'TP_A_0170', 'TP_B_0180', 'TP_B_0190'];
 
       // Build fetch promises: TPA require ps (period), TPB omit ps
