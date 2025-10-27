@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { countries, agriculturalProducts } from '@/lib/tariff-data';
+import { countries } from '@/lib/tariff-data';
 
 export default function MapPage() {
   const [selectedToCountry, setSelectedToCountry] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export default function MapPage() {
   };
 
     // Recursively search object for numeric "Value" fields.
-  const extractValueFromObj = (obj: any, preferYear?: string): number | null => {
+    const extractValueFromObj = (obj: unknown, preferYear?: string): number | null => {
     if (obj == null) return null;
 
     // If array: prefer element with matching Year then first numeric Value
@@ -52,22 +52,23 @@ export default function MapPage() {
       return null;
     }
 
-    // If object: check direct Value
-    if (typeof obj === "object") {
-      if ("Value" in obj && obj.Value != null && !isNaN(Number(obj.Value))) {
+        // If object: check direct Value
+        if (typeof obj === "object") {
+            const rec = obj as Record<string, unknown>;
+            if ("Value" in rec && rec.Value != null && !isNaN(Number(rec.Value as number))) {
         // treat Year=null/empty as absent (accept the Value)
-        const hasYearField = Object.prototype.hasOwnProperty.call(obj, "Year");
-        const yearVal = obj.Year ?? null;
+                const hasYearField = Object.prototype.hasOwnProperty.call(rec, "Year");
+                const yearVal = (rec as Record<string, unknown>)["Year"] ?? null;
         if (hasYearField && yearVal != null && preferYear && String(yearVal) === String(preferYear)) {
-          return Number(obj.Value);
+                    return Number(rec.Value);
         }
         if (!hasYearField || yearVal == null) {
-          return Number(obj.Value);
+                    return Number(rec.Value);
         }
         // otherwise keep searching children for a year-matching Value
       }
-      for (const k of Object.keys(obj)) {
-        const v = extractValueFromObj(obj[k], preferYear);
+            for (const k of Object.keys(rec)) {
+                const v = extractValueFromObj(rec[k], preferYear);
         if (v !== null) return v;
       }
     }
@@ -111,13 +112,13 @@ export default function MapPage() {
               }
               return { indicator: ind, error: `HTTP ${res.status}: ${text}` };
             }
-            try {
+                        try {
               const json = JSON.parse(text);
               const value = extractValueFromObj(json, selectedYear);
               // if value missing, treat as no data (server returns JSON but no numeric value)
               if (value == null) return { indicator: ind, noData: true };
               return { indicator: ind, value };
-            } catch (e) {
+                        } catch (_e) {
               // server returned non-JSON (often means API returned empty page) -> treat as no data
               return { indicator: ind, noData: true };
             }
