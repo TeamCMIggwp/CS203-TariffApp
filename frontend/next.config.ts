@@ -14,7 +14,8 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/api/database/:path*",
-        destination: `${BACKEND_URL}/api/database/:path*`,
+        // Proxy frontend /api/database/* to backend /api/v1/* so middleware can inject Authorization
+        destination: `${BACKEND_URL}/api/v1/:path*`,
       },
       {
         source: "/api/wits/:path*",

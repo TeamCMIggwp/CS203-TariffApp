@@ -57,8 +57,10 @@ export default function NewsPage() {
   const [addingToDatabase, setAddingToDatabase] = useState<{ [key: number]: boolean }>({});
   const [deletingFromDatabase, setDeletingFromDatabase] = useState<{ [key: number]: boolean }>({});
 
-  // Backend API base URL
+  // Backend API base URL for non-auth endpoints
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
+  // Proxied path that goes through Next.js so middleware can inject Authorization from access_token cookie
+  const NEWS_API = '/api/database/news'
 
   const fetchNewsData = async (searchQuery: string, max: number, year: number) => {
     setLoading(true);
@@ -112,7 +114,7 @@ export default function NewsPage() {
           try {
             const encodedUrl = encodeURIComponent(article.url);
             const checkResponse = await fetch(
-              `${API_BASE}/api/v1/news?newsLink=${encodedUrl}`,
+              `${NEWS_API}?newsLink=${encodedUrl}`,
               {
                 method: 'GET',
                 cache: 'no-store'
@@ -175,7 +177,7 @@ export default function NewsPage() {
     setUpdatingRemarks(prev => ({ ...prev, [index]: true }));
 
     try {
-      const response = await fetch(`${API_BASE}/api/v1/news`, {
+      const response = await fetch(`${NEWS_API}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -201,8 +203,16 @@ export default function NewsPage() {
 
         alert('Remarks updated successfully!');
       } else {
-        const errorData = await response.json();
-        alert(`Failed to update remarks: ${errorData.message || 'Unknown error'}`);
+        let msg = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          msg = errorData.message || msg;
+        } catch {}
+        if (response.status === 401 || response.status === 403) {
+          alert(`Failed to update remarks: ${msg}. Please login as an admin user.`);
+        } else {
+          alert(`Failed to update remarks: ${msg}`);
+        }
       }
     } catch (error) {
       console.error('Error updating remarks:', error);
@@ -218,7 +228,7 @@ export default function NewsPage() {
     setAddingToDatabase(prev => ({ ...prev, [index]: true }));
 
     try {
-      const response = await fetch(`${API_BASE}/api/v1/news`, {
+      const response = await fetch(`${NEWS_API}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -245,8 +255,12 @@ export default function NewsPage() {
 
         alert('Source added to database successfully!');
       } else {
-        const errorData = await response.json();
-        alert(`Failed to add source: ${errorData.message || 'Unknown error'}`);
+        let msg = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          msg = errorData.message || msg;
+        } catch {}
+        alert(`Failed to add source: ${msg}`);
       }
     } catch (error) {
       console.error('Error adding source to database:', error);
@@ -264,14 +278,8 @@ export default function NewsPage() {
     setDeletingFromDatabase(prev => ({ ...prev, [index]: true }));
 
     try {
-      const response = await fetch(`${API_BASE}/api/v1/news`, {
+      const response = await fetch(`${NEWS_API}?newsLink=${encodeURIComponent(article.url)}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          newsLink: article.url
-        }),
         cache: 'no-store'
       });
 
@@ -290,8 +298,16 @@ export default function NewsPage() {
 
         alert('Source deleted from database successfully!');
       } else {
-        const errorData = await response.json();
-        alert(`Failed to delete source: ${errorData.message || 'Unknown error'}`);
+        let msg = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          msg = errorData.message || msg;
+        } catch {}
+        if (response.status === 401 || response.status === 403) {
+          alert(`Failed to delete source: ${msg}. Please login as an admin user.`);
+        } else {
+          alert(`Failed to delete source: ${msg}`);
+        }
       }
     } catch (error) {
       console.error('Error deleting source from database:', error);
