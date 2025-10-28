@@ -12,7 +12,8 @@ export default function ResetPasswordPage() {
 }
 
 function ResetPasswordInner() {
-  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "http://localhost:8080";
+  // Use Next proxy for auth reset
+  const RESET_URL = "/api/auth/reset";
   const params = useSearchParams();
   const router = useRouter();
   const [token, setToken] = useState("");
@@ -32,7 +33,7 @@ function ResetPasswordInner() {
     setSubmitting(true);
     setStatus(null);
     try {
-      const resp = await fetch(`${API_BASE}/auth/reset`, {
+      const resp = await fetch(RESET_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, newPassword: password }),
