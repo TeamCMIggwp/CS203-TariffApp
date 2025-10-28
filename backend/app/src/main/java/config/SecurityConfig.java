@@ -49,14 +49,14 @@ public class SecurityConfig {
 				// Tariffs: GET and POST open; PUT/DELETE admin-only
 				.requestMatchers(HttpMethod.GET, "/api/v1/tariffs/**").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/v1/tariffs/**").permitAll()
-				.requestMatchers(HttpMethod.PUT, "/api/v1/tariffs/**").hasRole("admin")
-				.requestMatchers(HttpMethod.DELETE, "/api/v1/tariffs/**").hasRole("admin")
+				.requestMatchers(HttpMethod.PUT, "/api/v1/tariffs/**").hasRole("ADMIN")
+				.requestMatchers(HttpMethod.DELETE, "/api/v1/tariffs/**").hasRole("ADMIN")
 
 				// News: GET and POST open; PUT/DELETE admin-only
 				.requestMatchers(HttpMethod.GET, "/api/v1/news/**").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/v1/news/**").permitAll()
-				.requestMatchers(HttpMethod.PUT, "/api/v1/news/**").hasRole("admin")
-				.requestMatchers(HttpMethod.DELETE, "/api/v1/news/**").hasRole("admin")
+				.requestMatchers(HttpMethod.PUT, "/api/v1/news/**").hasRole("ADMIN")
+				.requestMatchers(HttpMethod.DELETE, "/api/v1/news/**").hasRole("ADMIN")
 
 				// WITS and WTO data open
 				.requestMatchers(HttpMethod.GET, "/api/v1/wits/**").permitAll()
