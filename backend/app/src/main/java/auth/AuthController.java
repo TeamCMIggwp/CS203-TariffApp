@@ -40,6 +40,14 @@ public class AuthController {
         // Always respond 200 to avoid email enumeration
         String email = body != null ? body.get("email") : null;
         try {
+            // Lightly mask email in logs to trace flow without leaking full address
+            String masked = null;
+            if (email != null) {
+                int at = email.indexOf('@');
+                if (at > 1) masked = email.charAt(0) + "***" + email.substring(at);
+                else masked = "***";
+            }
+            log.info("POST /auth/forgot request received for {}", masked);
             String ip = null;
             try { ip = request != null ? request.getRemoteAddr() : null; } catch (Exception ignore) {}
             authService.requestPasswordReset(email, frontendBase, ip);

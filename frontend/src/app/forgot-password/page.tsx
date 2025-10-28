@@ -3,7 +3,8 @@
 import { useState } from "react";
 
 export default function ForgotPasswordPage() {
-  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "http://localhost:8080";
+  // Use Next proxy so we avoid CORS/env drift; this rewrites to BACKEND_URL/auth/forgot
+  const FORGOT_URL = "/api/auth/forgot";
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -14,7 +15,7 @@ export default function ForgotPasswordPage() {
     setSubmitting(true);
     setStatus(null);
     try {
-      await fetch(`${API_BASE}/auth/forgot`, {
+      await fetch(FORGOT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
