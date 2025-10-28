@@ -64,7 +64,7 @@ function rolesFromPayload(payload: JWTPayload | undefined): string[] {
 }
 
 // Paths that don’t require auth (frontend API routes removed)
-const publicPaths = ["/login", "/signup"];
+const publicPaths = ["/login", "/signup", "/forgot-password", "/reset-password"];
 
 export async function middleware(req: NextRequest) {
   // Let CORS preflight pass through untouched

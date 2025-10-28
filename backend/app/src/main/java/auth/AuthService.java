@@ -44,8 +44,11 @@ public class AuthService {
     @Value("${google.oauth.clientId:}")
     private String googleClientId;
 
-    public AuthService(@Qualifier("authJdbcTemplate") JdbcTemplate jdbc) {
+    private final EmailService emailService;
+
+    public AuthService(@Qualifier("authJdbcTemplate") JdbcTemplate jdbc, EmailService emailService) {
         this.jdbc = jdbc;
+        this.emailService = emailService;
     }
 
     public record ParsedToken(String userId, String role) {}
@@ -627,6 +630,93 @@ public class AuthService {
     private void ensureAccountsSchema() {
         try {
             jdbc.execute("CREATE SCHEMA IF NOT EXISTS accounts");
+        } catch (org.springframework.jdbc.BadSqlGrammarException ignore) {}
+    }
+
+    // ===== Password reset support =====
+    public void requestPasswordReset(String email, String frontendBase) {
+        if (email == null || email.isBlank()) return;
+        String normalized = email.trim();
+        String userId = null;
+        try {
+            userId = jdbc.queryForObject(
+                "SELECT id FROM accounts.users WHERE LOWER(TRIM(email)) = LOWER(?) LIMIT 1",
+                String.class, normalized);
+        } catch (EmptyResultDataAccessException nf) {
+            userId = null;
+        } catch (BadSqlGrammarException ignore) {
+            userId = null;
+        }
+        if (userId == null) {
+            // Don't reveal existence; return silently
+            return;
+        }
+        ensureResetTokensTable();
+        String token = java.util.UUID.randomUUID().toString().replace("-", "");
+        java.time.Instant expires = java.time.Instant.now().plus(java.time.Duration.ofMinutes(30));
+        jdbc.update("INSERT INTO accounts.password_reset_tokens (token, user_id, email, expires_at, used_at, created_at) VALUES (?, ?, ?, ?, NULL, NOW())",
+            token, userId, normalized, java.sql.Timestamp.from(expires));
+        String link = frontendBase.endsWith("/") ? (frontendBase + "reset-password?token=" + token) : (frontendBase + "/reset-password?token=" + token);
+        emailService.sendPasswordReset(normalized, link);
+    }
+
+    public Map<String, Object> performPasswordReset(String token, String newPassword) {
+        if (token == null || token.isBlank() || newPassword == null || newPassword.isBlank()) {
+            return Map.of("updated", 0, "message", "Missing token or password");
+        }
+        ensureResetTokensTable();
+        try {
+            var row = jdbc.queryForMap(
+                "SELECT user_id, expires_at, used_at FROM accounts.password_reset_tokens WHERE token = ?",
+                token);
+            java.sql.Timestamp expiresAt = (java.sql.Timestamp) row.get("expires_at");
+            java.sql.Timestamp usedAt = (java.sql.Timestamp) row.get("used_at");
+            if (usedAt != null) {
+                return Map.of("updated", 0, "message", "Token already used");
+            }
+            if (expiresAt == null || expiresAt.toInstant().isBefore(java.time.Instant.now())) {
+                return Map.of("updated", 0, "message", "Token expired");
+            }
+            String userId = (String) row.get("user_id");
+            if (userId == null || userId.isBlank()) {
+                return Map.of("updated", 0, "message", "Invalid token");
+            }
+            String newHash = argon2.encode(newPassword);
+            // Ensure table and upsert password
+            try {
+                jdbc.execute("CREATE TABLE IF NOT EXISTS accounts.user_passwords (\n" +
+                            "  user_id VARCHAR(64) NOT NULL PRIMARY KEY,\n" +
+                            "  password_hash TEXT NOT NULL,\n" +
+                            "  algorithm VARCHAR(32) NOT NULL\n" +
+                            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            } catch (BadSqlGrammarException ignore) {}
+            int n = jdbc.update("UPDATE accounts.user_passwords SET password_hash = ?, algorithm='argon2id' WHERE user_id = ?",
+                    newHash, userId);
+            if (n == 0) {
+                jdbc.update("INSERT INTO accounts.user_passwords (user_id, password_hash, algorithm) VALUES (?, ?, 'argon2id')",
+                        userId, newHash);
+            }
+            // Invalidate all sessions for this user
+            try { jdbc.update("DELETE FROM accounts.sessions WHERE user_id = ?", userId); } catch (BadSqlGrammarException ignore) {}
+            // Mark token used
+            jdbc.update("UPDATE accounts.password_reset_tokens SET used_at = NOW() WHERE token = ?", token);
+            return Map.of("updated", 1);
+        } catch (EmptyResultDataAccessException nf) {
+            return Map.of("updated", 0, "message", "Invalid token");
+        }
+    }
+
+    private void ensureResetTokensTable() {
+        try {
+            ensureAccountsSchema();
+            jdbc.execute("CREATE TABLE IF NOT EXISTS accounts.password_reset_tokens (\n" +
+                "  token VARCHAR(128) NOT NULL PRIMARY KEY,\n" +
+                "  user_id VARCHAR(64) NOT NULL,\n" +
+                "  email VARCHAR(191) NOT NULL,\n" +
+                "  expires_at DATETIME NOT NULL,\n" +
+                "  used_at DATETIME NULL,\n" +
+                "  created_at DATETIME NOT NULL\n" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         } catch (org.springframework.jdbc.BadSqlGrammarException ignore) {}
     }
 
