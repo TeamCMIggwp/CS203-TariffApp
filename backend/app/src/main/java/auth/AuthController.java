@@ -36,11 +36,13 @@ public class AuthController {
     }
 
     @PostMapping("/forgot")
-    public ResponseEntity<?> forgot(@RequestBody java.util.Map<String, String> body) {
+    public ResponseEntity<?> forgot(@RequestBody java.util.Map<String, String> body, jakarta.servlet.http.HttpServletRequest request) {
         // Always respond 200 to avoid email enumeration
         String email = body != null ? body.get("email") : null;
         try {
-            authService.requestPasswordReset(email, frontendBase);
+            String ip = null;
+            try { ip = request != null ? request.getRemoteAddr() : null; } catch (Exception ignore) {}
+            authService.requestPasswordReset(email, frontendBase, ip);
         } catch (Exception ex) {
             // Don't leak backend errors to client; log and still return 200
             log.warn("forgot: error while processing reset for {}: {}", email, ex.toString());
