@@ -69,6 +69,9 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.GET, "/api/v1/gemini/health").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/v1/gemini/analyses").permitAll()
 
+				// Scraping Jobs
+				.requestMatchers(HttpMethod.GET, "/api/v1/scrape").permitAll()
+
 				// Everything else requires authentication
 				.anyRequest().authenticated()
 			)

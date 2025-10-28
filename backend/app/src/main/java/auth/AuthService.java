@@ -647,8 +647,21 @@ public class AuthService {
         } catch (BadSqlGrammarException ignore) {
             userId = null;
         }
+        // Fallback: credentials mapping table
+        if (userId == null) {
+            try {
+                userId = jdbc.queryForObject(
+                    "SELECT user_id FROM accounts.accounts WHERE provider = 'credentials' AND LOWER(TRIM(provider_account_id)) = LOWER(?) LIMIT 1",
+                    String.class, normalized);
+            } catch (EmptyResultDataAccessException nf) {
+                userId = null;
+            } catch (BadSqlGrammarException ignore) {
+                userId = null;
+            }
+        }
         if (userId == null) {
             // Don't reveal existence; return silently
+            log.debug("Password reset requested for non-existent email: {}", normalized);
             return;
         }
         ensureResetTokensTable();
@@ -658,6 +671,7 @@ public class AuthService {
             token, userId, normalized, java.sql.Timestamp.from(expires));
         String link = frontendBase.endsWith("/") ? (frontendBase + "reset-password?token=" + token) : (frontendBase + "/reset-password?token=" + token);
         emailService.sendPasswordReset(normalized, link);
+        log.info("Password reset token created for user {} (email {})", userId, normalized);
     }
 
     public Map<String, Object> performPasswordReset(String token, String newPassword) {
