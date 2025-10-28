@@ -66,17 +66,18 @@ export default function NewsPage() {
     setErrorMessage('');
     
     try {
-      // Step 1: Scrape news using new RESTful endpoint
-      const response = await fetch(`${API_BASE}/api/v1/scrape-jobs`, {
-        method: 'POST',
+      // Step 1: Scrape news using GET endpoint with query parameters
+      const queryParams = new URLSearchParams({
+        query: searchQuery,
+        maxResults: max.toString(),
+        minYear: year.toString()
+      });
+
+      const response = await fetch(`${API_BASE}/api/v1/scrape?${queryParams.toString()}`, {
+        method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
-        body: JSON.stringify({
-          query: searchQuery,
-          maxResults: max,
-          minYear: year
-        }),
         cache: 'no-store'
       });
 
