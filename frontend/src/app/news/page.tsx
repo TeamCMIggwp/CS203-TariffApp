@@ -3,8 +3,8 @@
 import { IconNews, IconDatabase, IconAlertCircle, IconSearch, IconCalendar, IconListNumbers, IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 
-// TypeScript interfaces based on your backend
-interface ScrapedData {
+// TypeScript interfaces matching the new API response structure
+interface ScrapedArticle {
   url: string;
   title: string;
   sourceDomain: string;
@@ -13,15 +13,23 @@ interface ScrapedData {
   publishDate: string | null;
 }
 
-interface ScrapeResult {
+interface MetaData {
+  minYear: number;
+  maxResults: number;
+  durationMs: number;
+}
+
+interface ScrapeResponse {
+  jobId: string;
   query: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
   startTime: string;
   endTime: string;
-  completed: boolean;
   totalSourcesFound: number;
   sourcesScraped: number;
-  data: ScrapedData[];
+  articles: ScrapedArticle[];
   errors: { [key: string]: string };
+  meta: MetaData;
 }
 
 interface NewsFromDB {
@@ -30,7 +38,7 @@ interface NewsFromDB {
   timestamp: string;
 }
 
-interface EnrichedArticle extends ScrapedData {
+interface EnrichedArticle extends ScrapedArticle {
   isInDatabase: boolean;
   remarks: string | null;
 }
@@ -39,25 +47,27 @@ export default function NewsPage() {
   const [query, setQuery] = useState("rice tariff");
   const [maxResults, setMaxResults] = useState(10);
   const [minYear, setMinYear] = useState(2024);
-  const [newsData, setNewsData] = useState<ScrapeResult | null>(null);
+  const [newsData, setNewsData] = useState<ScrapeResponse | null>(null);
   const [enrichedArticles, setEnrichedArticles] = useState<EnrichedArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const [editingRemarks, setEditingRemarks] = useState<{ [key: number]: string }>({});
   const [updatingRemarks, setUpdatingRemarks] = useState<{ [key: number]: boolean }>({});
   const [addingToDatabase, setAddingToDatabase] = useState<{ [key: number]: boolean }>({});
   const [deletingFromDatabase, setDeletingFromDatabase] = useState<{ [key: number]: boolean }>({});
 
-  // Backend API base URL available across all handlers
+  // Backend API base URL
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
 
   const fetchNewsData = async (searchQuery: string, max: number, year: number) => {
     setLoading(true);
     setError(false);
+    setErrorMessage('');
     
     try {
-      // Step 1: Scrape news from official sources
-  const response = await fetch(`${API_BASE}/api/scraper/search-and-scrape`, {
+      // Step 1: Scrape news using new RESTful endpoint
+      const response = await fetch(`${API_BASE}/api/v1/scrape-jobs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -71,23 +81,37 @@ export default function NewsPage() {
       });
 
       if (!response.ok) {
-        console.error('Failed to fetch news:', response.status);
+        // Handle error response
+        try {
+          const errorData = await response.json();
+          setErrorMessage(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        } catch {
+          setErrorMessage(`HTTP ${response.status}: ${response.statusText}`);
+        }
         setError(true);
         setLoading(false);
         return;
       }
 
-      const scrapedData: ScrapeResult = await response.json();
+      const scrapedData: ScrapeResponse = await response.json();
+      
+      // Check if job failed
+      if (scrapedData.status === 'FAILED') {
+        setErrorMessage('Scraping job failed');
+        setError(true);
+        setLoading(false);
+        return;
+      }
+      
       setNewsData(scrapedData);
 
-      // Step 2: For each scraped article, check if it exists in database
+      // Step 2: Enrich articles with database information
       const enriched: EnrichedArticle[] = await Promise.all(
-        scrapedData.data.map(async (article) => {
+        scrapedData.articles.map(async (article) => {
           try {
-            // Check if this link exists in database using GET with query parameter
             const encodedUrl = encodeURIComponent(article.url);
             const checkResponse = await fetch(
-              `${API_BASE}/api/v1/database/news?newsLink=${encodedUrl}`,
+              `${API_BASE}/api/v1/news?newsLink=${encodedUrl}`,
               {
                 method: 'GET',
                 cache: 'no-store'
@@ -95,7 +119,6 @@ export default function NewsPage() {
             );
 
             if (checkResponse.ok) {
-              // If exists, we got the full record with remarks
               const dbEntry: NewsFromDB = await checkResponse.json();
               return {
                 ...article,
@@ -103,7 +126,6 @@ export default function NewsPage() {
                 remarks: dbEntry.remarks
               };
             } else if (checkResponse.status === 404) {
-              // Not found in database
               return {
                 ...article,
                 isInDatabase: false,
@@ -114,7 +136,6 @@ export default function NewsPage() {
             console.error('Error checking database for:', article.url, dbError);
           }
 
-          // Default: not in database
           return {
             ...article,
             isInDatabase: false,
@@ -127,6 +148,7 @@ export default function NewsPage() {
 
     } catch (err) {
       console.error('Error fetching news:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'An unexpected error occurred');
       setError(true);
     } finally {
       setLoading(false);
@@ -152,7 +174,7 @@ export default function NewsPage() {
     setUpdatingRemarks(prev => ({ ...prev, [index]: true }));
 
     try {
-  const response = await fetch(`${API_BASE}/api/v1/news`, {
+      const response = await fetch(`${API_BASE}/api/v1/news`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -165,7 +187,6 @@ export default function NewsPage() {
       });
 
       if (response.ok) {
-        // Update local state to reflect the change
         const updatedArticles = [...enrichedArticles];
         updatedArticles[index] = {
           ...updatedArticles[index],
@@ -173,7 +194,6 @@ export default function NewsPage() {
         };
         setEnrichedArticles(updatedArticles);
         
-        // Clear editing state for this article
         const newEditingRemarks = { ...editingRemarks };
         delete newEditingRemarks[index];
         setEditingRemarks(newEditingRemarks);
@@ -197,7 +217,7 @@ export default function NewsPage() {
     setAddingToDatabase(prev => ({ ...prev, [index]: true }));
 
     try {
-  const response = await fetch(`${API_BASE}/api/v1/news`, {
+      const response = await fetch(`${API_BASE}/api/v1/news`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -210,7 +230,6 @@ export default function NewsPage() {
       });
 
       if (response.ok) {
-        // Update local state to mark article as in database
         const updatedArticles = [...enrichedArticles];
         updatedArticles[index] = {
           ...updatedArticles[index],
@@ -219,7 +238,6 @@ export default function NewsPage() {
         };
         setEnrichedArticles(updatedArticles);
         
-        // Clear editing state for this article
         const newEditingRemarks = { ...editingRemarks };
         delete newEditingRemarks[index];
         setEditingRemarks(newEditingRemarks);
@@ -238,7 +256,6 @@ export default function NewsPage() {
   };
 
   const deleteSourceFromDatabase = async (index: number, article: EnrichedArticle) => {
-    // Confirm deletion
     if (!confirm(`Are you sure you want to delete this source from the database?\n\n"${article.title}"`)) {
       return;
     }
@@ -246,7 +263,7 @@ export default function NewsPage() {
     setDeletingFromDatabase(prev => ({ ...prev, [index]: true }));
 
     try {
-  const response = await fetch(`${API_BASE}/api/v1/news`, {
+      const response = await fetch(`${API_BASE}/api/v1/news`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -258,7 +275,6 @@ export default function NewsPage() {
       });
 
       if (response.ok) {
-        // Update local state to mark article as not in database
         const updatedArticles = [...enrichedArticles];
         updatedArticles[index] = {
           ...updatedArticles[index],
@@ -267,7 +283,6 @@ export default function NewsPage() {
         };
         setEnrichedArticles(updatedArticles);
         
-        // Clear editing state for this article
         const newEditingRemarks = { ...editingRemarks };
         delete newEditingRemarks[index];
         setEditingRemarks(newEditingRemarks);
@@ -286,16 +301,19 @@ export default function NewsPage() {
   };
 
   // Error state
-  if (error || (newsData && !newsData.completed)) {
+  if (error) {
     return (
       <section className="py-20 min-h-screen relative z-10">
         <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center bg-black/40 backdrop-blur-lg p-8 rounded-2xl border border-white/30">
+          <div className="text-center bg-black/40 backdrop-blur-lg p-8 rounded-2xl border border-white/30 max-w-2xl">
             <IconAlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-white mb-2">Failed to Load News</h2>
-            <p className="text-white/90">Unable to fetch tariff news at this time</p>
+            <p className="text-white/90 mb-4">{errorMessage || 'Unable to fetch tariff news at this time'}</p>
             <button 
-              onClick={() => setError(false)}
+              onClick={() => {
+                setError(false);
+                setErrorMessage('');
+              }}
               className="mt-4 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 font-bold px-6 py-2 rounded-lg border border-cyan-400/40"
             >
               Try Again
@@ -307,7 +325,7 @@ export default function NewsPage() {
   }
 
   // No data state
-  if (newsData && enrichedArticles.length === 0) {
+  if (newsData && enrichedArticles.length === 0 && !loading) {
     return (
       <section className="py-20 min-h-screen relative z-10">
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -334,7 +352,6 @@ export default function NewsPage() {
           
           {/* Search Form */}
           <form onSubmit={handleSearch} className="max-w-4xl mx-auto mb-6">
-            {/* Query Input */}
             <div className="flex gap-3 mb-4">
               <div className="flex-1 relative">
                 <input
@@ -366,7 +383,6 @@ export default function NewsPage() {
 
             {/* Filters Row */}
             <div className="flex gap-4 justify-center">
-              {/* Max Results */}
               <div className="flex items-center gap-2 bg-black/50 px-4 py-2 rounded-lg border border-white/20">
                 <IconListNumbers className="w-5 h-5 text-cyan-300" />
                 <label className="text-white/90 text-sm font-medium">Max Results:</label>
@@ -380,7 +396,6 @@ export default function NewsPage() {
                 />
               </div>
 
-              {/* Min Year */}
               <div className="flex items-center gap-2 bg-black/50 px-4 py-2 rounded-lg border border-white/20">
                 <IconCalendar className="w-5 h-5 text-cyan-300" />
                 <label className="text-white/90 text-sm font-medium">From Year:</label>
@@ -397,20 +412,21 @@ export default function NewsPage() {
           </form>
 
           {/* Results Info */}
-          {newsData && (
+          {newsData && !loading && (
             <>
               <p className="text-cyan-300 text-sm font-semibold">
-                Query: &quot;{newsData.query}&quot;
+                Query: &quot;{newsData.query}&quot; • Job ID: {newsData.jobId}
               </p>
               <p className="text-white/90 text-lg font-medium mt-2">
-                Scraped from official sources • {newsData.sourcesScraped} articles found
-                {minYear && <span className="text-cyan-300"> • From {minYear} onwards</span>}
+                Status: {newsData.status} • {newsData.sourcesScraped} articles found
+                {newsData.meta.minYear && <span className="text-cyan-300"> • From {newsData.meta.minYear} onwards</span>}
               </p>
-              {/* Stats moved to top */}
               <div className="mt-4 bg-black/40 backdrop-blur-md p-3 rounded-xl border border-white/30">
                 <p className="text-white/90 font-medium">
                   Scraped {newsData.sourcesScraped} of {newsData.totalSourcesFound} sources
-                  {minYear && <span className="text-cyan-300"> • Filtered from {minYear}</span>}
+                  {newsData.meta.durationMs && (
+                    <span className="text-cyan-300"> • Duration: {(newsData.meta.durationMs / 1000).toFixed(1)}s</span>
+                  )}
                   {enrichedArticles.length > 0 && (
                     <>
                       {' • '}
@@ -528,14 +544,12 @@ export default function NewsPage() {
                     <div className="flex-1 min-w-0 flex flex-col gap-2">
                       {article.isInDatabase ? (
                         <>
-                          {/* Editable Remarks Textarea - In Database */}
                           <textarea
                             value={editingRemarks[index] !== undefined ? editingRemarks[index] : (article.remarks || '')}
                             onChange={(e) => handleRemarksChange(index, e.target.value)}
                             placeholder="No remarks added yet"
                             className="flex-1 bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-4 text-yellow-100 text-sm placeholder-yellow-300/50 focus:outline-none focus:border-yellow-400/60 transition-all resize-none min-h-[100px]"
                           />
-                          {/* Update and Delete Buttons */}
                           <div className="flex gap-2 self-end">
                             <button
                               onClick={() => updateRemarksToDatabase(index, article)}
@@ -572,14 +586,12 @@ export default function NewsPage() {
                         </>
                       ) : (
                         <>
-                          {/* Editable Remarks Textarea - Not in Database */}
                           <textarea
                             value={editingRemarks[index] || ''}
                             onChange={(e) => handleRemarksChange(index, e.target.value)}
                             placeholder="Add remarks (optional)"
                             className="flex-1 bg-white/5 border border-white/20 rounded-lg p-4 text-white/90 text-sm placeholder-white/40 focus:outline-none focus:border-cyan-400/60 transition-all resize-none min-h-[100px]"
                           />
-                          {/* Add to Database Button */}
                           <button
                             onClick={() => addSourceToDatabase(index, article)}
                             disabled={addingToDatabase[index]}
@@ -606,7 +618,7 @@ export default function NewsPage() {
             <div className="mt-10 text-center bg-black/30 backdrop-blur-md p-4 rounded-xl border border-white/30">
               <p className="text-white/90 font-medium">
                 Scraped {newsData.sourcesScraped} of {newsData.totalSourcesFound} sources
-                {minYear && <span className="text-cyan-300"> • Filtered from {minYear}</span>}
+                {newsData.meta.minYear && <span className="text-cyan-300"> • Filtered from {newsData.meta.minYear}</span>}
                 {' • '}
                 <span className="text-green-300">
                   {enrichedArticles.filter(a => a.isInDatabase).length} already in database
