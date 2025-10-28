@@ -452,8 +452,12 @@ export default function NewsPage() {
     setHidingSource(prev => ({ ...prev, [index]: true }));
 
     try {
-      const response = await fetch(`${NEWS_API}/hide?newsLink=${encodeURIComponent(article.url)}`, {
+      // Use API_BASE directly instead of NEWS_API to bypass authentication
+      const response = await fetch(`${API_BASE}/api/v1/news/hide?newsLink=${encodeURIComponent(article.url)}`, {
         method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         cache: 'no-store'
       });
 
