@@ -1,7 +1,6 @@
 package database.news.controller;
 
 import database.news.service.NewsService;
-import database.news.dto.NewsRequest; // adjust if you have
 import database.news.dto.NewsResponse; // adjust if you have
 
 import org.junit.jupiter.api.Test;
