@@ -9,7 +9,11 @@ interface ScrapedArticle {
   title: string;
   sourceDomain: string;
   relevantText: string[];
-  extractedRate: number | null;
+  exporter: string | null;
+  importer: string | null;
+  product: string | null;
+  year: string | null;
+  tariffRate: string | null;
   publishDate: string | null;
 }
 
@@ -24,11 +28,9 @@ interface GeminiAnalysis {
 interface MetaData {
   minYear: number;
   maxResults: number;
-  durationMs: number;
 }
 
 interface ScrapeResponse {
-  jobId: string;
   query: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
   startTime: string;
@@ -66,6 +68,7 @@ export default function NewsPage() {
   const [updatingRemarks, setUpdatingRemarks] = useState<{ [key: number]: boolean }>({});
   const [addingToDatabase, setAddingToDatabase] = useState<{ [key: number]: boolean }>({});
   const [deletingFromDatabase, setDeletingFromDatabase] = useState<{ [key: number]: boolean }>({});
+  const [runningGeminiAnalysis, setRunningGeminiAnalysis] = useState<{ [key: number]: boolean }>({});
 
   // Backend API base URL for non-auth endpoints
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
@@ -238,29 +241,6 @@ export default function NewsPage() {
       
       setEnrichedArticles(enriched);
 
-      // Step 3: Analyze each article with Gemini AI in the background
-      enriched.forEach(async (article, index) => {
-        // Mark as analyzing
-        setEnrichedArticles(prev => {
-          const updated = [...prev];
-          updated[index] = { ...updated[index], analyzingWithGemini: true };
-          return updated;
-        });
-
-        const geminiAnalysis = await analyzeWithGemini(article.url, searchQuery);
-        
-        // Update with Gemini analysis results
-        setEnrichedArticles(prev => {
-          const updated = [...prev];
-          updated[index] = { 
-            ...updated[index], 
-            geminiAnalysis: geminiAnalysis,
-            analyzingWithGemini: false
-          };
-          return updated;
-        });
-      });
-
     } catch (err) {
       console.error('Error fetching news:', err);
       setErrorMessage(err instanceof Error ? err.message : 'An unexpected error occurred');
@@ -275,6 +255,32 @@ export default function NewsPage() {
     if (query.trim()) {
       fetchNewsData(query.trim(), maxResults, minYear);
     }
+  };
+
+  const runGeminiAnalysisForArticle = async (index: number, article: EnrichedArticle) => {
+    setRunningGeminiAnalysis(prev => ({ ...prev, [index]: true }));
+
+    // Mark as analyzing
+    setEnrichedArticles(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], analyzingWithGemini: true };
+      return updated;
+    });
+
+    const geminiAnalysis = await analyzeWithGemini(article.url, query);
+
+    // Update with Gemini analysis results
+    setEnrichedArticles(prev => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        geminiAnalysis: geminiAnalysis,
+        analyzingWithGemini: false
+      };
+      return updated;
+    });
+
+    setRunningGeminiAnalysis(prev => ({ ...prev, [index]: false }));
   };
 
   const handleRemarksChange = (index: number, value: string) => {
@@ -601,14 +607,35 @@ export default function NewsPage() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-3">
-                        <h2 className="text-3xl font-bold text-white leading-tight">
+                        <h2 className="text-3xl font-bold text-white leading-tight flex-1">
                           {article.title}
                         </h2>
-                        {article.isInDatabase && (
-                          <span className="bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-xs font-semibold border border-green-400/40 flex-shrink-0">
-                            ✓ In Database
-                          </span>
-                        )}
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          {article.isInDatabase && (
+                            <span className="bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-xs font-semibold border border-green-400/40">
+                              ✓ In Database
+                            </span>
+                          )}
+                          {article.isInDatabase && !article.geminiAnalysis && !article.analyzingWithGemini && (
+                            <button
+                              onClick={() => runGeminiAnalysisForArticle(index, article)}
+                              disabled={runningGeminiAnalysis[index]}
+                              className="bg-gradient-to-r from-purple-500/30 to-pink-500/30 hover:from-purple-500/40 hover:to-pink-500/40 disabled:from-gray-500/30 disabled:to-gray-500/30 text-purple-200 hover:text-purple-100 disabled:text-gray-400 font-bold px-4 py-2 rounded-lg border border-purple-400/40 hover:border-purple-300 disabled:border-gray-400/40 transition-all duration-200 disabled:cursor-not-allowed text-sm flex items-center gap-2"
+                            >
+                              {runningGeminiAnalysis[index] ? (
+                                <>
+                                  <div className="w-4 h-4 border-2 border-purple-300/30 border-t-purple-300 rounded-full animate-spin"></div>
+                                  Running...
+                                </>
+                              ) : (
+                                <>
+                                  <IconDatabase className="w-4 h-4" />
+                                  Run Gemini Analysis
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-3 text-sm">
                         <span className="bg-cyan-500/30 text-cyan-100 px-4 py-1.5 rounded-full font-semibold border border-cyan-400/40">
