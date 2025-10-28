@@ -10,8 +10,7 @@ import java.util.regex.Pattern;
  */
 @Component
 public class TextProcessingUtil {
-    
-    private static final Pattern RATE_PATTERN = Pattern.compile("(\\d+\\.?\\d*)\\s*(%|percent|per cent)");
+
     private static final Pattern YEAR_PATTERN = Pattern.compile(
         "(?:published|updated|effective|dated|as of|©|copyright)\\s*:?\\s*(20\\d{2})",
         Pattern.CASE_INSENSITIVE
@@ -25,7 +24,7 @@ public class TextProcessingUtil {
         if (text == null) {
             return false;
         }
-        
+
         String lower = text.toLowerCase();
         return lower.contains("tariff") ||
                lower.contains("duty rate") ||
@@ -33,27 +32,7 @@ public class TextProcessingUtil {
                lower.contains("import duty") ||
                (lower.contains("rate") && (lower.contains("%") || lower.contains("percent")));
     }
-    
-    /**
-     * Extract tariff rate percentage from text
-     */
-    public Double extractRate(String text) {
-        if (text == null) {
-            return null;
-        }
-        
-        Matcher matcher = RATE_PATTERN.matcher(text);
-        if (matcher.find()) {
-            try {
-                return Double.parseDouble(matcher.group(1));
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
-        
-        return null;
-    }
-    
+
     /**
      * Extract year from document content
      */

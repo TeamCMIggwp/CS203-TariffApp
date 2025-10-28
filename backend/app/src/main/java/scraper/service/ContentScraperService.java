@@ -26,6 +26,7 @@ import java.net.URL;
 /**
  * Service responsible for scraping content from URLs
  * Handles different document types: HTML, PDF, Word documents
+ * Note: Rate extraction removed - now handled by Gemini AI on frontend
  */
 @Service
 public class ContentScraperService {
@@ -156,6 +157,7 @@ public class ContentScraperService {
     
     /**
      * Process plain text extracted from PDF or Word documents
+     * Note: Rate extraction removed - handled by Gemini AI
      */
     private ScrapedData processExtractedText(String url, String title, String text) {
         if (text == null || text.trim().isEmpty()) {
@@ -171,10 +173,6 @@ public class ContentScraperService {
         for (String paragraph : paragraphs) {
             if (textProcessor.containsTariffKeywords(paragraph) && paragraph.length() > 50) {
                 data.getRelevantText().add(textProcessor.cleanText(paragraph));
-                
-                if (data.getExtractedRate() == null) {
-                    data.setExtractedRate(textProcessor.extractRate(paragraph));
-                }
             }
         }
         
@@ -189,6 +187,7 @@ public class ContentScraperService {
     
     /**
      * Extract tariff data from HTML tables
+     * Note: Rate extraction removed - handled by Gemini AI
      */
     private void extractFromTables(Document doc, ScrapedData data) {
         Elements tables = doc.select("table");
@@ -197,16 +196,13 @@ public class ContentScraperService {
             String tableText = table.text();
             if (textProcessor.containsTariffKeywords(tableText)) {
                 data.getRelevantText().add(textProcessor.cleanText(tableText));
-                
-                if (data.getExtractedRate() == null) {
-                    data.setExtractedRate(textProcessor.extractRate(tableText));
-                }
             }
         }
     }
     
     /**
      * Extract tariff data from HTML paragraphs
+     * Note: Rate extraction removed - handled by Gemini AI
      */
     private void extractFromParagraphs(Document doc, ScrapedData data) {
         Elements elements = doc.select("p, div.content, article, section");
@@ -215,10 +211,6 @@ public class ContentScraperService {
             String text = element.text();
             if (textProcessor.containsTariffKeywords(text) && text.length() > 50) {
                 data.getRelevantText().add(textProcessor.cleanText(text));
-                
-                if (data.getExtractedRate() == null) {
-                    data.setExtractedRate(textProcessor.extractRate(text));
-                }
             }
         }
     }
@@ -259,6 +251,6 @@ public class ContentScraperService {
      * Check if scraped data has relevant content
      */
     private boolean hasRelevantContent(ScrapedData data) {
-        return !data.getRelevantText().isEmpty() || data.getExtractedRate() != null;
+        return !data.getRelevantText().isEmpty();
     }
 }

@@ -11,7 +11,11 @@ public class ScrapedData {
     private String title;
     private String sourceDomain;
     private List<String> relevantText;
-    private Double extractedRate;
+    private String exporter;
+    private String importer;
+    private String product;
+    private String year;
+    private String tariffRate;
     private String publishDate;
     
     public ScrapedData(String url, String title) {
@@ -52,15 +56,47 @@ public class ScrapedData {
     public void setRelevantText(List<String> relevantText) {
         this.relevantText = relevantText;
     }
-    
-    public Double getExtractedRate() {
-        return extractedRate;
+
+    public String getExporter() {
+        return exporter;
     }
-    
-    public void setExtractedRate(Double extractedRate) {
-        this.extractedRate = extractedRate;
+
+    public void setExporter(String exporter) {
+        this.exporter = exporter;
     }
-    
+
+    public String getImporter() {
+        return importer;
+    }
+
+    public void setImporter(String importer) {
+        this.importer = importer;
+    }
+
+    public String getProduct() {
+        return product;
+    }
+
+    public void setProduct(String product) {
+        this.product = product;
+    }
+
+    public String getYear() {
+        return year;
+    }
+
+    public void setYear(String year) {
+        this.year = year;
+    }
+
+    public String getTariffRate() {
+        return tariffRate;
+    }
+
+    public void setTariffRate(String tariffRate) {
+        this.tariffRate = tariffRate;
+    }
+
     public String getPublishDate() {
         return publishDate;
     }

@@ -1,6 +1,6 @@
 'use client';
 
-import { IconNews, IconDatabase, IconAlertCircle, IconSearch, IconCalendar, IconListNumbers, IconTrash } from "@tabler/icons-react";
+import { IconNews, IconDatabase, IconAlertCircle, IconSearch, IconCalendar, IconListNumbers, IconTrash, IconGlobe, IconPackage, IconCalendarEvent, IconPercentage } from "@tabler/icons-react";
 import { useState } from "react";
 
 // TypeScript interfaces matching the new API response structure
@@ -11,6 +11,14 @@ interface ScrapedArticle {
   relevantText: string[];
   extractedRate: number | null;
   publishDate: string | null;
+}
+
+interface GeminiAnalysis {
+  exporterCountry: string | null;
+  importerCountry: string | null;
+  product: string | null;
+  year: string | null;
+  tariffRate: string | null;
 }
 
 interface MetaData {
@@ -41,6 +49,8 @@ interface NewsFromDB {
 interface EnrichedArticle extends ScrapedArticle {
   isInDatabase: boolean;
   remarks: string | null;
+  geminiAnalysis: GeminiAnalysis | null;
+  analyzingWithGemini: boolean;
 }
 
 export default function NewsPage() {
@@ -61,6 +71,79 @@ export default function NewsPage() {
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
   // Proxied path that goes through Next.js so middleware can inject Authorization from access_token cookie
   const NEWS_API = '/api/v1/news'
+  const GEMINI_API = `${API_BASE}/api/v1/gemini/analyses`
+
+  /**
+   * Call Gemini API to analyze a tariff article
+   */
+  const analyzeWithGemini = async (url: string, searchQuery: string): Promise<GeminiAnalysis | null> => {
+    try {
+      const prompt = `${searchQuery}. Search, extract and return the accurate tariff rate that the user has prompted for from the link attached in the data. Return ONLY a JSON object with these exact fields: exporterCountry, importerCountry, product, year, tariffRate. Do not include any additional text or explanations.`;
+      
+      const response = await fetch(GEMINI_API, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: url,
+          prompt: prompt
+        }),
+        cache: 'no-store'
+      });
+
+      if (!response.ok) {
+        console.error(`Gemini API failed for ${url}: ${response.status}`);
+        return null;
+      }
+
+      const result = await response.json();
+      
+      // Parse the Gemini response - it should return JSON
+      // Handle different possible response formats
+      let analysis: GeminiAnalysis;
+      
+      if (typeof result === 'string') {
+        // If response is a string, try to parse it
+        const jsonMatch = result.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          analysis = JSON.parse(jsonMatch[0]);
+        } else {
+          return null;
+        }
+      } else if (result.exporterCountry !== undefined) {
+        // If response is already an object with the right structure
+        analysis = result;
+      } else if (result.response || result.analysis || result.result) {
+        // If response is wrapped in another object
+        const innerData = result.response || result.analysis || result.result;
+        if (typeof innerData === 'string') {
+          const jsonMatch = innerData.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            analysis = JSON.parse(jsonMatch[0]);
+          } else {
+            return null;
+          }
+        } else {
+          analysis = innerData;
+        }
+      } else {
+        return null;
+      }
+
+      return {
+        exporterCountry: analysis.exporterCountry || null,
+        importerCountry: analysis.importerCountry || null,
+        product: analysis.product || null,
+        year: analysis.year || null,
+        tariffRate: analysis.tariffRate || null
+      };
+
+    } catch (error) {
+      console.error('Error calling Gemini API:', error);
+      return null;
+    }
+  };
 
   const fetchNewsData = async (searchQuery: string, max: number, year: number) => {
     setLoading(true);
@@ -126,13 +209,17 @@ export default function NewsPage() {
               return {
                 ...article,
                 isInDatabase: true,
-                remarks: dbEntry.remarks
+                remarks: dbEntry.remarks,
+                geminiAnalysis: null,
+                analyzingWithGemini: false
               };
             } else if (checkResponse.status === 404) {
               return {
                 ...article,
                 isInDatabase: false,
-                remarks: null
+                remarks: null,
+                geminiAnalysis: null,
+                analyzingWithGemini: false
               };
             }
           } catch (dbError) {
@@ -142,12 +229,37 @@ export default function NewsPage() {
           return {
             ...article,
             isInDatabase: false,
-            remarks: null
+            remarks: null,
+            geminiAnalysis: null,
+            analyzingWithGemini: false
           };
         })
       );
       
       setEnrichedArticles(enriched);
+
+      // Step 3: Analyze each article with Gemini AI in the background
+      enriched.forEach(async (article, index) => {
+        // Mark as analyzing
+        setEnrichedArticles(prev => {
+          const updated = [...prev];
+          updated[index] = { ...updated[index], analyzingWithGemini: true };
+          return updated;
+        });
+
+        const geminiAnalysis = await analyzeWithGemini(article.url, searchQuery);
+        
+        // Update with Gemini analysis results
+        setEnrichedArticles(prev => {
+          const updated = [...prev];
+          updated[index] = { 
+            ...updated[index], 
+            geminiAnalysis: geminiAnalysis,
+            analyzingWithGemini: false
+          };
+          return updated;
+        });
+      });
 
     } catch (err) {
       console.error('Error fetching news:', err);
@@ -432,7 +544,7 @@ export default function NewsPage() {
           {newsData && !loading && (
             <>
               <p className="text-cyan-300 text-sm font-semibold">
-                Query: &quot;{newsData.query}&quot; • Job ID: {newsData.jobId}
+                Query: &quot;{newsData.query}&quot;
               </p>
               <p className="text-white/90 text-lg font-medium mt-2">
                 Status: {newsData.status} • {newsData.sourcesScraped} articles found
@@ -441,9 +553,6 @@ export default function NewsPage() {
               <div className="mt-4 bg-black/40 backdrop-blur-md p-3 rounded-xl border border-white/30">
                 <p className="text-white/90 font-medium">
                   Scraped {newsData.sourcesScraped} of {newsData.totalSourcesFound} sources
-                  {newsData.meta.durationMs && (
-                    <span className="text-cyan-300"> • Duration: {(newsData.meta.durationMs / 1000).toFixed(1)}s</span>
-                  )}
                   {enrichedArticles.length > 0 && (
                     <>
                       {' • '}
@@ -514,18 +623,81 @@ export default function NewsPage() {
                     </div>
                   </div>
 
-                  {/* Extracted Rate */}
-                  {article.extractedRate !== null && (
-                    <div className="bg-gradient-to-r from-cyan-500/30 to-blue-500/30 border-2 border-cyan-400/60 rounded-xl p-6 mb-6 shadow-lg">
+                  {/* Gemini Analysis Results */}
+                  {article.analyzingWithGemini && (
+                    <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-2 border-purple-400/40 rounded-xl p-6 mb-6 shadow-lg">
                       <div className="flex items-center gap-3 mb-2">
+                        <div className="w-6 h-6 border-3 border-purple-300/30 border-t-purple-300 rounded-full animate-spin"></div>
+                        <span className="text-purple-100 font-bold text-lg">Analyzing with Gemini AI...</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {article.geminiAnalysis && !article.analyzingWithGemini && (
+                    <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-2 border-cyan-400/50 rounded-xl p-6 mb-6 shadow-lg">
+                      <div className="flex items-center gap-3 mb-4">
                         <div className="bg-cyan-400/30 p-2 rounded-lg">
                           <IconDatabase className="w-6 h-6 text-cyan-200" />
                         </div>
-                        <span className="text-cyan-100 font-bold text-lg">Extracted Tariff Rate</span>
+                        <span className="text-cyan-100 font-bold text-lg">Tariff Analysis (AI-Extracted)</span>
                       </div>
-                      <p className="text-5xl font-extrabold text-cyan-300 drop-shadow-glow">
-                        {article.extractedRate}%
-                      </p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                        {/* Exporter Country */}
+                        <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <IconGlobe className="w-5 h-5 text-cyan-300" />
+                            <span className="text-cyan-300 text-xs font-semibold uppercase">From Country</span>
+                          </div>
+                          <p className="text-white text-lg font-bold">
+                            {article.geminiAnalysis.exporterCountry || 'N/A'}
+                          </p>
+                        </div>
+
+                        {/* Importer Country */}
+                        <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <IconGlobe className="w-5 h-5 text-green-300" />
+                            <span className="text-green-300 text-xs font-semibold uppercase">To Country</span>
+                          </div>
+                          <p className="text-white text-lg font-bold">
+                            {article.geminiAnalysis.importerCountry || 'N/A'}
+                          </p>
+                        </div>
+
+                        {/* Product */}
+                        <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <IconPackage className="w-5 h-5 text-yellow-300" />
+                            <span className="text-yellow-300 text-xs font-semibold uppercase">Product</span>
+                          </div>
+                          <p className="text-white text-lg font-bold">
+                            {article.geminiAnalysis.product || 'N/A'}
+                          </p>
+                        </div>
+
+                        {/* Year */}
+                        <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <IconCalendarEvent className="w-5 h-5 text-purple-300" />
+                            <span className="text-purple-300 text-xs font-semibold uppercase">Year</span>
+                          </div>
+                          <p className="text-white text-lg font-bold">
+                            {article.geminiAnalysis.year || 'N/A'}
+                          </p>
+                        </div>
+
+                        {/* Tariff Rate */}
+                        <div className="bg-gradient-to-br from-orange-500/30 to-red-500/30 backdrop-blur-sm rounded-lg p-4 border-2 border-orange-400/50">
+                          <div className="flex items-center gap-2 mb-2">
+                            <IconPercentage className="w-5 h-5 text-orange-200" />
+                            <span className="text-orange-200 text-xs font-semibold uppercase">Tariff Rate</span>
+                          </div>
+                          <p className="text-white text-2xl font-extrabold">
+                            {article.geminiAnalysis.tariffRate || 'N/A'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
 

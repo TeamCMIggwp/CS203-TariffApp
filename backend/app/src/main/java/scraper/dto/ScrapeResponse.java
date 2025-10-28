@@ -11,7 +11,6 @@ import java.util.Map;
  */
 public class ScrapeResponse {
     
-    private String jobId;
     private String query;
     private JobStatus status;
     private Instant startTime;
@@ -29,14 +28,6 @@ public class ScrapeResponse {
     }
     
     // Getters and setters
-    public String getJobId() {
-        return jobId;
-    }
-    
-    public void setJobId(String jobId) {
-        this.jobId = jobId;
-    }
-    
     public String getQuery() {
         return query;
     }
@@ -117,7 +108,11 @@ public class ScrapeResponse {
         private String title;
         private String sourceDomain;
         private List<String> relevantText;
-        private Double extractedRate;
+        private String exporter;
+        private String importer;
+        private String product;
+        private String year;
+        private String tariffRate;
         private String publishDate;
         
         public ScrapedArticle() {
@@ -156,15 +151,47 @@ public class ScrapeResponse {
         public void setRelevantText(List<String> relevantText) {
             this.relevantText = relevantText;
         }
-        
-        public Double getExtractedRate() {
-            return extractedRate;
+
+        public String getExporter() {
+            return exporter;
         }
-        
-        public void setExtractedRate(Double extractedRate) {
-            this.extractedRate = extractedRate;
+
+        public void setExporter(String exporter) {
+            this.exporter = exporter;
         }
-        
+
+        public String getImporter() {
+            return importer;
+        }
+
+        public void setImporter(String importer) {
+            this.importer = importer;
+        }
+
+        public String getProduct() {
+            return product;
+        }
+
+        public void setProduct(String product) {
+            this.product = product;
+        }
+
+        public String getYear() {
+            return year;
+        }
+
+        public void setYear(String year) {
+            this.year = year;
+        }
+
+        public String getTariffRate() {
+            return tariffRate;
+        }
+
+        public void setTariffRate(String tariffRate) {
+            this.tariffRate = tariffRate;
+        }
+
         public String getPublishDate() {
             return publishDate;
         }
@@ -180,31 +207,22 @@ public class ScrapeResponse {
     public static class MetaData {
         private Integer minYear;
         private Integer maxResults;
-        private Long durationMs;
-        
+
         // Getters and setters
         public Integer getMinYear() {
             return minYear;
         }
-        
+
         public void setMinYear(Integer minYear) {
             this.minYear = minYear;
         }
-        
+
         public Integer getMaxResults() {
             return maxResults;
         }
-        
+
         public void setMaxResults(Integer maxResults) {
             this.maxResults = maxResults;
-        }
-        
-        public Long getDurationMs() {
-            return durationMs;
-        }
-        
-        public void setDurationMs(Long durationMs) {
-            this.durationMs = durationMs;
         }
     }
     

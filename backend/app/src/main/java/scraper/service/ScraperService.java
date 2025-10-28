@@ -12,13 +12,9 @@ import scraper.exception.ScraperException;
 import scraper.model.SearchResult;
 import scraper.model.ScrapedData;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 /**
  * Main service that orchestrates the scraping process
@@ -41,11 +37,10 @@ public class ScraperService {
      */
     public ScrapeResponse executeScrapeJob(ScrapeRequest request) {
         Instant startTime = Instant.now();
-        String jobId = UUID.randomUUID().toString();
-        
-        log.info("Starting scrape job {} for query: {}", jobId, request.getQuery());
-        
-        ScrapeResponse response = initializeResponse(jobId, request, startTime);
+
+        log.info("Starting scrape job for query: {}", request.getQuery());
+
+        ScrapeResponse response = initializeResponse(request, startTime);
         
         try {
             // Step 1: Search for sources
@@ -56,15 +51,14 @@ public class ScraperService {
             
             response.setTotalSourcesFound(searchResults.size());
             response.setStatus(ScrapeResponse.JobStatus.IN_PROGRESS);
-            
-            log.info("Found {} sources for job {}", searchResults.size(), jobId);
-            
+
+            log.info("Found {} sources", searchResults.size());
+
             // Step 2: Scrape each source with rate limiting
             List<ScrapedArticle> articles = scrapeWithRateLimit(
                 searchResults,
                 request.getMinYear(),
-                response,
-                jobId
+                response
             );
             
             response.setArticles(articles);
@@ -72,20 +66,17 @@ public class ScraperService {
             response.setStatus(ScrapeResponse.JobStatus.COMPLETED);
             
         } catch (Exception e) {
-            log.error("Scrape job {} failed: {}", jobId, e.getMessage(), e);
+            log.error("Scrape job failed: {}", e.getMessage(), e);
             response.setStatus(ScrapeResponse.JobStatus.FAILED);
             response.getErrors().put("GENERAL", e.getMessage());
             throw new ScraperException("Scrape job failed", e);
         } finally {
             Instant endTime = Instant.now();
             response.setEndTime(endTime);
-            response.getMeta().setDurationMs(Duration.between(startTime, endTime).toMillis());
-            
-            log.info("Scrape job {} completed. Scraped {}/{} sources in {}ms",
-                    jobId,
+
+            log.info("Scrape job completed. Scraped {}/{} sources",
                     response.getSourcesScraped(),
-                    response.getTotalSourcesFound(),
-                    response.getMeta().getDurationMs());
+                    response.getTotalSourcesFound());
         }
         
         return response;
@@ -94,9 +85,8 @@ public class ScraperService {
     /**
      * Initialize response object
      */
-    private ScrapeResponse initializeResponse(String jobId, ScrapeRequest request, Instant startTime) {
+    private ScrapeResponse initializeResponse(ScrapeRequest request, Instant startTime) {
         ScrapeResponse response = new ScrapeResponse();
-        response.setJobId(jobId);
         response.setQuery(request.getQuery());
         response.setStatus(ScrapeResponse.JobStatus.PENDING);
         response.setStartTime(startTime);
@@ -111,18 +101,16 @@ public class ScraperService {
     private List<ScrapedArticle> scrapeWithRateLimit(
             List<SearchResult> searchResults,
             Integer minYear,
-            ScrapeResponse response,
-            String jobId) {
+            ScrapeResponse response) {
         
         List<ScrapedArticle> articles = new ArrayList<>();
         
         for (int i = 0; i < searchResults.size(); i++) {
             SearchResult searchResult = searchResults.get(i);
-            
-            log.debug("Scraping {}/{} for job {}: {}",
+
+            log.debug("Scraping {}/{}: {}",
                     i + 1,
                     searchResults.size(),
-                    jobId,
                     searchResult.getUrl());
             
             try {
@@ -146,12 +134,11 @@ public class ScraperService {
                 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                log.warn("Scraping interrupted for job {}", jobId);
+                log.warn("Scraping interrupted");
                 break;
             } catch (Exception e) {
-                log.warn("Failed to scrape {} for job {}: {}",
+                log.warn("Failed to scrape {}: {}",
                         searchResult.getUrl(),
-                        jobId,
                         e.getMessage());
                 response.getErrors().put(searchResult.getUrl(), e.getMessage());
             }
@@ -193,7 +180,11 @@ public class ScraperService {
         article.setTitle(data.getTitle());
         article.setSourceDomain(data.getSourceDomain());
         article.setRelevantText(data.getRelevantText());
-        article.setExtractedRate(data.getExtractedRate());
+        article.setExporter(data.getExporter());
+        article.setImporter(data.getImporter());
+        article.setProduct(data.getProduct());
+        article.setYear(data.getYear());
+        article.setTariffRate(data.getTariffRate());
         article.setPublishDate(data.getPublishDate());
         return article;
     }
