@@ -60,7 +60,7 @@ export default function NewsPage() {
   // Backend API base URL for non-auth endpoints
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
   // Proxied path that goes through Next.js so middleware can inject Authorization from access_token cookie
-  const NEWS_API = '/api/v1/news'
+  const NEWS_API = '${API_BASE}/api/v1/news'
 
   const fetchNewsData = async (searchQuery: string, max: number, year: number) => {
     setLoading(true);
