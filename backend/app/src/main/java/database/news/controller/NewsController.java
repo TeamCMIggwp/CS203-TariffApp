@@ -176,10 +176,70 @@ public class NewsController {
     public ResponseEntity<Void> deleteNews(
             @Parameter(description = "News article URL", example = "https://www.usitc.gov/rice-report", required = true)
             @RequestParam @NotBlank String newsLink) {
-        
+
         logger.info("DELETE /api/v1/database/news - Deleting: {}", newsLink);
-        
+
         newsService.deleteNews(newsLink);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+        summary = "Hide news source",
+        description = "Marks a news source as hidden. If the source doesn't exist in the database, it will be created as hidden. Hidden sources won't appear in search results."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "News source hidden successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = NewsResponse.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "Missing required parameter",
+            content = @Content(mediaType = "application/json")
+        )
+    })
+    @PatchMapping("/hide")
+    public ResponseEntity<NewsResponse> hideSource(
+            @Parameter(description = "News article URL to hide", example = "https://www.usitc.gov/rice-report", required = true)
+            @RequestParam @NotBlank String newsLink) {
+
+        logger.info("PATCH /api/v1/news/hide - Hiding source: {}", newsLink);
+
+        NewsResponse response = newsService.hideSource(newsLink);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(
+        summary = "Unhide news source",
+        description = "Marks a news source as visible again. Returns 404 if the source doesn't exist."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "News source unhidden successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = NewsResponse.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "404",
+            description = "News not found",
+            content = @Content(mediaType = "application/json")
+        )
+    })
+    @PatchMapping("/unhide")
+    public ResponseEntity<NewsResponse> unhideSource(
+            @Parameter(description = "News article URL to unhide", example = "https://www.usitc.gov/rice-report", required = true)
+            @RequestParam @NotBlank String newsLink) {
+
+        logger.info("PATCH /api/v1/news/unhide - Unhiding source: {}", newsLink);
+
+        NewsResponse response = newsService.unhideSource(newsLink);
+        return ResponseEntity.ok(response);
     }
 }

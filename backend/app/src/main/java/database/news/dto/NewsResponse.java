@@ -4,19 +4,23 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
 
 public class NewsResponse {
-    
+
     @JsonProperty("newsLink")
     private String newsLink;
-    
+
     @JsonProperty("remarks")
     private String remarks;
-    
+
+    @JsonProperty("isHidden")
+    private boolean isHidden;
+
     @JsonProperty("timestamp")
     private LocalDateTime timestamp;
-    
-    public NewsResponse(String newsLink, String remarks) {
+
+    public NewsResponse(String newsLink, String remarks, boolean isHidden) {
         this.newsLink = newsLink;
         this.remarks = remarks;
+        this.isHidden = isHidden;
         this.timestamp = LocalDateTime.now();
     }
     
@@ -33,15 +37,23 @@ public class NewsResponse {
         return remarks; 
     }
     
-    public void setRemarks(String remarks) { 
-        this.remarks = remarks; 
+    public void setRemarks(String remarks) {
+        this.remarks = remarks;
     }
-    
-    public LocalDateTime getTimestamp() { 
-        return timestamp; 
+
+    public boolean isHidden() {
+        return isHidden;
     }
-    
-    public void setTimestamp(LocalDateTime timestamp) { 
-        this.timestamp = timestamp; 
+
+    public void setHidden(boolean hidden) {
+        isHidden = hidden;
+    }
+
+    public LocalDateTime getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(LocalDateTime timestamp) {
+        this.timestamp = timestamp;
     }
 }

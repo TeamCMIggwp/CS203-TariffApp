@@ -4,9 +4,10 @@ public class NewsEntity {
 
     private String newsLink;
     private String remarks;
+    private boolean isHidden;
 
     // Getters and setters
-    
+
     public String getNewsLink() {
         return newsLink;
     }
@@ -23,11 +24,20 @@ public class NewsEntity {
         this.remarks = remarks;
     }
 
+    public boolean isHidden() {
+        return isHidden;
+    }
+
+    public void setHidden(boolean hidden) {
+        isHidden = hidden;
+    }
+
     @Override
     public String toString() {
         return "NewsEntity{" +
                 "newsLink='" + newsLink + '\'' +
                 ", remarks='" + remarks + '\'' +
+                ", isHidden=" + isHidden +
                 '}';
     }
 }

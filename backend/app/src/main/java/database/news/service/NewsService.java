@@ -38,10 +38,10 @@ public class NewsService {
         
         // Create new news
         repository.create(request.getNewsLink(), request.getRemarks());
-        
+
         logger.info("Successfully created news");
-        
-        return new NewsResponse(request.getNewsLink(), request.getRemarks());
+
+        return new NewsResponse(request.getNewsLink(), request.getRemarks(), false);
     }
     
     /**
@@ -58,14 +58,16 @@ public class NewsService {
         
         // Update news
         int rowsUpdated = repository.updateRemarks(newsLink, request.getRemarks());
-        
+
         if (rowsUpdated == 0) {
             throw new NewsNotFoundException(newsLink);
         }
-        
+
         logger.info("Successfully updated news");
-        
-        return new NewsResponse(newsLink, request.getRemarks());
+
+        // Fetch the entity to get the isHidden value
+        NewsEntity entity = repository.getNews(newsLink);
+        return new NewsResponse(newsLink, request.getRemarks(), entity.isHidden());
     }
     
     /**
@@ -73,14 +75,14 @@ public class NewsService {
      */
     public NewsResponse getNews(String newsLink) {
         logger.info("Retrieving news for: newsLink={}", newsLink);
-        
+
         NewsEntity entity = repository.getNews(newsLink);
-        
+
         if (entity == null) {
             throw new NewsNotFoundException(newsLink);
         }
-        
-        return new NewsResponse(entity.getNewsLink(), entity.getRemarks());
+
+        return new NewsResponse(entity.getNewsLink(), entity.getRemarks(), entity.isHidden());
     }
     
     /**
@@ -88,11 +90,24 @@ public class NewsService {
      */
     public List<NewsResponse> getAllNews() {
         logger.info("Retrieving all news");
-        
+
         List<NewsEntity> entities = repository.getAllNews();
-        
+
         return entities.stream()
-                .map(entity -> new NewsResponse(entity.getNewsLink(), entity.getRemarks()))
+                .map(entity -> new NewsResponse(entity.getNewsLink(), entity.getRemarks(), entity.isHidden()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get all visible news (not hidden)
+     */
+    public List<NewsResponse> getAllVisibleNews() {
+        logger.info("Retrieving all visible news");
+
+        List<NewsEntity> entities = repository.getAllVisibleNews();
+
+        return entities.stream()
+                .map(entity -> new NewsResponse(entity.getNewsLink(), entity.getRemarks(), entity.isHidden()))
                 .collect(Collectors.toList());
     }
     
@@ -122,5 +137,51 @@ public class NewsService {
      */
     public boolean newsExists(String newsLink) {
         return repository.exists(newsLink);
+    }
+
+    /**
+     * Hide a news source - if it doesn't exist, create it as hidden
+     */
+    @Transactional
+    public NewsResponse hideSource(String newsLink) {
+        logger.info("Hiding news source: newsLink={}", newsLink);
+
+        if (!repository.exists(newsLink)) {
+            // If news doesn't exist, create it as hidden with empty remarks
+            repository.create(newsLink, null);
+        }
+
+        int rowsUpdated = repository.hideSource(newsLink);
+
+        if (rowsUpdated == 0) {
+            throw new NewsNotFoundException(newsLink);
+        }
+
+        logger.info("Successfully hidden news source");
+
+        return new NewsResponse(newsLink, null, true);
+    }
+
+    /**
+     * Unhide a news source - throws NewsNotFoundException if not exists
+     */
+    @Transactional
+    public NewsResponse unhideSource(String newsLink) {
+        logger.info("Unhiding news source: newsLink={}", newsLink);
+
+        if (!repository.exists(newsLink)) {
+            throw new NewsNotFoundException(newsLink);
+        }
+
+        int rowsUpdated = repository.unhideSource(newsLink);
+
+        if (rowsUpdated == 0) {
+            throw new NewsNotFoundException(newsLink);
+        }
+
+        logger.info("Successfully unhidden news source");
+
+        NewsEntity entity = repository.getNews(newsLink);
+        return new NewsResponse(entity.getNewsLink(), entity.getRemarks(), entity.isHidden());
     }
 }

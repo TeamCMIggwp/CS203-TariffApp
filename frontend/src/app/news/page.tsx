@@ -45,11 +45,13 @@ interface ScrapeResponse {
 interface NewsFromDB {
   newsLink: string;
   remarks: string | null;
+  isHidden: boolean;
   timestamp: string;
 }
 
 interface EnrichedArticle extends ScrapedArticle {
   isInDatabase: boolean;
+  isHidden: boolean;
   remarks: string | null;
   geminiAnalysis: GeminiAnalysis | null;
   analyzingWithGemini: boolean;
@@ -69,6 +71,7 @@ export default function NewsPage() {
   const [addingToDatabase, setAddingToDatabase] = useState<{ [key: number]: boolean }>({});
   const [deletingFromDatabase, setDeletingFromDatabase] = useState<{ [key: number]: boolean }>({});
   const [runningGeminiAnalysis, setRunningGeminiAnalysis] = useState<{ [key: number]: boolean }>({});
+  const [hidingSource, setHidingSource] = useState<{ [key: number]: boolean }>({});
 
   // Backend API base URL for non-auth endpoints
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
@@ -212,6 +215,7 @@ export default function NewsPage() {
               return {
                 ...article,
                 isInDatabase: true,
+                isHidden: dbEntry.isHidden,
                 remarks: dbEntry.remarks,
                 geminiAnalysis: null,
                 analyzingWithGemini: false
@@ -220,6 +224,7 @@ export default function NewsPage() {
               return {
                 ...article,
                 isInDatabase: false,
+                isHidden: false,
                 remarks: null,
                 geminiAnalysis: null,
                 analyzingWithGemini: false
@@ -232,14 +237,18 @@ export default function NewsPage() {
           return {
             ...article,
             isInDatabase: false,
+            isHidden: false,
             remarks: null,
             geminiAnalysis: null,
             analyzingWithGemini: false
           };
         })
       );
-      
-      setEnrichedArticles(enriched);
+
+      // Step 3: Filter out hidden sources
+      const visibleArticles = enriched.filter(article => !article.isHidden);
+
+      setEnrichedArticles(visibleArticles);
 
     } catch (err) {
       console.error('Error fetching news:', err);
@@ -409,7 +418,7 @@ export default function NewsPage() {
           remarks: null
         };
         setEnrichedArticles(updatedArticles);
-        
+
         const newEditingRemarks = { ...editingRemarks };
         delete newEditingRemarks[index];
         setEditingRemarks(newEditingRemarks);
@@ -432,6 +441,41 @@ export default function NewsPage() {
       alert('Failed to delete source. Please try again.');
     } finally {
       setDeletingFromDatabase(prev => ({ ...prev, [index]: false }));
+    }
+  };
+
+  const hideSource = async (index: number, article: EnrichedArticle) => {
+    if (!confirm(`Are you sure you want to hide this source? You won't see it in future searches.\n\n"${article.title}"`)) {
+      return;
+    }
+
+    setHidingSource(prev => ({ ...prev, [index]: true }));
+
+    try {
+      const response = await fetch(`${NEWS_API}/hide?newsLink=${encodeURIComponent(article.url)}`, {
+        method: 'PATCH',
+        cache: 'no-store'
+      });
+
+      if (response.ok) {
+        // Remove the article from the displayed list
+        const updatedArticles = enrichedArticles.filter((_, i) => i !== index);
+        setEnrichedArticles(updatedArticles);
+
+        alert('Source hidden successfully! It will no longer appear in search results.');
+      } else {
+        let msg = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          msg = errorData.message || msg;
+        } catch {}
+        alert(`Failed to hide source: ${msg}`);
+      }
+    } catch (error) {
+      console.error('Error hiding source:', error);
+      alert('Failed to hide source. Please try again.');
+    } finally {
+      setHidingSource(prev => ({ ...prev, [index]: false }));
     }
   };
 
@@ -747,15 +791,36 @@ export default function NewsPage() {
 
                   {/* Source Link and Remarks */}
                   <div className="flex flex-col lg:flex-row gap-4 items-stretch">
-                    <a
-                      href={article.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 hover:text-cyan-100 font-bold px-6 py-3 rounded-lg border border-cyan-400/40 hover:border-cyan-300 transition-all duration-200 shadow-lg hover:shadow-cyan-500/30 w-fit"
-                    >
-                      Read Full Article →
-                    </a>
-                    
+                    <div className="flex flex-col gap-2">
+                      <a
+                        href={article.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 hover:text-cyan-100 font-bold px-6 py-3 rounded-lg border border-cyan-400/40 hover:border-cyan-300 transition-all duration-200 shadow-lg hover:shadow-cyan-500/30 w-fit"
+                      >
+                        Read Full Article →
+                      </a>
+
+                      {/* Hide this source button */}
+                      <button
+                        onClick={() => hideSource(index, article)}
+                        disabled={hidingSource[index]}
+                        className="inline-flex items-center gap-2 bg-gray-500/20 hover:bg-gray-500/30 disabled:bg-gray-500/10 text-gray-300 hover:text-gray-100 disabled:text-gray-500 font-medium px-6 py-2 rounded-lg border border-gray-400/40 hover:border-gray-300 disabled:border-gray-400/20 transition-all duration-200 shadow-lg hover:shadow-gray-500/30 w-fit text-sm disabled:cursor-not-allowed"
+                      >
+                        {hidingSource[index] ? (
+                          <>
+                            <div className="inline-block w-4 h-4 border-2 border-gray-300/30 border-t-gray-300 rounded-full animate-spin"></div>
+                            Hiding...
+                          </>
+                        ) : (
+                          <>
+                            <IconAlertCircle className="w-4 h-4" />
+                            Hide this source
+                          </>
+                        )}
+                      </button>
+                    </div>
+
                     {/* Remarks Section */}
                     <div className="flex-1 min-w-0 flex flex-col gap-2">
                       {article.isInDatabase ? (
