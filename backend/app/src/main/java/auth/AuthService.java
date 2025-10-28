@@ -681,7 +681,7 @@ public class AuthService {
         String token = java.util.UUID.randomUUID().toString().replace("-", "");
         java.time.Instant expires = java.time.Instant.now().plus(java.time.Duration.ofMinutes(30));
         boolean inserted = false;
-        // Try default table variant with token_hash first, adapting to available columns
+        // Try token_hash variants (both current schema and accounts schema) before falling back
         try {
             String tokenHash = sha256Hex(token);
             inserted = tryInsertTokenHashVariant(userId, tokenHash, expires, requestedIp);
@@ -710,20 +710,35 @@ public class AuthService {
     }
 
     private boolean tryInsertTokenHashVariant(String userId, String tokenHash, java.time.Instant expires, String requestedIp) {
+        // Try current schema first, then explicit accounts schema
+        if (tryInsertTokenHashIntoTable(null, userId, tokenHash, expires, requestedIp)) return true;
+        return tryInsertTokenHashIntoTable("accounts", userId, tokenHash, expires, requestedIp);
+    }
+
+    private boolean tryInsertTokenHashIntoTable(String schema, String userId, String tokenHash, java.time.Instant expires, String requestedIp) {
         try {
-            // Discover available columns on password_reset_tokens in current schema
-            java.util.List<String> columns = jdbc.query(
-                "SELECT LOWER(COLUMN_NAME) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'password_reset_tokens'",
-                (rs, i) -> rs.getString(1)
-            );
+            String tableName = (schema == null || schema.isBlank()) ? "password_reset_tokens" : (schema + ".password_reset_tokens");
+            // Discover available columns on password_reset_tokens for the chosen schema
+            java.util.List<String> columns;
+            if (schema == null || schema.isBlank()) {
+                columns = jdbc.query(
+                    "SELECT LOWER(COLUMN_NAME) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'password_reset_tokens'",
+                    (rs, i) -> rs.getString(1)
+                );
+            } else {
+                columns = jdbc.query(
+                    "SELECT LOWER(COLUMN_NAME) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'password_reset_tokens'",
+                    ps -> ps.setString(1, schema),
+                    (rs, i) -> rs.getString(1)
+                );
+            }
             java.util.Set<String> colset = new java.util.HashSet<>(columns);
             if (colset.isEmpty()) {
-                // Table might not exist in this schema
                 return false;
             }
             java.util.List<String> insertCols = new java.util.ArrayList<>();
             java.util.List<Object> values = new java.util.ArrayList<>();
-            // Required core fields
+            // Required/core fields
             if (colset.contains("user_id")) { insertCols.add("user_id"); values.add(userId); }
             if (colset.contains("token_hash")) { insertCols.add("token_hash"); values.add(tokenHash); }
             if (colset.contains("expires_at")) { insertCols.add("expires_at"); values.add(java.sql.Timestamp.from(expires)); }
@@ -731,15 +746,17 @@ public class AuthService {
             if (colset.contains("requested_ip")) { insertCols.add("requested_ip"); values.add(requestedIp); }
             if (colset.contains("created_at")) { insertCols.add("created_at"); values.add(new java.sql.Timestamp(System.currentTimeMillis())); }
             if (colset.contains("used_at")) { insertCols.add("used_at"); values.add(null); }
-            if (insertCols.isEmpty() || !insertCols.contains("token_hash")) {
-                // Without token_hash this variant is not usable
+            // Some schemas have an auto-increment id column; don't include it.
+            if (!insertCols.contains("token_hash")) {
                 return false;
             }
             String placeholders = String.join(", ", java.util.Collections.nCopies(insertCols.size(), "?"));
-            String sql = "INSERT INTO password_reset_tokens (" + String.join(", ", insertCols) + ") VALUES (" + placeholders + ")";
+            String sql = "INSERT INTO " + tableName + " (" + String.join(", ", insertCols) + ") VALUES (" + placeholders + ")";
             jdbc.update(sql, values.toArray());
+            log.debug("Inserted password reset token into {} with columns {}", tableName, insertCols);
             return true;
         } catch (BadSqlGrammarException ex) {
+            log.debug("Insert into {} failed due to SQL grammar: {}", (schema == null ? "<default>.password_reset_tokens" : schema + ".password_reset_tokens"), ex.getMessage());
             return false;
         }
     }
@@ -749,11 +766,19 @@ public class AuthService {
             return Map.of("updated", 0, "message", "Missing token or password");
         }
         try {
-            // First attempt the default variant using token_hash
+            // First attempt token_hash in current schema
             String tokenHash = sha256Hex(token);
-            var row = jdbc.queryForMap(
-                "SELECT user_id, expires_at, used_at FROM password_reset_tokens WHERE token_hash = ?",
-                tokenHash);
+            java.util.Map<String, Object> row;
+            try {
+                row = jdbc.queryForMap(
+                    "SELECT user_id, expires_at, used_at FROM password_reset_tokens WHERE token_hash = ?",
+                    tokenHash);
+            } catch (EmptyResultDataAccessException notHere) {
+                // Try accounts schema with token_hash
+                row = jdbc.queryForMap(
+                    "SELECT user_id, expires_at, used_at FROM accounts.password_reset_tokens WHERE token_hash = ?",
+                    tokenHash);
+            }
             java.sql.Timestamp expiresAt = (java.sql.Timestamp) row.get("expires_at");
             java.sql.Timestamp usedAt = (java.sql.Timestamp) row.get("used_at");
             if (usedAt != null) {
@@ -783,11 +808,12 @@ public class AuthService {
             }
             // Invalidate all sessions for this user
             try { jdbc.update("DELETE FROM accounts.sessions WHERE user_id = ?", userId); } catch (BadSqlGrammarException ignore) {}
-            // Mark token used (default variant)
+            // Mark token used (token_hash variant)
             try {
                 jdbc.update("UPDATE password_reset_tokens SET used_at = NOW() WHERE token_hash = ?", tokenHash);
             } catch (BadSqlGrammarException ignore) {
-                jdbc.update("UPDATE accounts.password_reset_tokens SET used_at = NOW() WHERE token = ?", token);
+                try { jdbc.update("UPDATE accounts.password_reset_tokens SET used_at = NOW() WHERE token_hash = ?", tokenHash); }
+                catch (BadSqlGrammarException ignore2) { jdbc.update("UPDATE accounts.password_reset_tokens SET used_at = NOW() WHERE token = ?", token); }
             }
             return Map.of("updated", 1);
         } catch (EmptyResultDataAccessException nf) {
