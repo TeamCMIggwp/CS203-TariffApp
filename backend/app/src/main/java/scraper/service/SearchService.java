@@ -24,7 +24,7 @@ public class SearchService {
     
     private static final Logger log = LoggerFactory.getLogger(SearchService.class);
     
-    @Value("${google.search.api.key:}")
+    @Value("${google.api.key:}")
     private String googleApiKey;
     
     @Value("${google.search.engine.id:}")
@@ -168,7 +168,7 @@ public class SearchService {
         if (googleApiKey == null || googleApiKey.isEmpty() ||
             searchEngineId == null || searchEngineId.isEmpty()) {
             throw new SearchFailedException("Google Search API is not configured. " +
-                "Please set google.search.api.key and google.search.engine.id");
+                "Please set google.api.key and google.search.engine.id");
         }
     }
 }
