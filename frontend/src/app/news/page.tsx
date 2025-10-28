@@ -60,7 +60,7 @@ export default function NewsPage() {
   // Backend API base URL for non-auth endpoints
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
   // Proxied path that goes through Next.js so middleware can inject Authorization from access_token cookie
-  const NEWS_API = '/api/database/news'
+  const NEWS_API = '/api/v1/news'
 
   const fetchNewsData = async (searchQuery: string, max: number, year: number) => {
     setLoading(true);
@@ -432,21 +432,21 @@ export default function NewsPage() {
           {newsData && !loading && (
             <>
               <p className="text-cyan-300 text-sm font-semibold">
-                Query: &quot;{newsData.query}&quot; • Job ID: {newsData.jobId}
+                Query: &quot;{newsData.query}&quot; â€¢ Job ID: {newsData.jobId}
               </p>
               <p className="text-white/90 text-lg font-medium mt-2">
-                Status: {newsData.status} • {newsData.sourcesScraped} articles found
-                {newsData.meta.minYear && <span className="text-cyan-300"> • From {newsData.meta.minYear} onwards</span>}
+                Status: {newsData.status} â€¢ {newsData.sourcesScraped} articles found
+                {newsData.meta.minYear && <span className="text-cyan-300"> â€¢ From {newsData.meta.minYear} onwards</span>}
               </p>
               <div className="mt-4 bg-black/40 backdrop-blur-md p-3 rounded-xl border border-white/30">
                 <p className="text-white/90 font-medium">
                   Scraped {newsData.sourcesScraped} of {newsData.totalSourcesFound} sources
                   {newsData.meta.durationMs && (
-                    <span className="text-cyan-300"> • Duration: {(newsData.meta.durationMs / 1000).toFixed(1)}s</span>
+                    <span className="text-cyan-300"> â€¢ Duration: {(newsData.meta.durationMs / 1000).toFixed(1)}s</span>
                   )}
                   {enrichedArticles.length > 0 && (
                     <>
-                      {' • '}
+                      {' â€¢ '}
                       <span className="text-green-300">
                         {enrichedArticles.filter(a => a.isInDatabase).length} already in database
                       </span>
@@ -455,7 +455,7 @@ export default function NewsPage() {
                 </p>
                 {Object.keys(newsData.errors).length > 0 && (
                   <p className="text-yellow-300 mt-2 font-semibold text-sm">
-                    ⚠️ {Object.keys(newsData.errors).length} sources failed to scrape
+                    âš ï¸ {Object.keys(newsData.errors).length} sources failed to scrape
                   </p>
                 )}
               </div>
@@ -497,7 +497,7 @@ export default function NewsPage() {
                         </h2>
                         {article.isInDatabase && (
                           <span className="bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-xs font-semibold border border-green-400/40 flex-shrink-0">
-                            ✓ In Database
+                            âœ“ In Database
                           </span>
                         )}
                       </div>
@@ -554,7 +554,7 @@ export default function NewsPage() {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 hover:text-cyan-100 font-bold px-6 py-3 rounded-lg border border-cyan-400/40 hover:border-cyan-300 transition-all duration-200 shadow-lg hover:shadow-cyan-500/30 w-fit"
                     >
-                      Read Full Article →
+                      Read Full Article â†’
                     </a>
                     
                     {/* Remarks Section */}
@@ -635,15 +635,15 @@ export default function NewsPage() {
             <div className="mt-10 text-center bg-black/30 backdrop-blur-md p-4 rounded-xl border border-white/30">
               <p className="text-white/90 font-medium">
                 Scraped {newsData.sourcesScraped} of {newsData.totalSourcesFound} sources
-                {newsData.meta.minYear && <span className="text-cyan-300"> • Filtered from {newsData.meta.minYear}</span>}
-                {' • '}
+                {newsData.meta.minYear && <span className="text-cyan-300"> â€¢ Filtered from {newsData.meta.minYear}</span>}
+                {' â€¢ '}
                 <span className="text-green-300">
                   {enrichedArticles.filter(a => a.isInDatabase).length} already in database
                 </span>
               </p>
               {Object.keys(newsData.errors).length > 0 && (
                 <p className="text-yellow-300 mt-2 font-semibold">
-                  ⚠️ {Object.keys(newsData.errors).length} sources failed to scrape
+                  âš ï¸ {Object.keys(newsData.errors).length} sources failed to scrape
                 </p>
               )}
             </div>
