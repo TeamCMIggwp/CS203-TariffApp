@@ -2,6 +2,7 @@ package config;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,10 +38,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String bearer = extractBearer(request);
             if (StringUtils.hasText(bearer)) {
                 var parsed = authService.parseToken(bearer);
-                String role = parsed.role() != null ? parsed.role() : "user";
-                var authority = role.equalsIgnoreCase("admin")
-                        ? new SimpleGrantedAuthority("ROLE_ADMIN")
-                        : new SimpleGrantedAuthority("ROLE_USER");
+        String role = parsed.role() != null ? parsed.role().trim() : "user";
+        String lower = role.toLowerCase(Locale.ROOT);
+        boolean adminLike = lower.equals("admin") || lower.equals("administrator") || role.equalsIgnoreCase("ROLE_ADMIN");
+        var authority = adminLike
+            ? new SimpleGrantedAuthority("ROLE_ADMIN")
+            : (role.toUpperCase(Locale.ROOT).startsWith("ROLE_")
+                ? new SimpleGrantedAuthority(role.toUpperCase(Locale.ROOT))
+                : new SimpleGrantedAuthority("ROLE_USER"));
                 Authentication auth = new UsernamePasswordAuthenticationToken(
                         parsed.userId(), null, List.of(authority));
                 SecurityContextHolder.getContext().setAuthentication(auth);
