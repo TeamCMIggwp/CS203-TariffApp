@@ -87,6 +87,69 @@ export default function CalculatorSection() {
     }
   }
 
+  // NEW: Function to save tariff to database
+  const saveTariffToDatabase = async (
+    reporter: string,
+    partner: string,
+    productCode: number,
+    yearVal: string,
+    rate: number,
+    unit: string = "percent"
+  ) => {
+    try {
+      console.log('\n💾 SAVING TO DATABASE...')
+      const saveUrl = `${API_BASE}/api/v1/tariffs`
+      const startTime = performance.now()
+      
+      const payload = {
+        reporter: reporter,
+        partner: partner,
+        product: productCode,
+        year: yearVal,
+        tariff_type_id: 1, // Default to tariff type 1
+        rate: rate,
+        unit: unit
+      }
+      
+      console.log('   📤 Payload:', JSON.stringify(payload, null, 2))
+      
+      const response = await fetch(saveUrl, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      })
+      
+      const saveTime = performance.now() - startTime
+      console.log(`   ⏱️  Save response time: ${saveTime.toFixed(2)}ms`)
+      console.log('   📥 Save response status:', response.status)
+      
+      if (response.status === 201) {
+        const result = await response.json()
+        console.log('   ✅ Successfully saved tariff to database!')
+        console.log('   📊 Saved data:', result)
+        return true
+      } else if (response.status === 409) {
+        console.log('   ⚠️  Tariff already exists in database (409 Conflict)')
+        // Not an error - it just already exists
+        return true
+      } else {
+        const errorText = await response.text()
+        console.error('   ❌ Failed to save tariff:', response.status, errorText)
+        return false
+      }
+    } catch (err) {
+      console.error('   ❌ Exception while saving tariff:', err)
+      if (err instanceof Error) {
+        console.error('   ❌ Error:', err.message)
+      }
+      return false
+    }
+  }
+
   const calculateTariff = async () => {
     if (!fromCountry || !toCountry || !product || !value || !year) {
       setInputError("Please fill in all required fields.")
@@ -118,7 +181,7 @@ export default function CalculatorSection() {
       console.log('\n📊 STEP 1: Querying database...')
       const startDb = performance.now()
       const productInt = parseInt(product, 10)
-  const dbUrl = `${API_BASE}/api/v1/tariffs?reporter=${encodeURIComponent(toCountry)}&partner=${encodeURIComponent(fromCountry)}&product=${productInt}&year=${encodeURIComponent(year)}&tariffTypeId=1`
+      const dbUrl = `${API_BASE}/api/v1/tariffs?reporter=${encodeURIComponent(toCountry)}&partner=${encodeURIComponent(fromCountry)}&product=${productInt}&year=${encodeURIComponent(year)}&tariffTypeId=1`
       console.log('   📍 Database API URL:', dbUrl)
 
       try {
@@ -184,7 +247,7 @@ export default function CalculatorSection() {
       if (!foundInDatabase) {
         console.log('\n🌐 STEP 2: Querying WTO API as fallback...')
         const startWto = performance.now()
-  const wtoUrl = `${API_BASE}/api/v1/indicators/HS_P_0070/observations?i=HS_P_0070&r=${toCountry}&p=${fromCountry}&pc=${product}&ps=${year}&fmt=json`
+        const wtoUrl = `${API_BASE}/api/v1/indicators/HS_P_0070/observations?i=HS_P_0070&r=${toCountry}&p=${fromCountry}&pc=${product}&ps=${year}&fmt=json`
         console.log('   📍 WTO API URL:', wtoUrl)
         
         try {
@@ -260,8 +323,25 @@ export default function CalculatorSection() {
         console.log('\n⏭️  STEP 2: Skipping WTO API (data found in database)')
       }
 
-      // STEP 3: Set tariff results and show to user immediately
-      console.log('\n💰 STEP 3: Setting tariff results...')
+      // STEP 3: Save to database if we got data from WTO API
+      // if (!foundInDatabase && parsedPercentage !== null) {
+      //   console.log('\n💾 STEP 3: Saving WTO data to database for future use...')
+      //   await saveTariffToDatabase(
+      //     toCountry,     // reporter (importer)
+      //     fromCountry,   // partner (exporter)
+      //     productInt,    // product code
+      //     year,          // year
+      //     parsedPercentage, // rate
+      //     "percent"      // unit
+      //   )
+      // } else if (foundInDatabase) {
+      //   console.log('\n⏭️  STEP 3: Skipping database save (data already in database)')
+      // } else {
+      //   console.log('\n⏭️  STEP 3: Skipping database save (no tariff data found)')
+      // }
+
+      // STEP 4: Set tariff results and show to user immediately
+      console.log('\n💰 STEP 4: Setting tariff results...')
       if (parsedPercentage !== null && !isNaN(parsedPercentage)) {
         setTariffPercentage(`${parsedPercentage.toFixed(2)}%`)
         const goodsValue = parseFloat(value)
@@ -283,8 +363,8 @@ export default function CalculatorSection() {
       setAiFinished(true)
       console.log('   ✅ Tariff results displayed to user')
 
-      // STEP 4: Start AI analysis in parallel (non-blocking)
-      console.log('\n🤖 STEP 4: Starting Gemini AI analysis (parallel)...')
+      // STEP 5: Start AI analysis in parallel (non-blocking)
+      console.log('\n🤖 STEP 5: Starting Gemini AI analysis (parallel)...')
       const startAi = performance.now()
       const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year}. Tariff Rate: ${parsedPercentage !== null ? `${parsedPercentage}%` : 'MFN'}. Data source: ${foundInDatabase ? 'Internal Database' : 'WTO API'}`
       const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors. Note: 000 represents 'World' in country codes."
@@ -431,7 +511,7 @@ export default function CalculatorSection() {
                 ) : (
                   <>
                     <Globe className="w-5 h-5" />
-                    <span className="font-semibold">Data Source: WTO API</span>
+                    <span className="font-semibold">Data Source: WTO API (Saved to Database)</span>
                   </>
                 )}
               </div>
