@@ -156,6 +156,20 @@
   <groupId>org.springframework.boot</groupId>
   <artifactId>spring-boot-starter-security</artifactId>
 </dependency>
+
+<!-- Security test helpers -->
+  <dependency>
+    <groupId>org.springframework.security</groupId>
+    <artifactId>spring-security-test</artifactId>
+    <scope>test</scope>
+  </dependency>
+
+  <!-- H2 for @JdbcTest -->
+  <dependency>
+    <groupId>com.h2database</groupId>
+    <artifactId>h2</artifactId>
+    <scope>test</scope>
+  </dependency>
   </dependencies>
 
   <build>
@@ -164,6 +178,53 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
+
+      <!-- Surefire runs unit tests -->
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-surefire-plugin</artifactId>
+      <version>3.3.0</version>
+    </plugin>
+
+    <!-- JaCoCo -->
+    <plugin>
+      <groupId>org.jacoco</groupId>
+      <artifactId>jacoco-maven-plugin</artifactId>
+      <version>0.8.12</version>
+      <executions>
+        <execution><goals><goal>prepare-agent</goal></goals></execution>
+        <execution>
+          <id>report</id><phase>verify</phase>
+          <goals><goal>report</goal></goals>
+          <configuration>
+            <excludes>
+              <exclude>**/*Application*</exclude>
+              <exclude>**/dto/**</exclude>
+              <exclude>**/model/**</exclude>
+              <exclude>**/config/**</exclude>
+            </excludes>
+          </configuration>
+        </execution>
+        <execution>
+          <id>check</id><phase>verify</phase>
+          <goals><goal>check</goal></goals>
+          <configuration>
+            <rules>
+              <rule>
+                <element>BUNDLE</element>
+                <limits>
+                  <limit>
+                    <counter>LINE</counter>
+                    <value>COVEREDRATIO</value>
+                    <minimum>0.70</minimum>
+                  </limit>
+                </limits>
+              </rule>
+            </rules>
+          </configuration>
+        </execution>
+      </executions>
+    </plugin>
     </plugins>
   </build>
 
