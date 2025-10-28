@@ -84,3 +84,31 @@ kill <PID>
 
 The API documentation is available at:
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
+
+## Password reset (SES)
+
+The backend supports a secure forgot/reset password flow via AWS SES (or any SMTP):
+
+- POST `/auth/forgot` body: `{ "email": "user@example.com" }`
+  - Always returns 200; if the email exists, a reset link is sent.
+- POST `/auth/reset` body: `{ "token": "<from email>", "newPassword": "..." }`
+  - Returns `{ "updated": 1 }` when successful.
+
+Frontend pages:
+- `/forgot-password` — email form
+- `/reset-password?token=...` — set new password
+
+Configure mail for production (example for AWS SES SMTP):
+
+```
+spring.mail.host=email-smtp.<region>.amazonaws.com
+spring.mail.port=587
+spring.mail.username=<SMTP_USERNAME>
+spring.mail.password=<SMTP_PASSWORD>
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+app.mail.from=noreply@yourdomain.tld
+app.frontend.url=https://www.teamcmiggwpholidaymood.fun
+```
+
+If mail isn’t configured, the backend logs the reset link instead of sending an email (no-op), so flows can be tested locally.

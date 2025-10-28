@@ -61,6 +61,12 @@
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
 
+    <!-- Mail support (use with AWS SES SMTP or any SMTP provider) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-mail</artifactId>
+    </dependency>
+
     <!-- WebClient (reactive HTTP client) for calling WITS -->
     <dependency>
       <groupId>org.springframework.boot</groupId>

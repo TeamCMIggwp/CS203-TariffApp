@@ -35,6 +35,28 @@ public class AuthController {
         this.authService = authService;
     }
 
+    @PostMapping("/forgot")
+    public ResponseEntity<?> forgot(@RequestBody java.util.Map<String, String> body) {
+        // Always respond 200 to avoid email enumeration
+        String email = body != null ? body.get("email") : null;
+        try {
+            authService.requestPasswordReset(email, frontendBase);
+        } catch (Exception ex) {
+            // Don't leak backend errors to client; log and still return 200
+            log.warn("forgot: error while processing reset for {}: {}", email, ex.toString());
+        }
+        return ResponseEntity.ok(java.util.Map.of("message", "If the email exists, a reset link has been sent."));
+    }
+
+    public static record ResetRequest(String token, String newPassword) {}
+
+    @PostMapping("/reset")
+    public ResponseEntity<?> reset(@RequestBody ResetRequest req) {
+        var result = authService.performPasswordReset(req != null ? req.token() : null, req != null ? req.newPassword() : null);
+        // Always 200 to keep response uniform
+        return ResponseEntity.ok(result);
+    }
+
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody SignupRequest req) {
         return authService.signup(req);

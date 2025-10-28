@@ -171,9 +171,9 @@ export default function LoginPage() {
               <label className={styles.checkbox}>
                 <input type="checkbox" /> Remember for 30 days
               </label>
-              <a href="#" className={styles.link}>
+              <Link href="/forgot-password" className={styles.link}>
                 Forgot password?
-              </a>
+              </Link>
             </div>
 
             <button type="submit" className={styles.signInBtn} disabled={loading}>
