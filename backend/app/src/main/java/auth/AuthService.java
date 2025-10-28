@@ -681,14 +681,14 @@ public class AuthService {
         String token = java.util.UUID.randomUUID().toString().replace("-", "");
         java.time.Instant expires = java.time.Instant.now().plus(java.time.Duration.ofMinutes(30));
         boolean inserted = false;
-        // Try default table variant with token_hash first
+        // Try default table variant with token_hash first, adapting to available columns
         try {
             String tokenHash = sha256Hex(token);
-            jdbc.update(
-                "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, requested_ip) VALUES (?, ?, ?, ?)",
-                userId, tokenHash, java.sql.Timestamp.from(expires), requestedIp);
-            inserted = true;
-        } catch (BadSqlGrammarException e) {
+            inserted = tryInsertTokenHashVariant(userId, tokenHash, expires, requestedIp);
+        } catch (Exception ignore) {
+            inserted = false;
+        }
+        if (!inserted) {
             // Fallback to accounts.password_reset_tokens structure
             try {
                 ensureResetTokensTable();
@@ -706,6 +706,41 @@ public class AuthService {
             log.info("Password reset token created for user {} (email {})", userId, normalized);
         } else {
             log.warn("Password reset token NOT persisted. Verify schema/columns for token table.");
+        }
+    }
+
+    private boolean tryInsertTokenHashVariant(String userId, String tokenHash, java.time.Instant expires, String requestedIp) {
+        try {
+            // Discover available columns on password_reset_tokens in current schema
+            java.util.List<String> columns = jdbc.query(
+                "SELECT LOWER(COLUMN_NAME) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'password_reset_tokens'",
+                (rs, i) -> rs.getString(1)
+            );
+            java.util.Set<String> colset = new java.util.HashSet<>(columns);
+            if (colset.isEmpty()) {
+                // Table might not exist in this schema
+                return false;
+            }
+            java.util.List<String> insertCols = new java.util.ArrayList<>();
+            java.util.List<Object> values = new java.util.ArrayList<>();
+            // Required core fields
+            if (colset.contains("user_id")) { insertCols.add("user_id"); values.add(userId); }
+            if (colset.contains("token_hash")) { insertCols.add("token_hash"); values.add(tokenHash); }
+            if (colset.contains("expires_at")) { insertCols.add("expires_at"); values.add(java.sql.Timestamp.from(expires)); }
+            // Optional fields
+            if (colset.contains("requested_ip")) { insertCols.add("requested_ip"); values.add(requestedIp); }
+            if (colset.contains("created_at")) { insertCols.add("created_at"); values.add(new java.sql.Timestamp(System.currentTimeMillis())); }
+            if (colset.contains("used_at")) { insertCols.add("used_at"); values.add(null); }
+            if (insertCols.isEmpty() || !insertCols.contains("token_hash")) {
+                // Without token_hash this variant is not usable
+                return false;
+            }
+            String placeholders = String.join(", ", java.util.Collections.nCopies(insertCols.size(), "?"));
+            String sql = "INSERT INTO password_reset_tokens (" + String.join(", ", insertCols) + ") VALUES (" + placeholders + ")";
+            jdbc.update(sql, values.toArray());
+            return true;
+        } catch (BadSqlGrammarException ex) {
+            return false;
         }
     }
 
