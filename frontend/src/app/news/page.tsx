@@ -82,7 +82,7 @@ export default function NewsPage() {
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
   // Proxied path that goes through Next.js so middleware can inject Authorization from access_token cookie
   const NEWS_API = '/api/v1/news'
-  const USER_HIDDEN_API = `${API_BASE}/api/v1/user/hidden-sources`
+  const USER_HIDDEN_API = '/api/user-hidden-sources' // Proxied through Next.js to access HttpOnly cookie
   const GEMINI_API = `${API_BASE}/api/v1/gemini/analyses`
 
   /**
@@ -567,10 +567,9 @@ export default function NewsPage() {
           console.error('Failed to fetch admin hidden sources:', response.status);
         }
       } else {
-        // Regular user: Fetch from UserHiddenSources table (personal)
+        // Regular user: Fetch from UserHiddenSources table (proxied through Next.js)
         const response = await fetch(USER_HIDDEN_API, {
           method: 'GET',
-          headers: getAuthHeaders(),
           cache: 'no-store'
         });
 
@@ -625,10 +624,9 @@ export default function NewsPage() {
           cache: 'no-store'
         });
       } else {
-        // Regular user: Use UserHiddenSources endpoint (personal)
-        response = await fetch(`${USER_HIDDEN_API}/hide?newsLink=${encodeURIComponent(article.url)}`, {
+        // Regular user: Use UserHiddenSources endpoint (proxied through Next.js)
+        response = await fetch(`${USER_HIDDEN_API}?newsLink=${encodeURIComponent(article.url)}&action=hide`, {
           method: 'POST',
-          headers: getAuthHeaders(),
           cache: 'no-store'
         });
       }
@@ -684,8 +682,8 @@ export default function NewsPage() {
           cache: 'no-store'
         });
       } else {
-        // Regular user: Use UserHiddenSources delete endpoint (no auth required)
-        response = await fetch(`${USER_HIDDEN_API}/unhide?newsLink=${encodeURIComponent(newsLink)}`, {
+        // Regular user: Use UserHiddenSources delete endpoint (proxied through Next.js)
+        response = await fetch(`${USER_HIDDEN_API}?newsLink=${encodeURIComponent(newsLink)}`, {
           method: 'DELETE',
           cache: 'no-store'
         });
@@ -812,8 +810,8 @@ export default function NewsPage() {
         await refreshUnhiddenArticles(unhiddenUrls);
 
       } else {
-        // Regular user: Use single DELETE endpoint to unhide all (no auth required)
-        const response = await fetch(`${USER_HIDDEN_API}/unhide-all`, {
+        // Regular user: Use single DELETE endpoint to unhide all (proxied through Next.js)
+        const response = await fetch(`${USER_HIDDEN_API}?unhideAll=true`, {
           method: 'DELETE',
           cache: 'no-store'
         });
