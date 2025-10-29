@@ -1,7 +1,7 @@
 'use client';
 
 import { IconNews, IconDatabase, IconAlertCircle, IconSearch, IconCalendar, IconListNumbers, IconTrash, IconGlobe, IconPackage, IconCalendarEvent, IconPercentage } from "@tabler/icons-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // TypeScript interfaces matching the new API response structure
 interface ScrapedArticle {
@@ -76,19 +76,59 @@ export default function NewsPage() {
   const [hiddenSources, setHiddenSources] = useState<NewsFromDB[]>([]);
   const [loadingHiddenSources, setLoadingHiddenSources] = useState(false);
   const [unhidingSource, setUnhidingSource] = useState<{ [key: string]: boolean }>({});
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   // Backend API base URL for non-auth endpoints
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
   // Proxied path that goes through Next.js so middleware can inject Authorization from access_token cookie
   const NEWS_API = '/api/v1/news'
+  const USER_HIDDEN_API = '/api/v1/user/hidden-sources'
   const GEMINI_API = `${API_BASE}/api/v1/gemini/analyses`
+
+  /**
+   * Extract user role from JWT token
+   */
+  const checkUserRole = () => {
+    try {
+      // Get access token from cookie
+      const cookies = document.cookie.split(';');
+      const accessTokenCookie = cookies.find(c => c.trim().startsWith('access_token='));
+
+      if (!accessTokenCookie) {
+        setIsAdmin(false);
+        return;
+      }
+
+      const token = accessTokenCookie.split('=')[1];
+
+      // Decode JWT (simple base64 decode of payload)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+
+      // Check if user has ADMIN role
+      const roles = payload.roles || payload.authorities || [];
+      const hasAdminRole = roles.some((role: string) =>
+        role === 'ADMIN' || role === 'ROLE_ADMIN' || role.toUpperCase().includes('ADMIN')
+      );
+
+      setIsAdmin(hasAdminRole);
+      console.log('User role check - isAdmin:', hasAdminRole, 'roles:', roles);
+    } catch (error) {
+      console.error('Error checking user role:', error);
+      setIsAdmin(false);
+    }
+  };
+
+  // Check user role on component mount
+  useEffect(() => {
+    checkUserRole();
+  }, []);
 
   /**
    * Call Gemini API to analyze a tariff article
    */
   const analyzeWithGemini = async (url: string, searchQuery: string): Promise<GeminiAnalysis | null> => {
     try {
-      const prompt = `${searchQuery}. Search, extract and return the accurate tariff rate that the user has prompted for from the link attached in the data. Return ONLY a JSON object with these exact fields: exporterCountry, importerCountry, product, year, tariffRate. Do not include any additional text or explanations.`;
+      const prompt = `Extract tariff data for: ${searchQuery}. Return ONLY this JSON: {"exporterCountry":"","importerCountry":"","product":"","year":"","tariffRate":""}. No explanations.`;
       
       const response = await fetch(GEMINI_API, {
         method: 'POST',
@@ -109,6 +149,13 @@ export default function NewsPage() {
 
       const result = await response.json();
       console.log('Gemini API raw response:', result);
+
+      // Check if the analysis failed
+      if (result.success === false) {
+        console.error('Gemini analysis failed:', result.error);
+        alert(`Gemini analysis failed: ${result.error || 'Unknown error'}`);
+        return null;
+      }
 
       // Parse the Gemini response - it should return JSON
       // Handle different possible response formats
@@ -478,19 +525,41 @@ export default function NewsPage() {
   const fetchHiddenSources = async () => {
     setLoadingHiddenSources(true);
     try {
-      // Fetch all news from database
-      const response = await fetch(`${API_BASE}/api/v1/news/all`, {
-        method: 'GET',
-        cache: 'no-store'
-      });
+      if (isAdmin) {
+        // Admin: Fetch from News table (shared hidden sources)
+        const response = await fetch(`${API_BASE}/api/v1/news/all`, {
+          method: 'GET',
+          cache: 'no-store'
+        });
 
-      if (response.ok) {
-        const allNews: NewsFromDB[] = await response.json();
-        // Filter only hidden sources
-        const hidden = allNews.filter(news => news.isHidden);
-        setHiddenSources(hidden);
+        if (response.ok) {
+          const allNews: NewsFromDB[] = await response.json();
+          // Filter only hidden sources
+          const hidden = allNews.filter(news => news.isHidden);
+          setHiddenSources(hidden);
+        } else {
+          console.error('Failed to fetch admin hidden sources:', response.status);
+        }
       } else {
-        console.error('Failed to fetch hidden sources:', response.status);
+        // Regular user: Fetch from UserHiddenSources table (personal)
+        const response = await fetch(USER_HIDDEN_API, {
+          method: 'GET',
+          cache: 'no-store'
+        });
+
+        if (response.ok) {
+          const userHidden = await response.json();
+          // Convert to NewsFromDB format for consistency
+          const hidden = userHidden.map((item: any) => ({
+            newsLink: item.newsLink,
+            remarks: null,
+            isHidden: true,
+            timestamp: item.hiddenAt
+          }));
+          setHiddenSources(hidden);
+        } else {
+          console.error('Failed to fetch user hidden sources:', response.status);
+        }
       }
     } catch (error) {
       console.error('Error fetching hidden sources:', error);
@@ -512,14 +581,24 @@ export default function NewsPage() {
     setHidingSource(prev => ({ ...prev, [index]: true }));
 
     try {
-      // Use API_BASE directly instead of NEWS_API to bypass authentication
-      const response = await fetch(`${API_BASE}/api/v1/news/hide?newsLink=${encodeURIComponent(article.url)}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store'
-      });
+      let response;
+
+      if (isAdmin) {
+        // Admin: Use News table hide endpoint (shared for all admins)
+        response = await fetch(`${API_BASE}/api/v1/news/hide?newsLink=${encodeURIComponent(article.url)}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-store'
+        });
+      } else {
+        // Regular user: Use UserHiddenSources endpoint (personal)
+        response = await fetch(`${USER_HIDDEN_API}/hide?newsLink=${encodeURIComponent(article.url)}`, {
+          method: 'POST',
+          cache: 'no-store'
+        });
+      }
 
       if (response.ok) {
         // Remove the article from the displayed list
@@ -559,13 +638,24 @@ export default function NewsPage() {
     setUnhidingSource(prev => ({ ...prev, [newsLink]: true }));
 
     try {
-      const response = await fetch(`${API_BASE}/api/v1/news/unhide?newsLink=${encodeURIComponent(newsLink)}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store'
-      });
+      let response;
+
+      if (isAdmin) {
+        // Admin: Use News table unhide endpoint
+        response = await fetch(`${API_BASE}/api/v1/news/unhide?newsLink=${encodeURIComponent(newsLink)}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-store'
+        });
+      } else {
+        // Regular user: Use UserHiddenSources delete endpoint
+        response = await fetch(`${USER_HIDDEN_API}/unhide?newsLink=${encodeURIComponent(newsLink)}`, {
+          method: 'DELETE',
+          cache: 'no-store'
+        });
+      }
 
       if (response.ok) {
         // Remove from hidden sources list
@@ -573,6 +663,55 @@ export default function NewsPage() {
         setHiddenSources(updatedHiddenSources);
 
         alert('Source unhidden successfully! It will now appear in search results.');
+
+        // Add back to current search results if it was in the original scraped data
+        if (newsData) {
+          const article = newsData.articles.find(a => a.url === newsLink);
+          if (article) {
+            // Check if not already in enrichedArticles
+            const exists = enrichedArticles.some(a => a.url === newsLink);
+            if (!exists) {
+              // Check database status
+              try {
+                const encodedUrl = encodeURIComponent(newsLink);
+                const checkResponse = await fetch(
+                  `${NEWS_API}?newsLink=${encodedUrl}`,
+                  {
+                    method: 'GET',
+                    cache: 'no-store'
+                  }
+                );
+
+                let enrichedArticle: EnrichedArticle;
+                if (checkResponse.ok) {
+                  const dbEntry: NewsFromDB = await checkResponse.json();
+                  enrichedArticle = {
+                    ...article,
+                    isInDatabase: true,
+                    isHidden: false,
+                    remarks: dbEntry.remarks,
+                    geminiAnalysis: null,
+                    analyzingWithGemini: false
+                  };
+                } else {
+                  enrichedArticle = {
+                    ...article,
+                    isInDatabase: false,
+                    isHidden: false,
+                    remarks: null,
+                    geminiAnalysis: null,
+                    analyzingWithGemini: false
+                  };
+                }
+
+                // Add to enrichedArticles
+                setEnrichedArticles(prev => [...prev, enrichedArticle]);
+              } catch (error) {
+                console.error('Error checking database for unhidden article:', error);
+              }
+            }
+          }
+        }
       } else {
         let msg = `HTTP ${response.status}`;
         try {
@@ -602,36 +741,136 @@ export default function NewsPage() {
     setLoadingHiddenSources(true);
 
     try {
-      // Unhide all sources in parallel
-      const unhidePromises = hiddenSources.map(source =>
-        fetch(`${API_BASE}/api/v1/news/unhide?newsLink=${encodeURIComponent(source.newsLink)}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          cache: 'no-store'
-        })
-      );
+      if (isAdmin) {
+        // Admin: Unhide all sources in parallel from News table
+        const unhidePromises = hiddenSources.map(source =>
+          fetch(`${API_BASE}/api/v1/news/unhide?newsLink=${encodeURIComponent(source.newsLink)}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            cache: 'no-store'
+          })
+        );
 
-      const results = await Promise.allSettled(unhidePromises);
+        const results = await Promise.allSettled(unhidePromises);
 
-      // Count successes and failures
-      const successCount = results.filter(r => r.status === 'fulfilled' && r.value.ok).length;
-      const failCount = results.length - successCount;
+        // Count successes and failures
+        const successCount = results.filter(r => r.status === 'fulfilled' && r.value.ok).length;
+        const failCount = results.length - successCount;
 
-      // Clear all hidden sources
-      setHiddenSources([]);
+        // Get URLs of successfully unhidden sources
+        const unhiddenUrls = hiddenSources
+          .filter((_, index) => results[index].status === 'fulfilled' && (results[index] as PromiseFulfilledResult<Response>).value.ok)
+          .map(source => source.newsLink);
 
-      if (failCount === 0) {
-        alert(`Successfully unhidden all ${successCount} sources!`);
+        // Clear all hidden sources
+        setHiddenSources([]);
+
+        if (failCount === 0) {
+          alert(`Successfully unhidden all ${successCount} sources!`);
+        } else {
+          alert(`Unhidden ${successCount} sources. ${failCount} failed.`);
+        }
+
+        // Refresh current search results if we have news data
+        await refreshUnhiddenArticles(unhiddenUrls);
+
       } else {
-        alert(`Unhidden ${successCount} sources. ${failCount} failed.`);
+        // Regular user: Use single DELETE endpoint to unhide all
+        const response = await fetch(`${USER_HIDDEN_API}/unhide-all`, {
+          method: 'DELETE',
+          cache: 'no-store'
+        });
+
+        if (response.ok) {
+          const result = await response.text();
+          setHiddenSources([]);
+          alert(result || 'All sources unhidden successfully!');
+
+          // Refresh current search results
+          const unhiddenUrls = hiddenSources.map(s => s.newsLink);
+          await refreshUnhiddenArticles(unhiddenUrls);
+        } else {
+          alert('Failed to unhide all sources.');
+        }
       }
     } catch (error) {
       console.error('Error unhiding all sources:', error);
       alert('Failed to unhide all sources. Please try again.');
     } finally {
       setLoadingHiddenSources(false);
+    }
+  };
+
+  const refreshUnhiddenArticles = async (unhiddenUrls: string[]) => {
+    // Refresh current search results if we have news data
+    if (newsData && unhiddenUrls.length > 0) {
+      // Re-enrich articles to include the newly unhidden sources
+      const currentArticles = [...enrichedArticles];
+
+      // Check if any unhidden URLs match articles in the original scraped data
+      const articlesToAdd: EnrichedArticle[] = [];
+
+      for (const article of newsData.articles) {
+        if (unhiddenUrls.includes(article.url)) {
+          // Check if this article is not already in enrichedArticles
+          const exists = currentArticles.some(a => a.url === article.url);
+          if (!exists) {
+            // Check database status for this article (only for admins)
+            try {
+              if (isAdmin) {
+                const encodedUrl = encodeURIComponent(article.url);
+                const checkResponse = await fetch(
+                  `${NEWS_API}?newsLink=${encodedUrl}`,
+                  {
+                    method: 'GET',
+                    cache: 'no-store'
+                  }
+                );
+
+                if (checkResponse.ok) {
+                  const dbEntry: NewsFromDB = await checkResponse.json();
+                  articlesToAdd.push({
+                    ...article,
+                    isInDatabase: true,
+                    isHidden: false, // Just unhidden
+                    remarks: dbEntry.remarks,
+                    geminiAnalysis: null,
+                    analyzingWithGemini: false
+                  });
+                } else {
+                  articlesToAdd.push({
+                    ...article,
+                    isInDatabase: false,
+                    isHidden: false,
+                    remarks: null,
+                    geminiAnalysis: null,
+                    analyzingWithGemini: false
+                  });
+                }
+              } else {
+                // Regular users don't have access to News database
+                articlesToAdd.push({
+                  ...article,
+                  isInDatabase: false,
+                  isHidden: false,
+                  remarks: null,
+                  geminiAnalysis: null,
+                  analyzingWithGemini: false
+                });
+              }
+            } catch (error) {
+              console.error('Error checking database for unhidden article:', article.url, error);
+            }
+          }
+        }
+      }
+
+      // Add the newly unhidden articles to the display
+      if (articlesToAdd.length > 0) {
+        setEnrichedArticles([...currentArticles, ...articlesToAdd]);
+      }
     }
   };
 

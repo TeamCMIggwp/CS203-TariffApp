@@ -129,7 +129,7 @@ public class GeminiAnalyzer {
                     "temperature": 0.3,
                     "topK": 40,
                     "topP": 0.95,
-                    "maxOutputTokens": 4096
+                    "maxOutputTokens": 8192
                 }
             }
             """, escapedPrompt);
@@ -147,6 +147,15 @@ public class GeminiAnalyzer {
 
             if (candidatesNode.isArray() && candidatesNode.size() > 0) {
                 JsonNode firstCandidate = candidatesNode.get(0);
+
+                // Check if response was cut off due to MAX_TOKENS
+                String finishReason = firstCandidate.path("finishReason").asText("");
+                if ("MAX_TOKENS".equals(finishReason)) {
+                    logger.warn("Gemini response hit MAX_TOKENS limit. Consider increasing maxOutputTokens.");
+                    return new GeminiResponse(false, null, null,
+                        "Response was cut off due to token limit. Please try with a shorter prompt or increase maxOutputTokens.");
+                }
+
                 JsonNode contentNode = firstCandidate.path("content");
                 JsonNode partsNode = contentNode.path("parts");
 
