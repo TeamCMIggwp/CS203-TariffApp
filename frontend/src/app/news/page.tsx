@@ -129,7 +129,7 @@ export default function NewsPage() {
   const analyzeWithGemini = async (url: string, searchQuery: string): Promise<GeminiAnalysis | null> => {
     try {
       const prompt = `Extract tariff data for: ${searchQuery}. Return ONLY this JSON: {"exporterCountry":"","importerCountry":"","product":"","year":"","tariffRate":""}. No explanations.`;
-      
+
       const response = await fetch(GEMINI_API, {
         method: 'POST',
         headers: {
@@ -233,7 +233,7 @@ export default function NewsPage() {
     setLoading(true);
     setError(false);
     setErrorMessage('');
-    
+
     try {
       // Step 1: Scrape news using GET endpoint with query parameters
       const queryParams = new URLSearchParams({
@@ -264,7 +264,7 @@ export default function NewsPage() {
       }
 
       const scrapedData: ScrapeResponse = await response.json();
-      
+
       // Check if job failed
       if (scrapedData.status === 'FAILED') {
         setErrorMessage('Scraping job failed');
@@ -272,7 +272,7 @@ export default function NewsPage() {
         setLoading(false);
         return;
       }
-      
+
       setNewsData(scrapedData);
 
       // Step 2: Enrich articles with database information
@@ -375,8 +375,8 @@ export default function NewsPage() {
   };
 
   const updateRemarksToDatabase = async (index: number, article: EnrichedArticle) => {
-    const remarksToUpdate = editingRemarks[index] !== undefined 
-      ? editingRemarks[index] 
+    const remarksToUpdate = editingRemarks[index] !== undefined
+      ? editingRemarks[index]
       : (article.remarks || '');
 
     setUpdatingRemarks(prev => ({ ...prev, [index]: true }));
@@ -401,7 +401,7 @@ export default function NewsPage() {
           remarks: remarksToUpdate
         };
         setEnrichedArticles(updatedArticles);
-        
+
         const newEditingRemarks = { ...editingRemarks };
         delete newEditingRemarks[index];
         setEditingRemarks(newEditingRemarks);
@@ -412,7 +412,7 @@ export default function NewsPage() {
         try {
           const errorData = await response.json();
           msg = errorData.message || msg;
-        } catch {}
+        } catch { }
         if (response.status === 401 || response.status === 403) {
           alert(`Failed to update remarks: ${msg}. Please login as an admin user.`);
         } else {
@@ -453,7 +453,7 @@ export default function NewsPage() {
           remarks: remarksToAdd
         };
         setEnrichedArticles(updatedArticles);
-        
+
         const newEditingRemarks = { ...editingRemarks };
         delete newEditingRemarks[index];
         setEditingRemarks(newEditingRemarks);
@@ -464,7 +464,7 @@ export default function NewsPage() {
         try {
           const errorData = await response.json();
           msg = errorData.message || msg;
-        } catch {}
+        } catch { }
         alert(`Failed to add source: ${msg}`);
       }
     } catch (error) {
@@ -507,7 +507,7 @@ export default function NewsPage() {
         try {
           const errorData = await response.json();
           msg = errorData.message || msg;
-        } catch {}
+        } catch { }
         if (response.status === 401 || response.status === 403) {
           alert(`Failed to delete source: ${msg}. Please login as an admin user.`);
         } else {
@@ -548,16 +548,20 @@ export default function NewsPage() {
         });
 
         if (response.ok) {
-          const userHidden = await response.json();
-          // Convert to NewsFromDB format for consistency
-          const hidden = userHidden.map((item: any) => ({
-            newsLink: item.newsLink,
+          type UserHidden = { newsLink: string; hiddenAt: string };
+
+          const userHidden: UserHidden[] = await response.json();
+
+          const hidden: NewsFromDB[] = userHidden.map(({ newsLink, hiddenAt }) => ({
+            newsLink,
             remarks: null,
             isHidden: true,
-            timestamp: item.hiddenAt
+            timestamp: hiddenAt
           }));
+
           setHiddenSources(hidden);
-        } else {
+        }
+        else {
           console.error('Failed to fetch user hidden sources:', response.status);
         }
       }
@@ -619,7 +623,7 @@ export default function NewsPage() {
         try {
           const errorData = await response.json();
           msg = errorData.message || msg;
-        } catch {}
+        } catch { }
         alert(`Failed to hide source: ${msg}`);
       }
     } catch (error) {
@@ -717,7 +721,7 @@ export default function NewsPage() {
         try {
           const errorData = await response.json();
           msg = errorData.message || msg;
-        } catch {}
+        } catch { }
         alert(`Failed to unhide source: ${msg}`);
       }
     } catch (error) {
@@ -883,7 +887,7 @@ export default function NewsPage() {
             <IconAlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-white mb-2">Failed to Load News</h2>
             <p className="text-white/90 mb-4">{errorMessage || 'Unable to fetch tariff news at this time'}</p>
-            <button 
+            <button
               onClick={() => {
                 setError(false);
                 setErrorMessage('');
@@ -918,9 +922,8 @@ export default function NewsPage() {
     <section className="py-20 min-h-screen relative z-10">
       {/* Hidden Sources Panel - Sliding from left */}
       <div
-        className={`fixed top-0 left-0 h-full w-96 bg-black/95 backdrop-blur-xl border-r-2 border-cyan-400/50 shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${
-          showHiddenPanel ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed top-0 left-0 h-full w-96 bg-black/95 backdrop-blur-xl border-r-2 border-cyan-400/50 shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${showHiddenPanel ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         {/* Panel Header */}
         <div className="p-6 border-b-2 border-white/20">
@@ -1036,13 +1039,13 @@ export default function NewsPage() {
       </button>
 
       <div className="max-w-6xl mx-auto px-4">
-        
+
         {/* Header with Search */}
         <div className="text-center mb-10 bg-black/30 backdrop-blur-md p-6 rounded-2xl border border-white/30">
           <h1 className="text-5xl font-extrabold text-white mb-6 drop-shadow-lg">
             Latest Tariff News
           </h1>
-          
+
           {/* Search Form */}
           <form onSubmit={handleSearch} className="max-w-4xl mx-auto mb-6">
             <div className="flex gap-3 mb-4">
@@ -1226,7 +1229,7 @@ export default function NewsPage() {
                         </div>
                         <span className="text-cyan-100 font-bold text-lg">Tariff Analysis (AI-Extracted)</span>
                       </div>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                         {/* Exporter Country */}
                         <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
