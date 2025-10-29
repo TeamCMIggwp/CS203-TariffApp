@@ -481,6 +481,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   const navLinks = React.useMemo(() => {
     const base = [...links];
+    // Hide History when not authenticated
+    if (!isAuth) {
+      const idx = base.findIndex((l) => l.title === "History");
+      if (idx !== -1) base.splice(idx, 1);
+    }
     // Replace Login with My Profile if authenticated
     const loginIdx = base.findIndex((l) => l.title === "Login");
     if (isAuth && loginIdx !== -1) {
