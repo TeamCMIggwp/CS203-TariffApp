@@ -210,12 +210,28 @@ public class AuthService {
     public Map<String, Object> getProfile(String userId) {
         try {
             var m = jdbc.queryForMap("SELECT id, email, name, role FROM accounts.users WHERE id = ?", userId);
-            return Map.of(
-                "userId", (String)m.get("id"),
-                "email", (String)m.get("email"),
-                "name", (String)m.getOrDefault("name", null),
-                "role", (String)m.getOrDefault("role", "user")
-            );
+            boolean googleLinked = false;
+            boolean hasPassword = false;
+            try {
+                Integer cnt = jdbc.queryForObject(
+                    "SELECT COUNT(1) FROM accounts.accounts WHERE user_id = ? AND provider = 'google'",
+                    Integer.class, userId);
+                googleLinked = cnt != null && cnt > 0;
+            } catch (BadSqlGrammarException ignore) {}
+            try {
+                Integer cntPwd = jdbc.queryForObject(
+                    "SELECT COUNT(1) FROM accounts.user_passwords WHERE user_id = ?",
+                    Integer.class, userId);
+                hasPassword = cntPwd != null && cntPwd > 0;
+            } catch (BadSqlGrammarException ignore) {}
+            var out = new java.util.HashMap<String, Object>();
+            out.put("userId", (String)m.get("id"));
+            out.put("email", (String)m.get("email"));
+            out.put("name", (String)m.getOrDefault("name", null));
+            out.put("role", (String)m.getOrDefault("role", "user"));
+            out.put("googleLinked", googleLinked);
+            out.put("hasPassword", hasPassword);
+            return out;
         } catch (EmptyResultDataAccessException e) {
             throw new Unauthorized("User not found");
         }
@@ -223,13 +239,23 @@ public class AuthService {
 
     public Map<String, Object> updateProfile(String userId, String name, String email) {
         int updated = 0;
-        if (email != null && !email.isBlank()) {
+        boolean googleLinked = false;
+        try {
+            Integer cnt = jdbc.queryForObject(
+                "SELECT COUNT(1) FROM accounts.accounts WHERE user_id = ? AND provider = 'google'",
+                Integer.class, userId);
+            googleLinked = cnt != null && cnt > 0;
+        } catch (BadSqlGrammarException ignore) {}
+
+        if (!googleLinked && email != null && !email.isBlank()) {
             // ensure uniqueness
             Integer exists = jdbc.queryForObject("SELECT COUNT(1) FROM accounts.users WHERE LOWER(email)=LOWER(?) AND id<>?", Integer.class, email, userId);
             if (exists != null && exists > 0) {
                 return Map.of("updated", 0, "message", "Email already in use");
             }
             updated += jdbc.update("UPDATE accounts.users SET email = ? WHERE id = ?", email, userId);
+        } else if (googleLinked && email != null && !email.isBlank()) {
+            // Ignore email updates for Google-linked accounts
         }
         if (name != null && !name.isBlank()) {
             try {
@@ -298,8 +324,14 @@ public class AuthService {
         String userId = UUID.randomUUID().toString();
         boolean insertedUser = false;
         try {
-            jdbc.update("INSERT INTO accounts.users (id, email, name, role) VALUES (?, ?, ?, ?)",
-                    userId, req.email(), req.name(), "user");
+            // Try inserting with country_code if column exists
+            try {
+                jdbc.update("INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+                        userId, req.email(), req.name(), req.country(), "user");
+            } catch (BadSqlGrammarException e0) {
+                jdbc.update("INSERT INTO accounts.users (id, email, name, role) VALUES (?, ?, ?, ?)",
+                        userId, req.email(), req.name(), "user");
+            }
             insertedUser = true;
         } catch (BadSqlGrammarException e1) {
             try {

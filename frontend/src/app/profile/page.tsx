@@ -9,10 +9,12 @@ interface ProfileResponse {
   name?: string | null;
   role?: string;
   message?: string;
+  googleLinked?: boolean;
+  hasPassword?: boolean;
 }
 
 export default function ProfilePage() {
-  const [, setProfile] = useState<ProfileResponse | null>(null);
+  const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true);
@@ -47,7 +49,7 @@ export default function ProfilePage() {
           return;
         }
         const data: ProfileResponse = await r.json();
-        setProfile(data);
+  setProfile(data);
         setName(data.name || '');
         setEmail(data.email || '');
         setError(null);
@@ -61,11 +63,14 @@ export default function ProfilePage() {
 
   const saveProfile = async () => {
     setSuccess(null); setError(null);
-    const r = await fetch('/api/profile', { method: 'PUT', headers: { 'content-type': 'application/json' }, credentials: 'include', body: JSON.stringify({ name, email }) });
+    // If Google-linked, do not send email updates
+    const payload: { name?: string; email?: string } = { name };
+    if (!profile?.googleLinked) payload.email = email;
+    const r = await fetch('/api/profile', { method: 'PUT', headers: { 'content-type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload) });
     const data = await r.json().catch(() => ({}));
     if (!r.ok || data?.message) { setError(data?.message || 'Failed to update profile'); return; }
     setSuccess('Profile updated');
-    setProfile((p) => ({ ...(p || {}), name, email }));
+    setProfile((p) => ({ ...(p || {}), name, email: payload.email ?? (p?.email || '') }));
   };
 
   const changePassword = async () => {
@@ -115,7 +120,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Profile form */}
-        <div className="bg-black/50 backdrop-blur-xl rounded-2xl p-8 border-2 border-white/30 mb-8">
+  <div className="bg-black/50 backdrop-blur-xl rounded-2xl p-8 border-2 border-white/30 mb-8">
           {error && (
             <div className="mb-4 text-sm text-red-300">{error}</div>
           )}
@@ -126,7 +131,16 @@ export default function ProfilePage() {
             </div>
             <div>
               <label className="text-white/90 text-sm font-medium flex items-center gap-2 mb-2"><IconMail className="w-5 h-5 text-cyan-300" />Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-2 bg-black/70 border border-white/20 rounded text-white focus:outline-none focus:border-cyan-400/60" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={!!profile?.googleLinked}
+                className={`w-full px-4 py-2 bg-black/70 border border-white/20 rounded text-white focus:outline-none ${profile?.googleLinked ? 'opacity-60 cursor-not-allowed' : 'focus:border-cyan-400/60'}`}
+              />
+              {profile?.googleLinked && (
+                <p className="text-xs text-white/60 mt-1">Email is managed by Google and cannot be changed.</p>
+              )}
             </div>
           </div>
           <div className="mt-6 flex gap-3">
@@ -139,6 +153,7 @@ export default function ProfilePage() {
         {/* Password */}
         <div className="bg-black/50 backdrop-blur-xl rounded-2xl p-8 border-2 border-white/30">
           <h2 className="text-white font-bold text-xl mb-4 flex items-center gap-2"><IconLock className="w-5 h-5 text-cyan-300" />Change Password</h2>
+          {!profile?.googleLinked ? (
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <label className="text-white/90 text-sm font-medium mb-2 block">Current Password</label>
@@ -149,10 +164,15 @@ export default function ProfilePage() {
               <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-2 bg-black/70 border border-white/20 rounded text-white focus:outline-none focus:border-cyan-400/60" />
             </div>
           </div>
+          ) : (
+            <p className="text-white/70">This account is linked with Google. Password changes are not available.</p>
+          )}
+          {!profile?.googleLinked && (
           <div className="mt-6 flex gap-3">
             <button onClick={changePassword} className="bg-cyan-500/30 hover:bg-cyan-500/40 text-cyan-100 font-bold px-6 py-2 rounded-xl border-2 border-cyan-400/40">Update Password</button>
             {pwdMsg && <span className="text-white/90">{pwdMsg}</span>}
           </div>
+          )}
         </div>
       </div>
     </section>
