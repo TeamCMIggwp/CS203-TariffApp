@@ -1,9 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 export default function BridgeRefreshPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="rounded-xl border border-cyan-400/40 bg-white/80 backdrop-blur-md shadow-lg p-6 text-slate-900">
+          <div className="font-semibold text-slate-800">Preparing…</div>
+        </div>
+      </div>
+    }>
+      <BridgeRefreshInner />
+    </Suspense>
+  );
+}
+
+function BridgeRefreshInner() {
   const search = useSearchParams();
   const router = useRouter();
   const accessToken = search.get("accessToken");
