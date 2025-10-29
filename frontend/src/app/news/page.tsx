@@ -86,20 +86,42 @@ export default function NewsPage() {
   const GEMINI_API = `${API_BASE}/api/v1/gemini/analyses`
 
   /**
+   * Get access token from cookie
+   */
+  const getAccessToken = (): string | null => {
+    try {
+      const cookies = document.cookie.split(';');
+      const accessTokenCookie = cookies.find(c => c.trim().startsWith('access_token='));
+      if (!accessTokenCookie) return null;
+      return accessTokenCookie.split('=')[1];
+    } catch (error) {
+      console.error('Error getting access token:', error);
+      return null;
+    }
+  };
+
+  /**
+   * Get authorization headers for API requests
+   */
+  const getAuthHeaders = (): HeadersInit => {
+    const token = getAccessToken();
+    if (!token) return {};
+    return {
+      'Authorization': `Bearer ${token}`
+    };
+  };
+
+  /**
    * Extract user role from JWT token
    */
   const checkUserRole = () => {
     try {
-      // Get access token from cookie
-      const cookies = document.cookie.split(';');
-      const accessTokenCookie = cookies.find(c => c.trim().startsWith('access_token='));
+      const token = getAccessToken();
 
-      if (!accessTokenCookie) {
+      if (!token) {
         setIsAdmin(false);
         return;
       }
-
-      const token = accessTokenCookie.split('=')[1];
 
       // Decode JWT (simple base64 decode of payload)
       const payload = JSON.parse(atob(token.split('.')[1]));
@@ -544,7 +566,7 @@ export default function NewsPage() {
         // Regular user: Fetch from UserHiddenSources table (personal)
         const response = await fetch(USER_HIDDEN_API, {
           method: 'GET',
-          credentials: 'include',
+          headers: getAuthHeaders(),
           cache: 'no-store'
         });
 
@@ -594,15 +616,15 @@ export default function NewsPage() {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
+            ...getAuthHeaders()
           },
-          credentials: 'include',
           cache: 'no-store'
         });
       } else {
         // Regular user: Use UserHiddenSources endpoint (personal)
         response = await fetch(`${USER_HIDDEN_API}/hide?newsLink=${encodeURIComponent(article.url)}`, {
           method: 'POST',
-          credentials: 'include',
+          headers: getAuthHeaders(),
           cache: 'no-store'
         });
       }
@@ -653,15 +675,14 @@ export default function NewsPage() {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
+            ...getAuthHeaders()
           },
-          credentials: 'include',
           cache: 'no-store'
         });
       } else {
-        // Regular user: Use UserHiddenSources delete endpoint
+        // Regular user: Use UserHiddenSources delete endpoint (no auth required)
         response = await fetch(`${USER_HIDDEN_API}/unhide?newsLink=${encodeURIComponent(newsLink)}`, {
           method: 'DELETE',
-          credentials: 'include',
           cache: 'no-store'
         });
       }
@@ -757,8 +778,8 @@ export default function NewsPage() {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
+              ...getAuthHeaders()
             },
-            credentials: 'include',
             cache: 'no-store'
           })
         );
@@ -787,10 +808,9 @@ export default function NewsPage() {
         await refreshUnhiddenArticles(unhiddenUrls);
 
       } else {
-        // Regular user: Use single DELETE endpoint to unhide all
+        // Regular user: Use single DELETE endpoint to unhide all (no auth required)
         const response = await fetch(`${USER_HIDDEN_API}/unhide-all`, {
           method: 'DELETE',
-          credentials: 'include',
           cache: 'no-store'
         });
 

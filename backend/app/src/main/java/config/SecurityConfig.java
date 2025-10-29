@@ -73,6 +73,11 @@ public class SecurityConfig {
 				// Scraping Jobs
 				.requestMatchers(HttpMethod.GET, "/api/v1/scrape").permitAll()
 
+				// User Hidden Sources - hide requires authentication, unhide is open
+				.requestMatchers(HttpMethod.POST, "/api/v1/user/hidden-sources/hide").authenticated()
+				.requestMatchers(HttpMethod.GET, "/api/v1/user/hidden-sources").authenticated()
+				.requestMatchers(HttpMethod.DELETE, "/api/v1/user/hidden-sources/**").permitAll()
+
 				// Everything else requires authentication
 				.anyRequest().authenticated()
 			)
