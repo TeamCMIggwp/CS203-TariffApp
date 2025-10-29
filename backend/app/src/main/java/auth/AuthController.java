@@ -120,6 +120,47 @@ public class AuthController {
         ));
     }
 
+    /**
+     * Refresh bridge for cross-site deployments: performs refresh on backend domain and redirects back
+     * to a frontend callback carrying only short-lived access info as query params.
+     * Example redirect: {frontend}/bridge/refresh?accessToken=...&ttl=900&returnTo={original}
+     */
+    @GetMapping("/refresh-bridge")
+    public void refreshBridge(
+        @CookieValue(name = "refresh_token", required = false) String refreshToken,
+        @RequestParam(name = "returnTo", defaultValue = "/") String returnTo,
+        HttpServletResponse res
+    ) throws java.io.IOException {
+        String safeReturnTo = returnTo;
+        try {
+            // Basic safety: only allow http/https URLs; otherwise treat as path
+            java.net.URI uri = new java.net.URI(returnTo);
+            if (uri.getScheme() == null || (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme()))) {
+                safeReturnTo = frontendBase + (returnTo.startsWith("/") ? returnTo : "/");
+            }
+        } catch (Exception ignore) {
+            safeReturnTo = frontendBase + (returnTo.startsWith("/") ? returnTo : "/");
+        }
+
+        if (refreshToken == null || refreshToken.isBlank()) {
+            res.setStatus(303);
+            res.setHeader("Location", frontendBase + "/login?reason=session_expired&returnTo=" + java.net.URLEncoder.encode(safeReturnTo, java.nio.charset.StandardCharsets.UTF_8));
+            return;
+        }
+        try {
+            AuthService.LoginResult result = authService.refresh(refreshToken);
+            setRefreshCookie(res, result.refreshToken(), result.refreshTtlSeconds());
+            String callback = frontendBase + "/bridge/refresh?accessToken=" + java.net.URLEncoder.encode(result.accessToken(), java.nio.charset.StandardCharsets.UTF_8)
+                + "&ttl=" + result.refreshTtlSeconds()
+                + "&returnTo=" + java.net.URLEncoder.encode(safeReturnTo, java.nio.charset.StandardCharsets.UTF_8);
+            res.setStatus(303);
+            res.setHeader("Location", callback);
+        } catch (AuthService.Unauthorized ex) {
+            res.setStatus(303);
+            res.setHeader("Location", frontendBase + "/login?reason=session_expired&returnTo=" + java.net.URLEncoder.encode(safeReturnTo, java.nio.charset.StandardCharsets.UTF_8));
+        }
+    }
+
     // Optional: support redirect-based refresh from backend directly
     @GetMapping("/refresh")
     public void refreshRedirect(@CookieValue(name = "refresh_token", required = false) String refreshToken,

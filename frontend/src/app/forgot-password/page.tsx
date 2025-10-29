@@ -70,7 +70,7 @@ export default function ForgotPasswordPage() {
               {!status && (
                 <span className="text-white/70 text-sm flex items-center gap-2">
                   <IconAlertCircle className="w-4 h-4 text-white/50" />
-                  We wont disclose whether an email exists.
+                  We won’t disclose whether an email exists.
                 </span>
               )}
             </div>
