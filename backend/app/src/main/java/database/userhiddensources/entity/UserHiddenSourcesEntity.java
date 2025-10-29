@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 public class UserHiddenSourcesEntity {
 
     private Integer id;
-    private String userEmail;
+    private String userId;
     private String newsLink;
     private LocalDateTime hiddenAt;
 
@@ -19,12 +19,12 @@ public class UserHiddenSourcesEntity {
         this.id = id;
     }
 
-    public String getUserEmail() {
-        return userEmail;
+    public String getUserId() {
+        return userId;
     }
 
-    public void setUserEmail(String userEmail) {
-        this.userEmail = userEmail;
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 
     public String getNewsLink() {
@@ -47,7 +47,7 @@ public class UserHiddenSourcesEntity {
     public String toString() {
         return "UserHiddenSourcesEntity{" +
                 "id=" + id +
-                ", userEmail='" + userEmail + '\'' +
+                ", userId='" + userId + '\'' +
                 ", newsLink='" + newsLink + '\'' +
                 ", hiddenAt=" + hiddenAt +
                 '}';

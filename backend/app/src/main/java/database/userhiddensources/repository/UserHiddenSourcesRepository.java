@@ -23,10 +23,10 @@ public class UserHiddenSourcesRepository {
     /**
      * Check if user has hidden a specific source
      */
-    public boolean isHiddenByUser(String userEmail, String newsLink) {
+    public boolean isHiddenByUser(String userId, String newsLink) {
         try {
-            String sql = "SELECT COUNT(*) FROM UserHiddenSources WHERE user_email = ? AND news_link = ?";
-            Integer count = jdbcTemplate.queryForObject(sql, Integer.class, userEmail, newsLink);
+            String sql = "SELECT COUNT(*) FROM UserHiddenSources WHERE user_id = ? AND news_link = ?";
+            Integer count = jdbcTemplate.queryForObject(sql, Integer.class, userId, newsLink);
             return count != null && count > 0;
         } catch (DataAccessException e) {
             logger.error("Error checking if source is hidden by user: {}", e.getMessage(), e);
@@ -37,26 +37,26 @@ public class UserHiddenSourcesRepository {
     /**
      * Get all hidden sources for a user
      */
-    public List<UserHiddenSourcesEntity> getAllHiddenSourcesByUser(String userEmail) {
+    public List<UserHiddenSourcesEntity> getAllHiddenSourcesByUser(String userId) {
         try {
-            logger.debug("Querying hidden sources for user: {}", userEmail);
+            logger.debug("Querying hidden sources for user: {}", userId);
 
-            String sql = "SELECT id, user_email, news_link, hidden_at FROM UserHiddenSources WHERE user_email = ? ORDER BY hidden_at DESC";
+            String sql = "SELECT id, user_id, news_link, hidden_at FROM UserHiddenSources WHERE user_id = ? ORDER BY hidden_at DESC";
 
             return jdbcTemplate.query(sql, (rs, rowNum) -> {
                 UserHiddenSourcesEntity entity = new UserHiddenSourcesEntity();
                 entity.setId(rs.getInt("id"));
-                entity.setUserEmail(rs.getString("user_email"));
+                entity.setUserId(rs.getString("user_id"));
                 entity.setNewsLink(rs.getString("news_link"));
                 Timestamp timestamp = rs.getTimestamp("hidden_at");
                 if (timestamp != null) {
                     entity.setHiddenAt(timestamp.toLocalDateTime());
                 }
                 return entity;
-            }, userEmail);
+            }, userId);
 
         } catch (DataAccessException e) {
-            logger.error("Database error while retrieving hidden sources for user: {}", userEmail, e);
+            logger.error("Database error while retrieving hidden sources for user: {}", userId, e);
             throw e;
         }
     }
@@ -64,14 +64,14 @@ public class UserHiddenSourcesRepository {
     /**
      * Hide a source for a user
      */
-    public void hideSource(String userEmail, String newsLink) {
+    public void hideSource(String userId, String newsLink) {
         try {
-            logger.info("Hiding source for user: userEmail={}, newsLink={}", userEmail, newsLink);
+            logger.info("Hiding source for user: userId={}, newsLink={}", userId, newsLink);
 
-            String sql = "INSERT INTO UserHiddenSources (user_email, news_link) VALUES (?, ?) " +
+            String sql = "INSERT INTO UserHiddenSources (user_id, news_link) VALUES (?, ?) " +
                         "ON DUPLICATE KEY UPDATE hidden_at = CURRENT_TIMESTAMP";
 
-            int rowsInserted = jdbcTemplate.update(sql, userEmail, newsLink);
+            int rowsInserted = jdbcTemplate.update(sql, userId, newsLink);
 
             logger.info("Successfully hidden source, rows affected: {}", rowsInserted);
 
@@ -84,13 +84,13 @@ public class UserHiddenSourcesRepository {
     /**
      * Unhide a source for a user
      */
-    public int unhideSource(String userEmail, String newsLink) {
+    public int unhideSource(String userId, String newsLink) {
         try {
-            logger.info("Unhiding source for user: userEmail={}, newsLink={}", userEmail, newsLink);
+            logger.info("Unhiding source for user: userId={}, newsLink={}", userId, newsLink);
 
-            String sql = "DELETE FROM UserHiddenSources WHERE user_email = ? AND news_link = ?";
+            String sql = "DELETE FROM UserHiddenSources WHERE user_id = ? AND news_link = ?";
 
-            int rowsDeleted = jdbcTemplate.update(sql, userEmail, newsLink);
+            int rowsDeleted = jdbcTemplate.update(sql, userId, newsLink);
 
             logger.info("Deleted {} rows", rowsDeleted);
             return rowsDeleted;
@@ -104,13 +104,13 @@ public class UserHiddenSourcesRepository {
     /**
      * Unhide all sources for a user
      */
-    public int unhideAllSources(String userEmail) {
+    public int unhideAllSources(String userId) {
         try {
-            logger.info("Unhiding all sources for user: {}", userEmail);
+            logger.info("Unhiding all sources for user: {}", userId);
 
-            String sql = "DELETE FROM UserHiddenSources WHERE user_email = ?";
+            String sql = "DELETE FROM UserHiddenSources WHERE user_id = ?";
 
-            int rowsDeleted = jdbcTemplate.update(sql, userEmail);
+            int rowsDeleted = jdbcTemplate.update(sql, userId);
 
             logger.info("Deleted {} rows", rowsDeleted);
             return rowsDeleted;

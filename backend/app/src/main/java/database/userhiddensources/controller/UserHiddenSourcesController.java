@@ -31,12 +31,14 @@ public class UserHiddenSourcesController {
     private UserHiddenSourcesService service;
 
     /**
-     * Get user email from JWT token
+     * Get user identifier from JWT token
+     * Note: authentication.getName() returns the userId (not email) from the JWT
+     * We use userId as the identifier since it's unique and consistent
      */
-    private String getUserEmail() {
+    private String getUserIdentifier() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated()) {
-            return authentication.getName(); // This should be the email from JWT
+            return authentication.getName(); // This returns userId from JWT
         }
         throw new RuntimeException("User not authenticated");
     }
@@ -62,10 +64,10 @@ public class UserHiddenSourcesController {
             @Parameter(description = "News article URL to hide", example = "https://www.wto.org/article", required = true)
             @RequestParam @NotBlank String newsLink) {
 
-        String userEmail = getUserEmail();
-        logger.info("POST /api/v1/user/hidden-sources/hide - User: {}, newsLink: {}", userEmail, newsLink);
+        String userId = getUserIdentifier();
+        logger.info("POST /api/v1/user/hidden-sources/hide - User: {}, newsLink: {}", userId, newsLink);
 
-        HiddenSourceResponse response = service.hideSourceForUser(userEmail, newsLink);
+        HiddenSourceResponse response = service.hideSourceForUser(userId, newsLink);
         return ResponseEntity.ok(response);
     }
 
@@ -89,10 +91,10 @@ public class UserHiddenSourcesController {
             @Parameter(description = "News article URL to unhide", example = "https://www.wto.org/article", required = true)
             @RequestParam @NotBlank String newsLink) {
 
-        String userEmail = getUserEmail();
-        logger.info("DELETE /api/v1/user/hidden-sources/unhide - User: {}, newsLink: {}", userEmail, newsLink);
+        String userId = getUserIdentifier();
+        logger.info("DELETE /api/v1/user/hidden-sources/unhide - User: {}, newsLink: {}", userId, newsLink);
 
-        service.unhideSourceForUser(userEmail, newsLink);
+        service.unhideSourceForUser(userId, newsLink);
         return ResponseEntity.noContent().build();
     }
 
@@ -115,10 +117,10 @@ public class UserHiddenSourcesController {
     @DeleteMapping("/unhide-all")
     public ResponseEntity<String> unhideAllSources() {
 
-        String userEmail = getUserEmail();
-        logger.info("DELETE /api/v1/user/hidden-sources/unhide-all - User: {}", userEmail);
+        String userId = getUserIdentifier();
+        logger.info("DELETE /api/v1/user/hidden-sources/unhide-all - User: {}", userId);
 
-        int count = service.unhideAllSourcesForUser(userEmail);
+        int count = service.unhideAllSourcesForUser(userId);
         return ResponseEntity.ok(String.format("Unhidden %d sources", count));
     }
 
@@ -141,10 +143,10 @@ public class UserHiddenSourcesController {
     @GetMapping
     public ResponseEntity<List<HiddenSourceResponse>> getHiddenSources() {
 
-        String userEmail = getUserEmail();
-        logger.info("GET /api/v1/user/hidden-sources - User: {}", userEmail);
+        String userId = getUserIdentifier();
+        logger.info("GET /api/v1/user/hidden-sources - User: {}", userId);
 
-        List<HiddenSourceResponse> response = service.getHiddenSourcesForUser(userEmail);
+        List<HiddenSourceResponse> response = service.getHiddenSourcesForUser(userId);
         return ResponseEntity.ok(response);
     }
 }

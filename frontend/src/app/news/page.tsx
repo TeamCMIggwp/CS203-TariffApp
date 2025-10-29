@@ -82,7 +82,7 @@ export default function NewsPage() {
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
   // Proxied path that goes through Next.js so middleware can inject Authorization from access_token cookie
   const NEWS_API = '/api/v1/news'
-  const USER_HIDDEN_API = '/api/v1/user/hidden-sources'
+  const USER_HIDDEN_API = `${API_BASE}/api/v1/user/hidden-sources`
   const GEMINI_API = `${API_BASE}/api/v1/gemini/analyses`
 
   /**
@@ -544,6 +544,7 @@ export default function NewsPage() {
         // Regular user: Fetch from UserHiddenSources table (personal)
         const response = await fetch(USER_HIDDEN_API, {
           method: 'GET',
+          credentials: 'include',
           cache: 'no-store'
         });
 
@@ -594,12 +595,14 @@ export default function NewsPage() {
           headers: {
             'Content-Type': 'application/json',
           },
+          credentials: 'include',
           cache: 'no-store'
         });
       } else {
         // Regular user: Use UserHiddenSources endpoint (personal)
         response = await fetch(`${USER_HIDDEN_API}/hide?newsLink=${encodeURIComponent(article.url)}`, {
           method: 'POST',
+          credentials: 'include',
           cache: 'no-store'
         });
       }
@@ -651,12 +654,14 @@ export default function NewsPage() {
           headers: {
             'Content-Type': 'application/json',
           },
+          credentials: 'include',
           cache: 'no-store'
         });
       } else {
         // Regular user: Use UserHiddenSources delete endpoint
         response = await fetch(`${USER_HIDDEN_API}/unhide?newsLink=${encodeURIComponent(newsLink)}`, {
           method: 'DELETE',
+          credentials: 'include',
           cache: 'no-store'
         });
       }
@@ -753,6 +758,7 @@ export default function NewsPage() {
             headers: {
               'Content-Type': 'application/json',
             },
+            credentials: 'include',
             cache: 'no-store'
           })
         );
@@ -784,6 +790,7 @@ export default function NewsPage() {
         // Regular user: Use single DELETE endpoint to unhide all
         const response = await fetch(`${USER_HIDDEN_API}/unhide-all`, {
           method: 'DELETE',
+          credentials: 'include',
           cache: 'no-store'
         });
 
