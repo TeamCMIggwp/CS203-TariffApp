@@ -149,6 +149,11 @@ export default function NewsPage() {
     checkUserRole();
   }, []);
 
+  // Fetch hidden sources count when isAdmin is determined
+  useEffect(() => {
+    fetchHiddenSources();
+  }, [isAdmin]);
+
   /**
    * Call Gemini API to analyze a tariff article
    */
@@ -1149,7 +1154,7 @@ export default function NewsPage() {
               <div className="mt-4 bg-black/40 backdrop-blur-md p-3 rounded-xl border border-white/30">
                 <p className="text-white/90 font-medium">
                   Scraped {newsData.sourcesScraped} of {newsData.totalSourcesFound} sources
-                  {enrichedArticles.length > 0 && (
+                  {isAdmin && enrichedArticles.length > 0 && (
                     <>
                       {' • '}
                       <span className="text-green-300">
@@ -1448,10 +1453,14 @@ export default function NewsPage() {
               <p className="text-white/90 font-medium">
                 Scraped {newsData.sourcesScraped} of {newsData.totalSourcesFound} sources
                 {newsData.meta.minYear && <span className="text-cyan-300"> • Filtered from {newsData.meta.minYear}</span>}
-                {' • '}
-                <span className="text-green-300">
-                  {enrichedArticles.filter(a => a.isInDatabase).length} already in database
-                </span>
+                {isAdmin && (
+                  <>
+                    {' • '}
+                    <span className="text-green-300">
+                      {enrichedArticles.filter(a => a.isInDatabase).length} already in database
+                    </span>
+                  </>
+                )}
               </p>
               {Object.keys(newsData.errors).length > 0 && (
                 <p className="text-yellow-300 mt-2 font-semibold">
