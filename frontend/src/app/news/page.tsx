@@ -104,14 +104,14 @@ export default function NewsPage() {
       // Decode JWT (simple base64 decode of payload)
       const payload = JSON.parse(atob(token.split('.')[1]));
 
-      // Check if user has ADMIN role
-      const roles = payload.roles || payload.authorities || [];
-      const hasAdminRole = roles.some((role: string) =>
-        role === 'ADMIN' || role === 'ROLE_ADMIN' || role.toUpperCase().includes('ADMIN')
-      );
+      // Check if user has ADMIN role (JWT has single "role" field, not array)
+      const role = payload.role || 'user';
+      const hasAdminRole = role.toLowerCase() === 'admin' ||
+                          role.toLowerCase() === 'administrator' ||
+                          role.toUpperCase() === 'ROLE_ADMIN';
 
       setIsAdmin(hasAdminRole);
-      console.log('User role check - isAdmin:', hasAdminRole, 'roles:', roles);
+      console.log('User role check - isAdmin:', hasAdminRole, 'role:', role, 'payload:', payload);
     } catch (error) {
       console.error('Error checking user role:', error);
       setIsAdmin(false);
@@ -1172,12 +1172,12 @@ export default function NewsPage() {
                           {article.title}
                         </h2>
                         <div className="flex items-center gap-3 flex-shrink-0">
-                          {article.isInDatabase && (
+                          {isAdmin && article.isInDatabase && (
                             <span className="bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-xs font-semibold border border-green-400/40">
                               ✓ In Database
                             </span>
                           )}
-                          {article.isInDatabase && !article.geminiAnalysis && !article.analyzingWithGemini && (
+                          {isAdmin && article.isInDatabase && !article.geminiAnalysis && !article.analyzingWithGemini && (
                             <button
                               onClick={() => runGeminiAnalysisForArticle(index, article)}
                               disabled={runningGeminiAnalysis[index]}
@@ -1211,8 +1211,8 @@ export default function NewsPage() {
                     </div>
                   </div>
 
-                  {/* Gemini Analysis Results */}
-                  {article.analyzingWithGemini && (
+                  {/* Gemini Analysis Results - Admin Only */}
+                  {isAdmin && article.analyzingWithGemini && (
                     <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-2 border-purple-400/40 rounded-xl p-6 mb-6 shadow-lg">
                       <div className="flex items-center gap-3 mb-2">
                         <div className="w-6 h-6 border-3 border-purple-300/30 border-t-purple-300 rounded-full animate-spin"></div>
@@ -1221,7 +1221,7 @@ export default function NewsPage() {
                     </div>
                   )}
 
-                  {article.geminiAnalysis && !article.analyzingWithGemini && (
+                  {isAdmin && article.geminiAnalysis && !article.analyzingWithGemini && (
                     <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-2 border-cyan-400/50 rounded-xl p-6 mb-6 shadow-lg">
                       <div className="flex items-center gap-3 mb-4">
                         <div className="bg-cyan-400/30 p-2 rounded-lg">
@@ -1338,75 +1338,77 @@ export default function NewsPage() {
                       </button>
                     </div>
 
-                    {/* Remarks Section */}
-                    <div className="flex-1 min-w-0 flex flex-col gap-2">
-                      {article.isInDatabase ? (
-                        <>
-                          <textarea
-                            value={editingRemarks[index] !== undefined ? editingRemarks[index] : (article.remarks || '')}
-                            onChange={(e) => handleRemarksChange(index, e.target.value)}
-                            placeholder="No remarks added yet"
-                            className="flex-1 bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-4 text-yellow-100 text-sm placeholder-yellow-300/50 focus:outline-none focus:border-yellow-400/60 transition-all resize-none min-h-[100px]"
-                          />
-                          <div className="flex gap-2 self-end">
+                    {/* Remarks Section - Admin Only */}
+                    {isAdmin && (
+                      <div className="flex-1 min-w-0 flex flex-col gap-2">
+                        {article.isInDatabase ? (
+                          <>
+                            <textarea
+                              value={editingRemarks[index] !== undefined ? editingRemarks[index] : (article.remarks || '')}
+                              onChange={(e) => handleRemarksChange(index, e.target.value)}
+                              placeholder="No remarks added yet"
+                              className="flex-1 bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-4 text-yellow-100 text-sm placeholder-yellow-300/50 focus:outline-none focus:border-yellow-400/60 transition-all resize-none min-h-[100px]"
+                            />
+                            <div className="flex gap-2 self-end">
+                              <button
+                                onClick={() => updateRemarksToDatabase(index, article)}
+                                disabled={updatingRemarks[index]}
+                                className="bg-yellow-500/20 hover:bg-yellow-500/30 disabled:bg-gray-500/20 text-yellow-300 hover:text-yellow-100 disabled:text-gray-400 font-bold px-6 py-2 rounded-lg border border-yellow-400/40 hover:border-yellow-300 disabled:border-gray-400/40 transition-all duration-200 disabled:cursor-not-allowed"
+                              >
+                                {updatingRemarks[index] ? (
+                                  <>
+                                    <div className="inline-block w-4 h-4 border-2 border-yellow-300/30 border-t-yellow-300 rounded-full animate-spin mr-2"></div>
+                                    Updating...
+                                  </>
+                                ) : (
+                                  'Update remarks'
+                                )}
+                              </button>
+                              <button
+                                onClick={() => deleteSourceFromDatabase(index, article)}
+                                disabled={deletingFromDatabase[index]}
+                                className="bg-red-500/20 hover:bg-red-500/30 disabled:bg-gray-500/20 text-red-300 hover:text-red-100 disabled:text-gray-400 font-bold px-6 py-2 rounded-lg border border-red-400/40 hover:border-red-300 disabled:border-gray-400/40 transition-all duration-200 disabled:cursor-not-allowed flex items-center gap-2"
+                              >
+                                {deletingFromDatabase[index] ? (
+                                  <>
+                                    <div className="inline-block w-4 h-4 border-2 border-red-300/30 border-t-red-300 rounded-full animate-spin"></div>
+                                    Deleting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <IconTrash className="w-4 h-4" />
+                                    Delete from database
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <textarea
+                              value={editingRemarks[index] || ''}
+                              onChange={(e) => handleRemarksChange(index, e.target.value)}
+                              placeholder="Add remarks (optional)"
+                              className="flex-1 bg-white/5 border border-white/20 rounded-lg p-4 text-white/90 text-sm placeholder-white/40 focus:outline-none focus:border-cyan-400/60 transition-all resize-none min-h-[100px]"
+                            />
                             <button
-                              onClick={() => updateRemarksToDatabase(index, article)}
-                              disabled={updatingRemarks[index]}
-                              className="bg-yellow-500/20 hover:bg-yellow-500/30 disabled:bg-gray-500/20 text-yellow-300 hover:text-yellow-100 disabled:text-gray-400 font-bold px-6 py-2 rounded-lg border border-yellow-400/40 hover:border-yellow-300 disabled:border-gray-400/40 transition-all duration-200 disabled:cursor-not-allowed"
+                              onClick={() => addSourceToDatabase(index, article)}
+                              disabled={addingToDatabase[index]}
+                              className="self-end bg-cyan-500/20 hover:bg-cyan-500/30 disabled:bg-gray-500/20 text-cyan-300 hover:text-cyan-100 disabled:text-gray-400 font-bold px-6 py-2 rounded-lg border border-cyan-400/40 hover:border-cyan-300 disabled:border-gray-400/40 transition-all duration-200 disabled:cursor-not-allowed"
                             >
-                              {updatingRemarks[index] ? (
+                              {addingToDatabase[index] ? (
                                 <>
-                                  <div className="inline-block w-4 h-4 border-2 border-yellow-300/30 border-t-yellow-300 rounded-full animate-spin mr-2"></div>
-                                  Updating...
+                                  <div className="inline-block w-4 h-4 border-2 border-cyan-300/30 border-t-cyan-300 rounded-full animate-spin mr-2"></div>
+                                  Adding...
                                 </>
                               ) : (
-                                'Update remarks'
+                                'Add source to database'
                               )}
                             </button>
-                            <button
-                              onClick={() => deleteSourceFromDatabase(index, article)}
-                              disabled={deletingFromDatabase[index]}
-                              className="bg-red-500/20 hover:bg-red-500/30 disabled:bg-gray-500/20 text-red-300 hover:text-red-100 disabled:text-gray-400 font-bold px-6 py-2 rounded-lg border border-red-400/40 hover:border-red-300 disabled:border-gray-400/40 transition-all duration-200 disabled:cursor-not-allowed flex items-center gap-2"
-                            >
-                              {deletingFromDatabase[index] ? (
-                                <>
-                                  <div className="inline-block w-4 h-4 border-2 border-red-300/30 border-t-red-300 rounded-full animate-spin"></div>
-                                  Deleting...
-                                </>
-                              ) : (
-                                <>
-                                  <IconTrash className="w-4 h-4" />
-                                  Delete from database
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <textarea
-                            value={editingRemarks[index] || ''}
-                            onChange={(e) => handleRemarksChange(index, e.target.value)}
-                            placeholder="Add remarks (optional)"
-                            className="flex-1 bg-white/5 border border-white/20 rounded-lg p-4 text-white/90 text-sm placeholder-white/40 focus:outline-none focus:border-cyan-400/60 transition-all resize-none min-h-[100px]"
-                          />
-                          <button
-                            onClick={() => addSourceToDatabase(index, article)}
-                            disabled={addingToDatabase[index]}
-                            className="self-end bg-cyan-500/20 hover:bg-cyan-500/30 disabled:bg-gray-500/20 text-cyan-300 hover:text-cyan-100 disabled:text-gray-400 font-bold px-6 py-2 rounded-lg border border-cyan-400/40 hover:border-cyan-300 disabled:border-gray-400/40 transition-all duration-200 disabled:cursor-not-allowed"
-                          >
-                            {addingToDatabase[index] ? (
-                              <>
-                                <div className="inline-block w-4 h-4 border-2 border-cyan-300/30 border-t-cyan-300 rounded-full animate-spin mr-2"></div>
-                                Adding...
-                              </>
-                            ) : (
-                              'Add source to database'
-                            )}
-                          </button>
-                        </>
-                      )}
-                    </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
