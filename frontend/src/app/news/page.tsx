@@ -108,38 +108,65 @@ export default function NewsPage() {
       }
 
       const result = await response.json();
-      
+      console.log('Gemini API raw response:', result);
+
       // Parse the Gemini response - it should return JSON
       // Handle different possible response formats
       let analysis: GeminiAnalysis;
-      
-      if (typeof result === 'string') {
+
+      // Check if it's an AnalysisResponse object with success field
+      if (result.success !== undefined && result.analysis !== undefined) {
+        console.log('Detected AnalysisResponse format');
+        const analysisData = result.analysis;
+
+        // If analysis is a string, try to parse JSON from it
+        if (typeof analysisData === 'string') {
+          const jsonMatch = analysisData.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            analysis = JSON.parse(jsonMatch[0]);
+          } else {
+            console.error('Could not extract JSON from analysis string:', analysisData);
+            return null;
+          }
+        } else if (typeof analysisData === 'object') {
+          // If it's already an object, use it directly
+          analysis = analysisData;
+        } else {
+          console.error('Unexpected analysis data type:', typeof analysisData);
+          return null;
+        }
+      } else if (typeof result === 'string') {
         // If response is a string, try to parse it
         const jsonMatch = result.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           analysis = JSON.parse(jsonMatch[0]);
         } else {
+          console.error('Could not extract JSON from string response');
           return null;
         }
       } else if (result.exporterCountry !== undefined) {
         // If response is already an object with the right structure
         analysis = result;
-      } else if (result.response || result.analysis || result.result) {
+      } else if (result.response || result.result) {
         // If response is wrapped in another object
-        const innerData = result.response || result.analysis || result.result;
+        const innerData = result.response || result.result;
         if (typeof innerData === 'string') {
           const jsonMatch = innerData.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             analysis = JSON.parse(jsonMatch[0]);
           } else {
+            console.error('Could not extract JSON from wrapped response');
             return null;
           }
         } else {
           analysis = innerData;
         }
       } else {
+        console.error('Unknown response format:', result);
         return null;
       }
+
+      console.log('Parsed analysis:', analysis);
 
       return {
         exporterCountry: analysis.exporterCountry || null,
@@ -499,6 +526,14 @@ export default function NewsPage() {
         const updatedArticles = enrichedArticles.filter((_, i) => i !== index);
         setEnrichedArticles(updatedArticles);
 
+        // Update hidden sources count by adding this source to the list
+        setHiddenSources(prev => [...prev, {
+          newsLink: article.url,
+          remarks: null,
+          isHidden: true,
+          timestamp: new Date().toISOString()
+        }]);
+
         alert('Source hidden successfully! It will no longer appear in search results.');
       } else {
         let msg = `HTTP ${response.status}`;
@@ -554,6 +589,52 @@ export default function NewsPage() {
     }
   };
 
+  const unhideAllSources = async () => {
+    if (hiddenSources.length === 0) {
+      alert('No hidden sources to unhide.');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to unhide all ${hiddenSources.length} sources? They will all appear in future searches.`)) {
+      return;
+    }
+
+    setLoadingHiddenSources(true);
+
+    try {
+      // Unhide all sources in parallel
+      const unhidePromises = hiddenSources.map(source =>
+        fetch(`${API_BASE}/api/v1/news/unhide?newsLink=${encodeURIComponent(source.newsLink)}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-store'
+        })
+      );
+
+      const results = await Promise.allSettled(unhidePromises);
+
+      // Count successes and failures
+      const successCount = results.filter(r => r.status === 'fulfilled' && r.value.ok).length;
+      const failCount = results.length - successCount;
+
+      // Clear all hidden sources
+      setHiddenSources([]);
+
+      if (failCount === 0) {
+        alert(`Successfully unhidden all ${successCount} sources!`);
+      } else {
+        alert(`Unhidden ${successCount} sources. ${failCount} failed.`);
+      }
+    } catch (error) {
+      console.error('Error unhiding all sources:', error);
+      alert('Failed to unhide all sources. Please try again.');
+    } finally {
+      setLoadingHiddenSources(false);
+    }
+  };
+
   // Error state
   if (error) {
     return (
@@ -603,23 +684,43 @@ export default function NewsPage() {
         }`}
       >
         {/* Panel Header */}
-        <div className="flex items-center justify-between p-6 border-b-2 border-white/20">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <IconAlertCircle className="w-6 h-6 text-cyan-300" />
-            Hidden Sources
-          </h2>
-          <button
-            onClick={() => setShowHiddenPanel(false)}
-            className="text-white/70 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+        <div className="p-6 border-b-2 border-white/20">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+              <IconAlertCircle className="w-6 h-6 text-cyan-300" />
+              Hidden Sources
+            </h2>
+            <button
+              onClick={() => setShowHiddenPanel(false)}
+              className="text-white/70 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Unhide All Button */}
+          {hiddenSources.length > 0 && (
+            <button
+              onClick={unhideAllSources}
+              disabled={loadingHiddenSources}
+              className="w-full bg-gradient-to-r from-orange-500/20 to-red-500/20 hover:from-orange-500/30 hover:to-red-500/30 disabled:from-gray-500/20 disabled:to-gray-500/20 text-orange-300 hover:text-orange-100 disabled:text-gray-400 font-bold px-4 py-2 rounded-lg border border-orange-400/40 hover:border-orange-300 disabled:border-gray-400/40 transition-all text-sm disabled:cursor-not-allowed"
+            >
+              {loadingHiddenSources ? (
+                <>
+                  <div className="inline-block w-4 h-4 border-2 border-orange-300/30 border-t-orange-300 rounded-full animate-spin mr-2"></div>
+                  Unhiding all...
+                </>
+              ) : (
+                `Unhide All (${hiddenSources.length})`
+              )}
+            </button>
+          )}
         </div>
 
         {/* Panel Content - Scrollable */}
-        <div className="h-[calc(100%-80px)] overflow-y-auto p-6">
+        <div className="h-[calc(100%-140px)] overflow-y-auto p-6">
           {loadingHiddenSources ? (
             <div className="flex items-center justify-center py-20">
               <div className="text-center">
