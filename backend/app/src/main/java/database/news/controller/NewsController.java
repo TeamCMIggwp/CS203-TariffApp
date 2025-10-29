@@ -146,9 +146,28 @@ public class NewsController {
     public ResponseEntity<NewsResponse> getNews(
             @Parameter(description = "News article URL", example = "https://www.usitc.gov/rice-report", required = true)
             @RequestParam @NotBlank String newsLink) {
-        
+
         logger.info("GET /api/v1/database/news - Getting news: {}", newsLink);
         NewsResponse response = newsService.getNews(newsLink);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(
+        summary = "Get all news articles",
+        description = "Retrieves all news articles from the database, including hidden ones"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "News articles retrieved successfully",
+            content = @Content(mediaType = "application/json")
+        )
+    })
+    @GetMapping("/all")
+    public ResponseEntity<List<NewsResponse>> getAllNews() {
+
+        logger.info("GET /api/v1/news/all - Getting all news");
+        List<NewsResponse> response = newsService.getAllNews();
         return ResponseEntity.ok(response);
     }
 

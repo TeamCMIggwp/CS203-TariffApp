@@ -72,6 +72,10 @@ export default function NewsPage() {
   const [deletingFromDatabase, setDeletingFromDatabase] = useState<{ [key: number]: boolean }>({});
   const [runningGeminiAnalysis, setRunningGeminiAnalysis] = useState<{ [key: number]: boolean }>({});
   const [hidingSource, setHidingSource] = useState<{ [key: number]: boolean }>({});
+  const [showHiddenPanel, setShowHiddenPanel] = useState(false);
+  const [hiddenSources, setHiddenSources] = useState<NewsFromDB[]>([]);
+  const [loadingHiddenSources, setLoadingHiddenSources] = useState(false);
+  const [unhidingSource, setUnhidingSource] = useState<{ [key: string]: boolean }>({});
 
   // Backend API base URL for non-auth endpoints
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
@@ -444,6 +448,35 @@ export default function NewsPage() {
     }
   };
 
+  const fetchHiddenSources = async () => {
+    setLoadingHiddenSources(true);
+    try {
+      // Fetch all news from database
+      const response = await fetch(`${API_BASE}/api/v1/news/all`, {
+        method: 'GET',
+        cache: 'no-store'
+      });
+
+      if (response.ok) {
+        const allNews: NewsFromDB[] = await response.json();
+        // Filter only hidden sources
+        const hidden = allNews.filter(news => news.isHidden);
+        setHiddenSources(hidden);
+      } else {
+        console.error('Failed to fetch hidden sources:', response.status);
+      }
+    } catch (error) {
+      console.error('Error fetching hidden sources:', error);
+    } finally {
+      setLoadingHiddenSources(false);
+    }
+  };
+
+  const openHiddenPanel = () => {
+    setShowHiddenPanel(true);
+    fetchHiddenSources();
+  };
+
   const hideSource = async (index: number, article: EnrichedArticle) => {
     if (!confirm(`Are you sure you want to hide this source? You won't see it in future searches.\n\n"${article.title}"`)) {
       return;
@@ -480,6 +513,44 @@ export default function NewsPage() {
       alert('Failed to hide source. Please try again.');
     } finally {
       setHidingSource(prev => ({ ...prev, [index]: false }));
+    }
+  };
+
+  const unhideSource = async (newsLink: string) => {
+    if (!confirm(`Are you sure you want to unhide this source?\n\n"${newsLink}"`)) {
+      return;
+    }
+
+    setUnhidingSource(prev => ({ ...prev, [newsLink]: true }));
+
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/news/unhide?newsLink=${encodeURIComponent(newsLink)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store'
+      });
+
+      if (response.ok) {
+        // Remove from hidden sources list
+        const updatedHiddenSources = hiddenSources.filter(source => source.newsLink !== newsLink);
+        setHiddenSources(updatedHiddenSources);
+
+        alert('Source unhidden successfully! It will now appear in search results.');
+      } else {
+        let msg = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          msg = errorData.message || msg;
+        } catch {}
+        alert(`Failed to unhide source: ${msg}`);
+      }
+    } catch (error) {
+      console.error('Error unhiding source:', error);
+      alert('Failed to unhide source. Please try again.');
+    } finally {
+      setUnhidingSource(prev => ({ ...prev, [newsLink]: false }));
     }
   };
 
@@ -525,6 +596,105 @@ export default function NewsPage() {
   // Main page with search
   return (
     <section className="py-20 min-h-screen relative z-10">
+      {/* Hidden Sources Panel - Sliding from left */}
+      <div
+        className={`fixed top-0 left-0 h-full w-96 bg-black/95 backdrop-blur-xl border-r-2 border-cyan-400/50 shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${
+          showHiddenPanel ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {/* Panel Header */}
+        <div className="flex items-center justify-between p-6 border-b-2 border-white/20">
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <IconAlertCircle className="w-6 h-6 text-cyan-300" />
+            Hidden Sources
+          </h2>
+          <button
+            onClick={() => setShowHiddenPanel(false)}
+            className="text-white/70 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Panel Content - Scrollable */}
+        <div className="h-[calc(100%-80px)] overflow-y-auto p-6">
+          {loadingHiddenSources ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <div className="w-12 h-12 border-4 border-cyan-300/30 border-t-cyan-300 rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-white/70">Loading hidden sources...</p>
+              </div>
+            </div>
+          ) : hiddenSources.length === 0 ? (
+            <div className="text-center py-20">
+              <IconAlertCircle className="w-16 h-16 text-white/30 mx-auto mb-4" />
+              <p className="text-white/70 text-lg">No hidden sources</p>
+              <p className="text-white/50 text-sm mt-2">Sources you hide will appear here</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {hiddenSources.map((source) => (
+                <div
+                  key={source.newsLink}
+                  className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:border-cyan-400/50 transition-all"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <a
+                      href={source.newsLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-300 hover:text-cyan-100 text-sm font-medium underline break-all flex-1"
+                    >
+                      {source.newsLink}
+                    </a>
+                  </div>
+
+                  {source.remarks && (
+                    <p className="text-white/70 text-xs mb-3 italic">
+                      &quot;{source.remarks}&quot;
+                    </p>
+                  )}
+
+                  <button
+                    onClick={() => unhideSource(source.newsLink)}
+                    disabled={unhidingSource[source.newsLink]}
+                    className="w-full bg-cyan-500/20 hover:bg-cyan-500/30 disabled:bg-gray-500/20 text-cyan-300 hover:text-cyan-100 disabled:text-gray-400 font-medium px-4 py-2 rounded-lg border border-cyan-400/40 hover:border-cyan-300 disabled:border-gray-400/40 transition-all text-sm disabled:cursor-not-allowed"
+                  >
+                    {unhidingSource[source.newsLink] ? (
+                      <>
+                        <div className="inline-block w-4 h-4 border-2 border-cyan-300/30 border-t-cyan-300 rounded-full animate-spin mr-2"></div>
+                        Unhiding...
+                      </>
+                    ) : (
+                      'Unhide this source'
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Overlay when panel is open */}
+      {showHiddenPanel && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+          onClick={() => setShowHiddenPanel(false)}
+        />
+      )}
+
+      {/* Hidden Sources Button - Fixed on left side */}
+      <button
+        onClick={openHiddenPanel}
+        className="fixed left-4 top-24 bg-gradient-to-r from-gray-500/30 to-gray-600/30 hover:from-gray-500/40 hover:to-gray-600/40 text-gray-200 hover:text-white font-bold px-4 py-3 rounded-lg border-2 border-gray-400/40 hover:border-gray-300 transition-all duration-200 shadow-lg hover:shadow-gray-500/30 z-30 flex items-center gap-2"
+      >
+        <IconAlertCircle className="w-5 h-5" />
+        <span className="text-sm">Hidden Sources ({hiddenSources.length})</span>
+      </button>
+
       <div className="max-w-6xl mx-auto px-4">
         
         {/* Header with Search */}
