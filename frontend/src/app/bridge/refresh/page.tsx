@@ -38,8 +38,9 @@ export default function BridgeRefreshPage() {
           window.history.replaceState({}, "", returnTo || "/");
         }
         router.replace(returnTo || "/");
-      } catch (e: any) {
-        setError(e?.message || "Failed to refresh session");
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to refresh session";
+        setError(message);
         router.replace(`/login?reason=session_expired&returnTo=${encodeURIComponent(returnTo)}`);
       }
     };

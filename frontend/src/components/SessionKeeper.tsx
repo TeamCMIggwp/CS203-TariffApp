@@ -9,6 +9,11 @@ type SessionInfo = {
   remainingSeconds: number;
 };
 
+type RefreshResponse = {
+  accessToken?: string;
+  ttl?: number;
+};
+
 /**
  * SessionKeeper
  * - Polls a tiny server API for access-token remaining time
@@ -64,9 +69,9 @@ export default function SessionKeeper({ warnSeconds = 120, showBadge = false }: 
       // Attempt refresh via proxy (works when backend and frontend are same-site)
       const refreshRes = await fetch("/api/auth/refresh", { method: "POST", credentials: "include" });
       if (!refreshRes.ok) throw new Error("Refresh failed");
-      const data: any = await refreshRes.json();
-      const accessToken = data?.accessToken as string | undefined;
-      const ttl = data?.ttl as number | undefined;
+      const data = (await refreshRes.json()) as RefreshResponse;
+      const accessToken = data.accessToken;
+      const ttl = data.ttl;
       if (!accessToken) throw new Error("No token returned");
       const setRes = await fetch("/api/session/set", {
         method: "POST",
@@ -79,7 +84,7 @@ export default function SessionKeeper({ warnSeconds = 120, showBadge = false }: 
       setShowPrompt(false);
       setBusy(false);
       poll();
-    } catch (e: any) {
+    } catch (_err: unknown) {
       // Fallback: cross-site refresh bridge (requires NEXT_PUBLIC_BACKEND_URL)
       setBusy(false);
       try {
