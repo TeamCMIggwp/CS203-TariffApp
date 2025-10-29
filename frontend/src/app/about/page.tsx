@@ -18,18 +18,17 @@ import {
   CheckCircle,
   Calendar,
   ArrowRight,
-  Minus,
   Activity,
 } from "lucide-react"
 
 function DynamicRates() {
   const countries = [
-    { name: "China", code: "cn", rates: [12.5, 11.8, 13.2, 12.1, 11.9, 12.7], trend: "up" },
-    { name: "Singapore", code: "sg", rates: [0.0, 0.0, 0.5, 0.2, 0.0, 0.3], trend: "stable" },
-    { name: "USA", code: "us", rates: [5.3, 5.1, 5.5, 5.2, 5.4, 5.0], trend: "down" },
-    { name: "EU", code: "eu", rates: [8.7, 8.9, 8.5, 8.8, 8.6, 8.7], trend: "stable" },
-    { name: "India", code: "in", rates: [33.5, 34.2, 33.8, 34.0, 33.6, 34.1], trend: "up" },
-    { name: "Brazil", code: "br", rates: [10.2, 10.5, 10.1, 10.3, 10.4, 10.2], trend: "down" },
+    { name: "China", rates: [12.5, 11.8, 13.2, 12.1, 11.9, 12.7], trend: "up" },
+    { name: "Singapore", rates: [0.0, 0.0, 0.5, 0.2, 0.0, 0.3], trend: "stable" },
+    { name: "USA", rates: [5.3, 5.1, 5.5, 5.2, 5.4, 5.0], trend: "down" },
+    { name: "EU", rates: [8.7, 8.9, 8.5, 8.8, 8.6, 8.7], trend: "stable" },
+    { name: "India", rates: [33.5, 34.2, 33.8, 34.0, 33.6, 34.1], trend: "up" },
+    { name: "Brazil", rates: [10.2, 10.5, 10.1, 10.3, 10.4, 10.2], trend: "down" },
   ]
 
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -47,7 +46,8 @@ function DynamicRates() {
 
         setCurrentCountry(nextCountry)
         setCurrentIndex(Math.floor(Math.random() * countries[nextCountry].rates.length))
-        setIsAnimating(false)
+
+        setTimeout(() => setIsAnimating(false), 50)
       }, 300)
     }, 2000)
 
@@ -58,13 +58,9 @@ function DynamicRates() {
   const currentTrend = countries[currentCountry].trend
 
   const getTrendIcon = () => {
-    if (currentTrend === "up") {
-      return <TrendingUp className="w-8 h-8 text-green-500" />
-    } else if (currentTrend === "down") {
-      return <TrendingDown className="w-8 h-8 text-red-500" />
-    } else {
-      return <Minus className="w-8 h-8 text-muted-foreground" />
-    }
+    if (currentTrend === "up") return <TrendingUp className="w-10 h-10 text-green-500" />
+    if (currentTrend === "down") return <TrendingDown className="w-10 h-10 text-red-500" />
+    return <Scale className="w-10 h-10 text-gray-500" />
   }
 
   return (
@@ -79,18 +75,24 @@ function DynamicRates() {
           </div>
 
           <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16">
+            {/* Country */}
             <div className="text-center">
               <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">COUNTRY</p>
-              <p className="text-3xl font-bold text-foreground">{countries[currentCountry].name}</p>
+              <p
+                className={`text-3xl font-bold text-foreground transition-all duration-300 ${isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
+                  }`}
+              >
+                {countries[currentCountry].name}
+              </p>
             </div>
 
+            {/* Current Rate */}
             <div className="flex items-center gap-6">
               <div className="text-center">
                 <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">CURRENT RATE</p>
                 <div
-                  className={`text-7xl font-bold tabular-nums transition-all duration-300 ${
-                    isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
-                  }`}
+                  className={`text-7xl font-bold tabular-nums text-black transition-all duration-300 ${isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
+                    }`}
                 >
                   {currentRate.toFixed(1)}
                   <span className="text-4xl text-muted-foreground">%</span>
@@ -98,12 +100,15 @@ function DynamicRates() {
               </div>
 
               <div
-                className={`transition-all duration-300 ${isAnimating ? "opacity-0 scale-50" : "opacity-100 scale-100"}`}
+                className={`transition-all duration-300 ${isAnimating ? "opacity-0 scale-50" : "opacity-100 scale-100"
+                  }`}
               >
                 {getTrendIcon()}
               </div>
             </div>
 
+
+            {/* Trend */}
             <div className="text-center">
               <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">TREND</p>
               <p className="text-2xl font-semibold capitalize text-foreground">{currentTrend}</p>
@@ -120,7 +125,6 @@ function DynamicRates() {
     </div>
   )
 }
-
 export default function AboutPage() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
@@ -227,19 +231,11 @@ export default function AboutPage() {
   ]
 
   return (
-    <main className="min-h-screen relative">
-      <div className="fixed inset-0 -z-10">
-        <div
-          className="absolute inset-0 bg-cover bg-center blur-md"
-          style={{ backgroundImage: "url(/images/agriculture-background.jpg)" }}
-        />
-        <div className="absolute inset-0 bg-background/60" />
-      </div>
-
+    <main className="min-h-screen page-blur-bg">
       {/* Header Section */}
       <section className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4 text-balance">About AgriTariff</h1>
+          <h1 className="text-3xl md:text-4xl font-bold mb-4 text-balance text-gray-900">About AgriTariff</h1>
           <p className="text-base text-gray-700 max-w-2xl text-pretty leading-relaxed">
             Your comprehensive resource for understanding agricultural tariffs and their impact on global trade
           </p>
@@ -250,7 +246,7 @@ export default function AboutPage() {
       <section className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="mb-12 max-w-3xl">
-            <h2 className="text-4xl font-bold mb-4 text-foreground">What Are Tariffs?</h2>
+            <h2 className="text-4xl font-bold mb-4 text-gray-900">What Are Tariffs?</h2>
             <p className="text-lg text-gray-700 leading-relaxed">
               Tariffs are taxes imposed by governments on imported goods. In agricultural trade, they serve as crucial
               policy instruments that affect food security, farmer livelihoods, and international trade relationships.
@@ -258,12 +254,12 @@ export default function AboutPage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            <Card className="bg-background border-2 hover:border-primary transition-colors">
+            <Card className="bg-white border-2 hover:border-blue-500 transition-colors">
               <CardContent className="pt-6">
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <BookOpen className="w-6 h-6 text-primary" />
+                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-4">
+                  <BookOpen className="w-6 h-6 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3 text-foreground">Historical Context</h3>
+                <h3 className="text-xl font-semibold mb-3 text-gray-900">Historical Context</h3>
                 <p className="text-gray-700 leading-relaxed">
                   Agricultural tariffs have evolved since the GATT Uruguay Round (1986-1994), which transformed
                   non-tariff barriers into transparent tariff measures.
@@ -271,12 +267,12 @@ export default function AboutPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-background border-2 hover:border-primary transition-colors">
+            <Card className="bg-white border-2 hover:border-blue-500 transition-colors">
               <CardContent className="pt-6">
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <Globe className="w-6 h-6 text-primary" />
+                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-4">
+                  <Globe className="w-6 h-6 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3 text-foreground">Global Impact</h3>
+                <h3 className="text-xl font-semibold mb-3 text-gray-900">Global Impact</h3>
                 <p className="text-gray-700 leading-relaxed">
                   Tariffs directly influence food prices, market access for farmers, and the competitiveness of
                   agricultural products in international markets.
@@ -284,12 +280,12 @@ export default function AboutPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-background border-2 hover:border-primary transition-colors">
+            <Card className="bg-white border-2 hover:border-blue-500 transition-colors">
               <CardContent className="pt-6">
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <TrendingUp className="w-6 h-6 text-primary" />
+                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-4">
+                  <TrendingUp className="w-6 h-6 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3 text-foreground">Trade Dynamics</h3>
+                <h3 className="text-xl font-semibold mb-3 text-gray-900">Trade Dynamics</h3>
                 <p className="text-gray-700 leading-relaxed">
                   Understanding tariff structures helps stakeholders navigate complex trade agreements and make informed
                   decisions about market entry strategies.
@@ -304,7 +300,7 @@ export default function AboutPage() {
       <section className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4 text-foreground">Why Tariffs Matter</h2>
+            <h2 className="text-4xl font-bold mb-4 text-gray-900">Why Tariffs Matter</h2>
             <p className="text-lg text-gray-700 max-w-3xl mx-auto leading-relaxed">
               Agricultural tariffs play a critical role in shaping global food systems, economic development, and
               international trade relationships
@@ -315,16 +311,16 @@ export default function AboutPage() {
             {reasons.map((reason, index) => {
               const Icon = reason.icon
               return (
-                <Card key={index} className="bg-background border-2">
+                <Card key={index} className="bg-white border-2">
                   <CardContent className="pt-6">
                     <div className="flex gap-4">
                       <div className="flex-shrink-0">
-                        <div className="w-14 h-14 rounded-xl bg-primary text-primary-foreground flex items-center justify-center">
+                        <div className="w-14 h-14 rounded-xl bg-blue-600 text-white flex items-center justify-center">
                           <Icon className="w-7 h-7" />
                         </div>
                       </div>
                       <div>
-                        <h3 className="text-xl font-semibold mb-2 text-foreground">{reason.title}</h3>
+                        <h3 className="text-xl font-semibold mb-2 text-gray-900">{reason.title}</h3>
                         <p className="text-gray-700 leading-relaxed">{reason.description}</p>
                       </div>
                     </div>
@@ -340,7 +336,7 @@ export default function AboutPage() {
       <section className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">Key Tariff Indicators</h2>
+            <h2 className="text-4xl font-bold mb-4 text-gray-900">Key Tariff Indicators</h2>
             <p className="text-lg text-gray-700 max-w-3xl mx-auto leading-relaxed">
               Understanding WTO tariff indicators is essential for analyzing agricultural trade policies and market
               access conditions across countries. Hover over each card to see detailed information.
@@ -355,28 +351,26 @@ export default function AboutPage() {
               return (
                 <Card
                   key={index}
-                  className="bg-background border-2 hover:shadow-xl transition-all duration-300 cursor-pointer relative overflow-hidden aspect-square flex flex-col"
+                  className="bg-white border-2 hover:shadow-xl transition-all duration-300 cursor-pointer relative overflow-hidden aspect-square flex flex-col"
                   onMouseEnter={() => setHoveredIndex(index)}
                   onMouseLeave={() => setHoveredIndex(null)}
                 >
                   <div
-                    className={`absolute inset-0 p-4 flex flex-col items-center justify-center text-center transition-opacity duration-300 ${
-                      isHovered ? "opacity-0" : "opacity-100"
-                    }`}
+                    className={`absolute inset-0 p-4 flex flex-col items-center justify-center text-center transition-opacity duration-300 ${isHovered ? "opacity-0" : "opacity-100"
+                      }`}
                   >
                     <div
                       className={`w-12 h-12 rounded-lg ${indicator.color} text-white flex items-center justify-center mb-3`}
                     >
                       <Icon className="w-6 h-6" />
                     </div>
-                    <h3 className="font-bold text-sm mb-2 leading-tight">{indicator.title}</h3>
-                    <p className="text-xs font-mono text-muted-foreground">{indicator.code}</p>
+                    <h3 className="font-bold text-sm mb-2 leading-tight text-gray-900">{indicator.title}</h3>
+                    <p className="text-xs font-mono text-gray-600">{indicator.code}</p>
                   </div>
 
                   <div
-                    className={`absolute inset-0 p-4 flex flex-col transition-opacity duration-300 ${
-                      isHovered ? "opacity-100" : "opacity-0"
-                    }`}
+                    className={`absolute inset-0 p-4 flex flex-col transition-opacity duration-300 ${isHovered ? "opacity-100" : "opacity-0"
+                      }`}
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <div
@@ -384,9 +378,9 @@ export default function AboutPage() {
                       >
                         <Icon className="w-3 h-3" />
                       </div>
-                      <p className="text-xs font-mono text-muted-foreground">{indicator.code}</p>
+                      <p className="text-xs font-mono text-gray-600">{indicator.code}</p>
                     </div>
-                    <h3 className="font-bold text-xs mb-2 leading-tight">{indicator.title}</h3>
+                    <h3 className="font-bold text-xs mb-2 leading-tight text-gray-900">{indicator.title}</h3>
                     <p className="text-xs text-gray-700 mb-2 leading-relaxed">{indicator.description}</p>
                     <p className="text-xs text-gray-700 leading-relaxed flex-1 overflow-y-auto">{indicator.details}</p>
                   </div>
@@ -405,33 +399,33 @@ export default function AboutPage() {
       </section>
 
       {/* News Section */}
-      <section className="py-20 px-4 bg-background">
+      <section className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-12">
             <div>
-              <h2 className="text-4xl font-bold mb-2 text-foreground">Latest News</h2>
+              <h2 className="text-4xl font-bold mb-2 text-gray-900">Latest News</h2>
               <p className="text-lg text-gray-700">Stay updated on agricultural trade developments</p>
             </div>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
             {news.map((item, index) => (
-              <Card key={index} className="flex flex-col hover:shadow-lg transition-shadow">
+              <Card key={index} className="flex flex-col bg-white hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="flex items-center gap-2 mb-3">
                     <Badge variant="secondary">{item.category}</Badge>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1 text-sm text-gray-600">
                       <Calendar className="w-4 h-4" />
                       <span>{item.date}</span>
                     </div>
                   </div>
-                  <CardTitle className="text-xl leading-tight text-balance text-foreground">{item.title}</CardTitle>
+                  <CardTitle className="text-xl leading-tight text-balance text-gray-900">{item.title}</CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col">
                   <CardDescription className="text-base text-gray-700 leading-relaxed mb-4 flex-1">
                     {item.description}
                   </CardDescription>
-                  <Button variant="ghost" className="w-fit px-0 group">
+                  <Button variant="ghost" className="w-fit px-0 group text-blue-600 hover:text-blue-700">
                     Read more
                     <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                   </Button>
