@@ -119,12 +119,14 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
 }
 
 @layer components {
+
   /* Main container styles */
   .tariff-calculator-container {
     @apply min-h-screen bg-black text-white overflow-x-hidden;
@@ -156,11 +158,11 @@
 
   /* globals.css */
 
-/* Blurred translucent page background */
-.page-blur-bg {
-  @apply relative z-20 min-h-screen px-4 py-20 backdrop-blur-md;
-  background-color: rgba(255, 255, 255, 0.6);
-}
+  /* Blurred translucent page background */
+  .page-blur-bg {
+    @apply relative z-20 min-h-screen px-4 py-20 backdrop-blur-md;
+    background-color: rgba(255, 255, 255, 0.6);
+  }
 
   /* Calculator section styles */
   .calculator-section {
@@ -203,4 +205,16 @@
   .calculator-label {
     @apply text-black font-medium;
   }
+
+  .about-page-section {
+    @apply relative z-10 px-4 py-20;
+    background-color: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 1rem;
+    /* optional */
+    border: none;
+    /* remove borders if you added any */
+  }
+
 }
