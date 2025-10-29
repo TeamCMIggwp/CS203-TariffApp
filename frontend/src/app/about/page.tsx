@@ -21,6 +21,31 @@ import {
   Activity,
 } from "lucide-react"
 
+const tariffFeatures = [
+  {
+    id: 1,
+    title: "Real-Time Calculations",
+    description: "Instant tariff calculations for agricultural products across 195+ countries with up-to-date rates",
+    image: "/pic1.jpg",
+    number: "01",
+  },
+  {
+    id: 2,
+    title: "Global Database Access",
+    description:
+      "Comprehensive WTO tariff data covering MFN rates, preferential agreements, and bound tariff commitments",
+    image: "/pic2.jpg",
+    number: "02",
+  },
+  {
+    id: 3,
+    title: "Trade Compliance Tools",
+    description: "Navigate complex trade regulations with confidence using our compliance verification system",
+    image: "/pic3.jpg",
+    number: "03",
+  },
+]
+
 function DynamicRates() {
   const countries = [
     { name: "China", rates: [12.5, 11.8, 13.2, 12.1, 11.9, 12.7], trend: "up" },
@@ -79,8 +104,9 @@ function DynamicRates() {
             <div className="text-center">
               <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">COUNTRY</p>
               <p
-                className={`text-3xl font-bold text-foreground transition-all duration-300 ${isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
-                  }`}
+                className={`text-3xl font-bold text-foreground transition-all duration-300 ${
+                  isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
+                }`}
               >
                 {countries[currentCountry].name}
               </p>
@@ -91,8 +117,9 @@ function DynamicRates() {
               <div className="text-center">
                 <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">CURRENT RATE</p>
                 <div
-                  className={`text-7xl font-bold tabular-nums text-black transition-all duration-300 ${isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
-                    }`}
+                  className={`text-7xl font-bold tabular-nums text-black transition-all duration-300 ${
+                    isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
+                  }`}
                 >
                   {currentRate.toFixed(1)}
                   <span className="text-4xl text-muted-foreground">%</span>
@@ -100,13 +127,13 @@ function DynamicRates() {
               </div>
 
               <div
-                className={`transition-all duration-300 ${isAnimating ? "opacity-0 scale-50" : "opacity-100 scale-100"
-                  }`}
+                className={`transition-all duration-300 ${
+                  isAnimating ? "opacity-0 scale-50" : "opacity-100 scale-100"
+                }`}
               >
                 {getTrendIcon()}
               </div>
             </div>
-
 
             {/* Trend */}
             <div className="text-center">
@@ -231,14 +258,47 @@ export default function AboutPage() {
   ]
 
   return (
-    <main className="min-h-screen page-blur-bg">
-      {/* Header Section */}
+    <main className="min-h-screen bg-white">
       <section className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4 text-balance text-gray-900">About AgriTariff</h1>
-          <p className="text-base text-gray-700 max-w-2xl text-pretty leading-relaxed">
-            Your comprehensive resource for understanding agricultural tariffs and their impact on global trade
-          </p>
+          {/* Hero Content */}
+          <div className="text-center mb-16">
+            <p className="text-sm font-semibold tracking-[0.3em] text-gray-400 mb-6">ABOUT</p>
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 text-balance leading-tight text-gray-900">
+              AgriTariff
+            </h1>
+            <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
+              Calculate tariffs with confidence and clarity.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {tariffFeatures.map((feature) => (
+              <div key={feature.id} className="relative">
+                <div className="relative group">
+                  {/* Image Container */}
+                  <div className="relative overflow-hidden rounded-3xl bg-gray-100 aspect-[3/4] mb-6">
+                    <img
+                      src={feature.image || "/placeholder.svg"}
+                      alt={feature.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+
+                  {/* Content Card */}
+                  <div className="bg-[#E8E5D5] rounded-2xl p-6">
+                    <div className="flex items-start gap-4">
+                      <span className="text-4xl font-bold text-gray-900">{feature.number}</span>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">{feature.title}</h3>
+                        <p className="text-sm text-gray-700 leading-relaxed">{feature.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -356,8 +416,9 @@ export default function AboutPage() {
                   onMouseLeave={() => setHoveredIndex(null)}
                 >
                   <div
-                    className={`absolute inset-0 p-4 flex flex-col items-center justify-center text-center transition-opacity duration-300 ${isHovered ? "opacity-0" : "opacity-100"
-                      }`}
+                    className={`absolute inset-0 p-4 flex flex-col items-center justify-center text-center transition-opacity duration-300 ${
+                      isHovered ? "opacity-0" : "opacity-100"
+                    }`}
                   >
                     <div
                       className={`w-12 h-12 rounded-lg ${indicator.color} text-white flex items-center justify-center mb-3`}
@@ -369,8 +430,9 @@ export default function AboutPage() {
                   </div>
 
                   <div
-                    className={`absolute inset-0 p-4 flex flex-col transition-opacity duration-300 ${isHovered ? "opacity-100" : "opacity-0"
-                      }`}
+                    className={`absolute inset-0 p-4 flex flex-col transition-opacity duration-300 ${
+                      isHovered ? "opacity-100" : "opacity-0"
+                    }`}
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <div
