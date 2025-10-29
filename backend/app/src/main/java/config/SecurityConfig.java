@@ -57,6 +57,7 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/api/v1/news/**").permitAll()
 				.requestMatchers(HttpMethod.PUT, "/api/v1/news/**").hasRole("ADMIN")
 				.requestMatchers(HttpMethod.DELETE, "/api/v1/news/**").hasRole("ADMIN")
+				.requestMatchers(HttpMethod.PATCH, "/api/v1/news/**").permitAll()
 
 				// WITS and WTO data open
 				.requestMatchers(HttpMethod.GET, "/api/v1/wits/**").permitAll()

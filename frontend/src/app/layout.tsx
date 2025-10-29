@@ -5,6 +5,7 @@ import React from "react"
 import dynamic from "next/dynamic"
 import { FloatingDock } from "@/components/ui/floating-dock"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
+import SessionKeeper from "@/components/SessionKeeper"
 import {
   IconAdjustmentsCog,
   IconMap,
@@ -519,7 +520,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         {/* Page Content */}
-        <div className="relative z-10 min-h-screen">{children}</div>
+        <div className="relative z-10 min-h-screen">
+          {/* Keep session alive and prompt before expiry */}
+          <SessionKeeper warnSeconds={120} />
+          {children}
+        </div>
 
         {/* Floating Dock */}
         <div className="fixed bottom-6 left-0 w-full flex justify-center z-50">
