@@ -105,7 +105,11 @@ export default function NewsPage() {
    */
   const getAuthHeaders = (): HeadersInit => {
     const token = getAccessToken();
-    if (!token) return {};
+    console.log('getAuthHeaders - token:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN');
+    if (!token) {
+      console.warn('No access token found in cookies!');
+      return {};
+    }
     return {
       'Authorization': `Bearer ${token}`
     };
