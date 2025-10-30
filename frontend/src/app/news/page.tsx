@@ -151,9 +151,40 @@ export default function NewsPage() {
   /**
    * Call Gemini API to analyze a tariff article
    */
-  const analyzeWithGemini = async (url: string, searchQuery: string): Promise<GeminiAnalysis | null> => {
+  const analyzeWithGemini = async (article: EnrichedArticle, searchQuery: string): Promise<GeminiAnalysis | null> => {
     try {
-      const prompt = `Extract tariff data for: ${searchQuery}. Return ONLY this JSON: {"exporterCountry":"","importerCountry":"","product":"","year":"","tariffRate":""}. No explanations.`;
+      // Enhanced prompt with context and clear instructions
+      const prompt = `You are analyzing a trade policy document to extract tariff information.
+
+DOCUMENT CONTEXT:
+- Title: "${article.title}"
+- Source: ${article.sourceDomain}
+- Search Query: "${searchQuery}"
+
+EXTRACTION RULES:
+1. EXPORTER COUNTRY: The country IMPOSING/CHARGING the tariff
+   - For "Trade Policy Review of [Country]", the reviewed country is the EXPORTER
+   - For "[Country A] imposes tariff on [Country B]", Country A is EXPORTER
+
+2. IMPORTER COUNTRY: The country RECEIVING goods and PAYING the tariff
+   - May be "N/A" for general trade policy reviews
+   - Specific country if bilateral tariff mentioned
+
+3. PRODUCT: Specific goods/category (e.g., "Rice", "Steel", "Automobiles")
+   - Use "Various" or "General" only if multiple products discussed
+
+4. YEAR: Year the tariff applies or document published
+   - Extract from title, date, or content
+
+5. TARIFF RATE: The percentage or amount (e.g., "50%", "10.5%", "$5 per kg")
+   - Include average rates if specific rate not available
+   - Use "N/A" only if truly not mentioned
+
+ARTICLE CONTENT:
+${article.relevantText.slice(0, 3).join('\n\n')}
+
+Return ONLY valid JSON (no markdown, no explanation):
+{"exporterCountry":"","importerCountry":"","product":"","year":"","tariffRate":""}`;
 
       const response = await fetch(GEMINI_API, {
         method: 'POST',
@@ -161,7 +192,7 @@ export default function NewsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          data: url,
+          data: article.url,
           prompt: prompt
         }),
         cache: 'no-store'
@@ -169,11 +200,12 @@ export default function NewsPage() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`Gemini API failed for ${url}: ${response.status}`, errorText);
+        console.error(`Gemini API failed for ${article.url}: ${response.status}`, errorText);
         console.error('Full error details:', {
           status: response.status,
           statusText: response.statusText,
-          url: url,
+          url: article.url,
+          title: article.title,
           errorBody: errorText
         });
         return null;
@@ -381,6 +413,53 @@ export default function NewsPage() {
     }
   };
 
+  /**
+   * Merge Gemini analysis with scraper data - use scraper as fallback for N/A fields
+   */
+  const mergeWithScraperData = (geminiResult: GeminiAnalysis | null, article: EnrichedArticle): GeminiAnalysis => {
+    // If Gemini completely failed, use all scraper data
+    if (!geminiResult) {
+      console.log('Gemini failed, using scraper data as fallback');
+      return {
+        exporterCountry: article.exporter || 'N/A',
+        importerCountry: article.importer || 'N/A',
+        product: article.product || 'N/A',
+        year: article.year || 'N/A',
+        tariffRate: article.tariffRate || 'N/A'
+      };
+    }
+
+    // Hybrid: Use Gemini data, but fall back to scraper for N/A fields
+    const hybrid: GeminiAnalysis = {
+      exporterCountry: (geminiResult.exporterCountry && geminiResult.exporterCountry !== 'N/A')
+        ? geminiResult.exporterCountry
+        : (article.exporter || 'N/A'),
+      importerCountry: (geminiResult.importerCountry && geminiResult.importerCountry !== 'N/A')
+        ? geminiResult.importerCountry
+        : (article.importer || 'N/A'),
+      product: (geminiResult.product && geminiResult.product !== 'N/A')
+        ? geminiResult.product
+        : (article.product || 'N/A'),
+      year: (geminiResult.year && geminiResult.year !== 'N/A')
+        ? geminiResult.year
+        : (article.year || 'N/A'),
+      tariffRate: (geminiResult.tariffRate && geminiResult.tariffRate !== 'N/A')
+        ? geminiResult.tariffRate
+        : (article.tariffRate || 'N/A')
+    };
+
+    // Log which fields came from which source
+    console.log('Hybrid Analysis Result:', {
+      exporterCountry: hybrid.exporterCountry === geminiResult.exporterCountry ? '🤖 Gemini' : '🔍 Scraper',
+      importerCountry: hybrid.importerCountry === geminiResult.importerCountry ? '🤖 Gemini' : '🔍 Scraper',
+      product: hybrid.product === geminiResult.product ? '🤖 Gemini' : '🔍 Scraper',
+      year: hybrid.year === geminiResult.year ? '🤖 Gemini' : '🔍 Scraper',
+      tariffRate: hybrid.tariffRate === geminiResult.tariffRate ? '🤖 Gemini' : '🔍 Scraper'
+    });
+
+    return hybrid;
+  };
+
   const runGeminiAnalysisForArticle = async (index: number, article: EnrichedArticle) => {
     setRunningGeminiAnalysis(prev => ({ ...prev, [index]: true }));
 
@@ -391,25 +470,26 @@ export default function NewsPage() {
       return updated;
     });
 
-    const geminiAnalysis = await analyzeWithGemini(article.url, query);
+    const geminiAnalysis = await analyzeWithGemini(article, query);
 
-    // Check if analysis returned all N/A
-    if (geminiAnalysis) {
-      const allNA = Object.values(geminiAnalysis).every(val => val === 'N/A' || val === '' || val === null);
-      if (allNA) {
-        alert(`⚠️ Gemini Analysis Warning\n\nAll fields returned "N/A". This could mean:\n\n1. The article doesn't contain clear tariff information\n2. The source link is inaccessible or blocked\n3. Gemini couldn't extract structured data from the content\n\nTry checking the article manually or use a different source.`);
-      }
-    } else {
-      // Analysis returned null (failed completely)
-      alert(`❌ Gemini Analysis Failed\n\nThe analysis could not be completed. Check the browser console for error details.`);
+    // Merge Gemini results with scraper data
+    const hybridAnalysis = mergeWithScraperData(geminiAnalysis, article);
+
+    // Check if final hybrid analysis still has all N/A
+    const allNA = Object.values(hybridAnalysis).every(val => val === 'N/A' || val === '' || val === null);
+    if (allNA) {
+      alert(`⚠️ Analysis Warning\n\nBoth Gemini AI and web scraper could not extract tariff information.\n\nThis article may not contain structured tariff data.\n\nTry checking the article manually.`);
+    } else if (!geminiAnalysis) {
+      // Gemini failed but scraper provided some data
+      alert(`ℹ️ Using Scraper Data\n\nGemini AI analysis failed, but the web scraper extracted some information.\n\nCheck the results carefully as scraper data may be less accurate.`);
     }
 
-    // Update with Gemini analysis results
+    // Update with hybrid analysis results
     setEnrichedArticles(prev => {
       const updated = [...prev];
       updated[index] = {
         ...updated[index],
-        geminiAnalysis: geminiAnalysis,
+        geminiAnalysis: hybridAnalysis,
         analyzingWithGemini: false
       };
       return updated;
