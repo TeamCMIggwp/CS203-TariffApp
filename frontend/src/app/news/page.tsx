@@ -168,7 +168,14 @@ export default function NewsPage() {
       });
 
       if (!response.ok) {
-        console.error(`Gemini API failed for ${url}: ${response.status}`);
+        const errorText = await response.text();
+        console.error(`Gemini API failed for ${url}: ${response.status}`, errorText);
+        console.error('Full error details:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: url,
+          errorBody: errorText
+        });
         return null;
       }
 
@@ -234,7 +241,12 @@ export default function NewsPage() {
           analysis = innerData;
         }
       } else {
-        console.error('Unknown response format:', result);
+        console.error('Unknown response format. Expected fields not found:', {
+          result,
+          hasSuccess: 'success' in result,
+          hasAnalysis: 'analysis' in result,
+          hasExporterCountry: 'exporterCountry' in result
+        });
         return null;
       }
 
@@ -380,6 +392,17 @@ export default function NewsPage() {
     });
 
     const geminiAnalysis = await analyzeWithGemini(article.url, query);
+
+    // Check if analysis returned all N/A
+    if (geminiAnalysis) {
+      const allNA = Object.values(geminiAnalysis).every(val => val === 'N/A' || val === '' || val === null);
+      if (allNA) {
+        alert(`⚠️ Gemini Analysis Warning\n\nAll fields returned "N/A". This could mean:\n\n1. The article doesn't contain clear tariff information\n2. The source link is inaccessible or blocked\n3. Gemini couldn't extract structured data from the content\n\nTry checking the article manually or use a different source.`);
+      }
+    } else {
+      // Analysis returned null (failed completely)
+      alert(`❌ Gemini Analysis Failed\n\nThe analysis could not be completed. Check the browser console for error details.`);
+    }
 
     // Update with Gemini analysis results
     setEnrichedArticles(prev => {
