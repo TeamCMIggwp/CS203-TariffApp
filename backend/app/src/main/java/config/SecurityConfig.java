@@ -78,6 +78,10 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.GET, "/api/v1/user/hidden-sources").authenticated()
 				.requestMatchers(HttpMethod.DELETE, "/api/v1/user/hidden-sources/**").permitAll()
 
+				// News Tariff Rates - POST requires admin authentication, GET is open
+				.requestMatchers(HttpMethod.POST, "/api/v1/tariff-rates").hasRole("ADMIN")
+				.requestMatchers(HttpMethod.GET, "/api/v1/tariff-rates/**").permitAll()
+
 				// Everything else requires authentication
 				.anyRequest().authenticated()
 			)

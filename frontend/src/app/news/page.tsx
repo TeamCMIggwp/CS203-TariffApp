@@ -78,6 +78,20 @@ export default function NewsPage() {
   const [unhidingSource, setUnhidingSource] = useState<{ [key: string]: boolean }>({});
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
+  // Tariff Rate Modal State
+  const [showTariffModal, setShowTariffModal] = useState(false);
+  const [selectedArticleForTariff, setSelectedArticleForTariff] = useState<EnrichedArticle | null>(null);
+  const [tariffFormData, setTariffFormData] = useState({
+    countryId: '',
+    partnerCountryId: '',
+    productId: '',
+    tariffTypeId: '',
+    year: '',
+    rate: '',
+    unit: ''
+  });
+  const [savingTariffRate, setSavingTariffRate] = useState(false);
+
   // Backend API base URL for non-auth endpoints
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
   // Proxied path that goes through Next.js so middleware can inject Authorization from access_token cookie
@@ -496,6 +510,106 @@ Return ONLY valid JSON (no markdown, no explanation):
     });
 
     setRunningGeminiAnalysis(prev => ({ ...prev, [index]: false }));
+  };
+
+  /**
+   * Open tariff rate modal and pre-fill form if Gemini analysis exists
+   */
+  const openTariffModal = (article: EnrichedArticle) => {
+    setSelectedArticleForTariff(article);
+
+    // Note: Gemini returns country/product names, but DB needs ISO codes and HS codes
+    // We'll show Gemini data as hints, but admin must enter correct codes
+    if (article.geminiAnalysis) {
+      setTariffFormData({
+        countryId: '', // Admin must enter 3-char ISO code
+        partnerCountryId: '',
+        productId: '', // Admin must enter HS code
+        tariffTypeId: '',
+        year: article.geminiAnalysis.year || '',
+        rate: article.geminiAnalysis.tariffRate?.replace('%', '') || '',
+        unit: article.geminiAnalysis.tariffRate?.includes('%') ? '%' : ''
+      });
+    } else {
+      // Reset form for manual entry
+      setTariffFormData({
+        countryId: '',
+        partnerCountryId: '',
+        productId: '',
+        tariffTypeId: '',
+        year: '',
+        rate: '',
+        unit: ''
+      });
+    }
+
+    setShowTariffModal(true);
+  };
+
+  const closeTariffModal = () => {
+    setShowTariffModal(false);
+    setSelectedArticleForTariff(null);
+  };
+
+  const handleTariffFormChange = (field: string, value: string) => {
+    setTariffFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const saveTariffRateToDatabase = async () => {
+    if (!selectedArticleForTariff) return;
+
+    // Validation
+    if (!tariffFormData.countryId || !tariffFormData.productId || !tariffFormData.year || !tariffFormData.rate) {
+      alert('Please fill in all required fields: Country ISO Code, Product HS Code, Year, and Rate');
+      return;
+    }
+
+    // Validate country code is 3 characters
+    if (tariffFormData.countryId.length !== 3) {
+      alert('Country ID must be a 3-character ISO code (e.g., USA, JPN, CHN)');
+      return;
+    }
+
+    if (tariffFormData.partnerCountryId && tariffFormData.partnerCountryId.length !== 3) {
+      alert('Partner Country ID must be a 3-character ISO code or left empty');
+      return;
+    }
+
+    setSavingTariffRate(true);
+
+    try {
+      // Use proxied endpoint so middleware can inject Authorization header
+      const response = await fetch('/api/database/tariff-rates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          newsLink: selectedArticleForTariff.url,
+          countryId: tariffFormData.countryId.toUpperCase(),
+          partnerCountryId: tariffFormData.partnerCountryId ? tariffFormData.partnerCountryId.toUpperCase() : null,
+          productId: parseInt(tariffFormData.productId),
+          tariffTypeId: tariffFormData.tariffTypeId ? parseInt(tariffFormData.tariffTypeId) : null,
+          year: parseInt(tariffFormData.year),
+          rate: parseFloat(tariffFormData.rate),
+          unit: tariffFormData.unit || '%'
+        }),
+        cache: 'no-store'
+      });
+
+      if (response.ok) {
+        alert('✅ Tariff rate saved to database successfully!');
+        closeTariffModal();
+      } else {
+        const errorText = await response.text();
+        alert(`Failed to save tariff rate: ${errorText}`);
+      }
+    } catch (error) {
+      console.error('Error saving tariff rate:', error);
+      alert('Failed to save tariff rate. Please try again.');
+    } finally {
+      setSavingTariffRate(false);
+    }
   };
 
   const handleRemarksChange = (index: number, value: string) => {
@@ -1354,11 +1468,24 @@ Return ONLY valid JSON (no markdown, no explanation):
 
                   {isAdmin && article.geminiAnalysis && !article.analyzingWithGemini && (
                     <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-2 border-cyan-400/50 rounded-xl p-6 mb-6 shadow-lg">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="bg-cyan-400/30 p-2 rounded-lg">
-                          <IconDatabase className="w-6 h-6 text-cyan-200" />
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-cyan-400/30 p-2 rounded-lg">
+                            <IconDatabase className="w-6 h-6 text-cyan-200" />
+                          </div>
+                          <span className="text-cyan-100 font-bold text-lg">Tariff Analysis (AI-Extracted)</span>
                         </div>
-                        <span className="text-cyan-100 font-bold text-lg">Tariff Analysis (AI-Extracted)</span>
+
+                        {/* Save Tariff Rate Button - Only if in database */}
+                        {article.isInDatabase && (
+                          <button
+                            onClick={() => openTariffModal(article)}
+                            className="bg-gradient-to-r from-green-500/30 to-emerald-500/30 hover:from-green-500/40 hover:to-emerald-500/40 text-green-200 hover:text-green-100 font-bold px-4 py-2 rounded-lg border border-green-400/40 hover:border-green-300 transition-all duration-200 text-sm flex items-center gap-2"
+                          >
+                            <IconDatabase className="w-4 h-4" />
+                            Save Tariff Rate to Database
+                          </button>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -1568,6 +1695,209 @@ Return ONLY valid JSON (no markdown, no explanation):
           </>
         )}
       </div>
+
+      {/* Tariff Rate Modal */}
+      {showTariffModal && selectedArticleForTariff && (
+        <>
+          {/* Modal Overlay */}
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
+            onClick={closeTariffModal}
+          />
+
+          {/* Modal Content */}
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div
+              className="bg-gradient-to-br from-gray-900 to-black border-2 border-cyan-400/50 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-b-2 border-cyan-400/50 p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-cyan-400/30 p-2 rounded-lg">
+                      <IconDatabase className="w-6 h-6 text-cyan-200" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white">Save Tariff Rate to Database</h2>
+                  </div>
+                  <button
+                    onClick={closeTariffModal}
+                    className="text-white/70 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <p className="text-white/70 text-sm mt-2">
+                  Article: {selectedArticleForTariff.title.substring(0, 80)}...
+                </p>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-4">
+                {/* Show Gemini extracted data as reference */}
+                {selectedArticleForTariff.geminiAnalysis && (
+                  <div className="bg-blue-500/20 border border-blue-400/40 rounded-lg p-4 mb-4">
+                    <p className="text-blue-200 text-sm font-semibold mb-2">📋 Gemini AI Extracted Data (for reference):</p>
+                    <div className="text-blue-100 text-xs space-y-1">
+                      <p>• Country: {selectedArticleForTariff.geminiAnalysis.exporterCountry}</p>
+                      <p>• Partner: {selectedArticleForTariff.geminiAnalysis.importerCountry}</p>
+                      <p>• Product: {selectedArticleForTariff.geminiAnalysis.product}</p>
+                      <p>• Year: {selectedArticleForTariff.geminiAnalysis.year}</p>
+                      <p>• Rate: {selectedArticleForTariff.geminiAnalysis.tariffRate}</p>
+                    </div>
+                    <p className="text-blue-200 text-xs mt-2 italic">⚠️ You must convert these to ISO codes and HS codes below</p>
+                  </div>
+                )}
+
+                {/* Country ID */}
+                <div>
+                  <label className="block text-cyan-300 font-semibold mb-2 text-sm">
+                    Country ISO Code (3 chars) <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={3}
+                    value={tariffFormData.countryId}
+                    onChange={(e) => handleTariffFormChange('countryId', e.target.value.toUpperCase())}
+                    placeholder="e.g., JPN, USA, CHN"
+                    className="w-full px-4 py-3 bg-black/50 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-cyan-400/60 transition-all uppercase"
+                  />
+                </div>
+
+                {/* Partner Country ID */}
+                <div>
+                  <label className="block text-green-300 font-semibold mb-2 text-sm">
+                    Partner Country ISO Code (3 chars, optional)
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={3}
+                    value={tariffFormData.partnerCountryId}
+                    onChange={(e) => handleTariffFormChange('partnerCountryId', e.target.value.toUpperCase())}
+                    placeholder="e.g., USA, CHN (optional)"
+                    className="w-full px-4 py-3 bg-black/50 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-green-400/60 transition-all uppercase"
+                  />
+                </div>
+
+                {/* Product ID */}
+                <div>
+                  <label className="block text-yellow-300 font-semibold mb-2 text-sm">
+                    Product HS Code (integer) <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={tariffFormData.productId}
+                    onChange={(e) => handleTariffFormChange('productId', e.target.value)}
+                    placeholder="e.g., 100630 for rice"
+                    className="w-full px-4 py-3 bg-black/50 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-yellow-400/60 transition-all"
+                  />
+                </div>
+
+                {/* Tariff Type ID */}
+                <div>
+                  <label className="block text-purple-300 font-semibold mb-2 text-sm">
+                    Tariff Type ID (integer, optional)
+                  </label>
+                  <input
+                    type="number"
+                    value={tariffFormData.tariffTypeId}
+                    onChange={(e) => handleTariffFormChange('tariffTypeId', e.target.value)}
+                    placeholder="e.g., 1 for MFN (optional)"
+                    className="w-full px-4 py-3 bg-black/50 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-purple-400/60 transition-all"
+                  />
+                </div>
+
+                {/* Year */}
+                <div>
+                  <label className="block text-pink-300 font-semibold mb-2 text-sm">
+                    Year <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={tariffFormData.year}
+                    onChange={(e) => handleTariffFormChange('year', e.target.value)}
+                    placeholder="e.g., 2024"
+                    min="1900"
+                    max="2100"
+                    className="w-full px-4 py-3 bg-black/50 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-pink-400/60 transition-all"
+                  />
+                </div>
+
+                {/* Rate and Unit */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-orange-300 font-semibold mb-2 text-sm">
+                      Tariff Rate <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={tariffFormData.rate}
+                      onChange={(e) => handleTariffFormChange('rate', e.target.value)}
+                      placeholder="e.g., 50"
+                      className="w-full px-4 py-3 bg-black/50 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-orange-400/60 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-orange-300 font-semibold mb-2 text-sm">
+                      Unit
+                    </label>
+                    <input
+                      type="text"
+                      value={tariffFormData.unit}
+                      onChange={(e) => handleTariffFormChange('unit', e.target.value)}
+                      placeholder="e.g., %"
+                      className="w-full px-4 py-3 bg-black/50 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-orange-400/60 transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Info Message */}
+                <div className="bg-orange-500/20 border border-orange-400/40 rounded-lg p-4">
+                  <p className="text-orange-200 text-sm font-semibold mb-1">
+                    ⚠️ Important: Database Requirements
+                  </p>
+                  <ul className="text-orange-100 text-xs space-y-1 ml-4 list-disc">
+                    <li>Country codes must be 3-character ISO codes (e.g., JPN for Japan, USA for United States)</li>
+                    <li>Product codes must be HS (Harmonized System) codes (e.g., 100630 for semi-milled rice)</li>
+                    <li>Tariff type IDs are database reference IDs (optional)</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-gradient-to-r from-gray-800/50 to-black/50 border-t-2 border-white/20 p-6 flex gap-4 justify-end">
+                <button
+                  onClick={closeTariffModal}
+                  disabled={savingTariffRate}
+                  className="bg-gray-500/20 hover:bg-gray-500/30 disabled:bg-gray-500/10 text-gray-300 hover:text-white disabled:text-gray-500 font-bold px-6 py-3 rounded-lg border border-gray-400/40 hover:border-gray-300 disabled:border-gray-400/20 transition-all disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveTariffRateToDatabase}
+                  disabled={savingTariffRate}
+                  className="bg-gradient-to-r from-green-500/30 to-emerald-500/30 hover:from-green-500/40 hover:to-emerald-500/40 disabled:from-gray-500/20 disabled:to-gray-500/20 text-green-200 hover:text-green-100 disabled:text-gray-400 font-bold px-6 py-3 rounded-lg border border-green-400/40 hover:border-green-300 disabled:border-gray-400/40 transition-all disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {savingTariffRate ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-green-300/30 border-t-green-300 rounded-full animate-spin"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <IconDatabase className="w-5 h-5" />
+                      Save to Database
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }
