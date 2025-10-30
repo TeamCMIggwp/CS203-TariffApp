@@ -116,28 +116,22 @@ export default function NewsPage() {
   };
 
   /**
-   * Extract user role from JWT token
+   * Check user role by calling server-side API (can read HttpOnly cookie)
    */
-  const checkUserRole = () => {
+  const checkUserRole = async () => {
     try {
-      const token = getAccessToken();
+      const response = await fetch('/api/user/me', {
+        method: 'GET',
+        cache: 'no-store'
+      });
 
-      if (!token) {
+      if (response.ok) {
+        const data = await response.json();
+        setIsAdmin(data.isAdmin || false);
+        console.log('User role check - isAdmin:', data.isAdmin, 'role:', data.role);
+      } else {
         setIsAdmin(false);
-        return;
       }
-
-      // Decode JWT (simple base64 decode of payload)
-      const payload = JSON.parse(atob(token.split('.')[1]));
-
-      // Check if user has ADMIN role (JWT has single "role" field, not array)
-      const role = payload.role || 'user';
-      const hasAdminRole = role.toLowerCase() === 'admin' ||
-                          role.toLowerCase() === 'administrator' ||
-                          role.toUpperCase() === 'ROLE_ADMIN';
-
-      setIsAdmin(hasAdminRole);
-      console.log('User role check - isAdmin:', hasAdminRole, 'role:', role, 'payload:', payload);
     } catch (error) {
       console.error('Error checking user role:', error);
       setIsAdmin(false);
