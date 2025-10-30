@@ -1,67 +1,26 @@
 package database.newstariffrates.entity;
 
-import jakarta.persistence.*;
-import java.time.LocalDateTime;
-
-@Entity
-@Table(name = "TariffRates")
 public class NewsTariffRate {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "tariff_id")
-    private Integer id;
-
-    @Column(name = "news_link", nullable = false, unique = true, length = 200)
+    private Integer tariffId;
     private String newsLink;
-
-    @Column(name = "country_id", length = 3)
     private String countryId;
-
-    @Column(name = "partner_country_id", length = 3)
     private String partnerCountryId;
-
-    @Column(name = "product_id")
     private Integer productId;
-
-    @Column(name = "tariff_type_id")
     private Integer tariffTypeId;
-
-    @Column(name = "year")
     private Integer year;
-
-    @Column(name = "rate", precision = 6, scale = 3)
     private Double rate;
-
-    @Column(name = "unit", length = 20)
     private String unit;
-
-    @Column(name = "last_updated")
     private java.sql.Timestamp lastUpdated;
-
-    @Column(name = "in_effect")
     private Boolean inEffect;
 
-    @PrePersist
-    protected void onCreate() {
-        lastUpdated = new java.sql.Timestamp(System.currentTimeMillis());
-        if (inEffect == null) {
-            inEffect = true; // Default to active
-        }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        lastUpdated = new java.sql.Timestamp(System.currentTimeMillis());
-    }
-
     // Getters and Setters
-    public Integer getId() {
-        return id;
+    public Integer getTariffId() {
+        return tariffId;
     }
 
-    public void setId(Integer id) {
-        this.id = id;
+    public void setTariffId(Integer tariffId) {
+        this.tariffId = tariffId;
     }
 
     public String getNewsLink() {

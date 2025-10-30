@@ -5,8 +5,8 @@ import java.time.LocalDateTime;
 
 public class NewsTariffRateResponse {
 
-    @JsonProperty("id")
-    private Integer id;
+    @JsonProperty("tariffId")
+    private Integer tariffId;
 
     @JsonProperty("newsLink")
     private String newsLink;
@@ -39,12 +39,12 @@ public class NewsTariffRateResponse {
     private Boolean inEffect;
 
     // Getters and Setters
-    public Integer getId() {
-        return id;
+    public Integer getTariffId() {
+        return tariffId;
     }
 
-    public void setId(Integer id) {
-        this.id = id;
+    public void setTariffId(Integer tariffId) {
+        this.tariffId = tariffId;
     }
 
     public String getNewsLink() {

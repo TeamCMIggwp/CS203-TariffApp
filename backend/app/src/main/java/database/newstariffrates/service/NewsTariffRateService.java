@@ -44,11 +44,12 @@ public class NewsTariffRateService {
         entity.setYear(request.getYear());
         entity.setRate(request.getRate());
         entity.setUnit(request.getUnit());
+        entity.setInEffect(true); // Default to active
 
         // Save to database
         NewsTariffRate saved = repository.save(entity);
 
-        logger.info("Tariff rate created successfully with ID: {}", saved.getId());
+        logger.info("Tariff rate created successfully with ID: {}", saved.getTariffId());
 
         // Convert to response DTO
         return convertToResponse(saved);
@@ -78,7 +79,7 @@ public class NewsTariffRateService {
      */
     private NewsTariffRateResponse convertToResponse(NewsTariffRate entity) {
         NewsTariffRateResponse response = new NewsTariffRateResponse();
-        response.setId(entity.getId());
+        response.setTariffId(entity.getTariffId());
         response.setNewsLink(entity.getNewsLink());
         response.setCountryId(entity.getCountryId());
         response.setPartnerCountryId(entity.getPartnerCountryId());
