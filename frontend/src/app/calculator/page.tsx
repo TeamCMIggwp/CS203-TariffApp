@@ -497,50 +497,50 @@ export default function CalculatorSection() {
             <CardTitle className="calculator-title">Agricultural Tariff Calculator</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="from-country">From Country (Exporter)</Label>
-                <Select value={fromCountry} onValueChange={setFromCountry}>
-                  <SelectTrigger>
-                    <SelectValue>{getCountryName(fromCountry)}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {countries.map(c => (
-                      <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+  {/* Top row: From, To, Year all in one line */}
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="space-y-2">
+      <Label htmlFor="from-country">From Country (Exporter)</Label>
+      <Select value={fromCountry} onValueChange={setFromCountry}>
+        <SelectTrigger>
+          <SelectValue>{getCountryName(fromCountry)}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {countries.map(c => (
+            <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="to-country">To Country (Importer)</Label>
-                <Select value={toCountry} onValueChange={setToCountry}>
-                  <SelectTrigger>
-                    <SelectValue>{getCountryName(toCountry)}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {countries.map(c => (
-                      <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+    <div className="space-y-2">
+      <Label htmlFor="to-country">To Country (Importer)</Label>
+      <Select value={toCountry} onValueChange={setToCountry}>
+        <SelectTrigger>
+          <SelectValue>{getCountryName(toCountry)}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {countries.map(c => (
+            <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="year">Year</Label>
-                <Select value={year} onValueChange={setYear}>
-                  <SelectTrigger>
-                    <SelectValue>{year}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[2024, 2023, 2022, 2021, 2020, 2019].map(y => (
-                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
+    <div className="space-y-2">
+      <Label htmlFor="year">Year</Label>
+      <Select value={year} onValueChange={setYear}>
+        <SelectTrigger>
+          <SelectValue>{year}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {[2024, 2023, 2022, 2021, 2020, 2019].map(y => (
+            <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
             {/* Products Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
