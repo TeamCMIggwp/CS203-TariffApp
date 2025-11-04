@@ -12,7 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
-import java.time.LocalDateTime;
+import java.sql.Timestamp;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,8 +30,8 @@ class NewsTariffRateServiceTest {
     private NewsTariffRateService service;
 
     private static final String NEWS_LINK = "https://example.com/news/1";
-    private static final Integer COUNTRY_ID = 702;
-    private static final Integer PARTNER_COUNTRY_ID = 156;
+    private static final String COUNTRY_ID = "702";
+    private static final String PARTNER_COUNTRY_ID = "156";
     private static final Integer PRODUCT_ID = 1001;
     private static final Integer TARIFF_TYPE_ID = 1;
     private static final Integer YEAR = 2023;
@@ -61,7 +61,7 @@ class NewsTariffRateServiceTest {
         savedEntity.setYear(YEAR);
         savedEntity.setRate(RATE);
         savedEntity.setUnit(UNIT);
-        savedEntity.setLastUpdated(LocalDateTime.now());
+        savedEntity.setLastUpdated(new Timestamp(System.currentTimeMillis()));
         savedEntity.setInEffect(true);
 
         when(repository.existsByNewsLink(NEWS_LINK)).thenReturn(false);
@@ -124,7 +124,7 @@ class NewsTariffRateServiceTest {
         entity.setYear(YEAR);
         entity.setRate(RATE);
         entity.setUnit(UNIT);
-        entity.setLastUpdated(LocalDateTime.now());
+        entity.setLastUpdated(new Timestamp(System.currentTimeMillis()));
         entity.setInEffect(true);
 
         when(repository.findByNewsLink(NEWS_LINK)).thenReturn(Optional.of(entity));
