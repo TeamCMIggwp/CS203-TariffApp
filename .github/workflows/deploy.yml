@@ -43,14 +43,25 @@ jobs:
         cd backend/app
         mvn clean verify
         
-    - name: Deploy JAR and JaCoCo Reports
+    - name: Deploy JAR
       if: success()
       uses: appleboy/scp-action@v0.1.4
       with:
         host: ${{ secrets.AWS_HOST }}
         username: ${{ secrets.AWS_USERNAME }}
         key: ${{ secrets.AWS_PRIVATE_KEY }}
-        source: "backend/app/target/api-server-1.0.jar,backend/app/target/site/jacoco"
+        source: "backend/app/target/api-server-1.0.jar"
+        target: "backend/app/target/"
+        strip_components: 3
+
+    - name: Deploy JaCoCo Reports
+      if: success()
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.AWS_HOST }}
+        username: ${{ secrets.AWS_USERNAME }}
+        key: ${{ secrets.AWS_PRIVATE_KEY }}
+        source: "backend/app/target/site/"
         target: "backend/app/target/"
         strip_components: 3
         
