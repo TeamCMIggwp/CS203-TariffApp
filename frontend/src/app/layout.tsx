@@ -23,27 +23,55 @@ const World = dynamic(() => import("@/components/ui/globe").then((m) => m.World)
   ssr: false,
 })
 
+const isDev = process.env.NODE_ENV === "development"
+
 const globeConfig = {
   pointSize: 4,
   globeColor: "#062056",
+  // Textures: keep local-only to avoid CORS issues; provide higher-res local files later
+  globeImageUrl: "/8k_earth_daymap.ktx2",
+  nightImageUrl: "/8k_earth_nightmap.ktx2",
+  showNightLights: false, // make brightness uniform; disable night overlay
+  // Optional extras if you add them later:
+  // bumpImageUrl: "/earth_bump.jpg", // add to public/ to enable
+  // specularImageUrl: "/earth_specular.jpg", // add to public/ to enable
+  cloudsImageUrl: "/8k_earth_clouds.ktx2",
+  cloudsSpeed: 0.0006, // even slower cloud rotation
   showAtmosphere: true,
   atmosphereColor: "#FFFFFF",
   atmosphereAltitude: 0.1,
-  emissive: "#062056",
-  emissiveIntensity: 0.1,
-  shininess: 0.9,
-  polygonColor: "rgba(255,255,255,0.7)",
-  ambientLight: "#38bdf8",
-  directionalLeftLight: "#ffffff",
-  directionalTopLight: "#ffffff",
+  // Keep emissive low so the day texture retains contrast
+  emissive: "#102b4d",
+  emissiveIntensity: 0.32,
+  shininess: 8,
+  polygonColor: "rgba(255,255,255,0.2)",
+  showHexPolygons: false,
+  ambientLight: "#7fb1ff",
+  ambientIntensity: 0.75,
+  directionalLeftLight: "#f0f5ff", // soft cool rim light
+  directionalTopLight: "#deebff",
   pointLight: "#ffffff",
-  arcTime: 1000,
-  arcLength: 0.9,
+  directionalIntensity: 0.72, // stronger contouring with balanced highlights
+  // Significantly reduce arc count and visibility
+  arcDensity: 0.01, // 1% of arcs sampled
+  maxArcs: 4,      // hard cap
+  arcTime: 1200,
+  arcLength: 0.5,
   rings: 1,
   maxRings: 3,
-  initialPosition: { lat: 22.3193, lng: 114.1694 },
+  showRings: false, // disable translucent pulse rings entirely
+  // Start centered over Singapore (lat ~1.35N, lng ~103.82E)
+  initialPosition: { lat: 300.35, lng: 103.82, altitude: 2.2 },
   autoRotate: true,
-  autoRotateSpeed: 0.5,
+  autoRotateSpeed: 0.06,  // a hair slower
+  useSkybox: !isDev,
+  starsBackgroundUrl: "/stars_milky.jpg",
+  starfieldCount: isDev ? 1200 : 2000,
+  enableBloom: !isDev,
+  flipPoles: false,
+  flipTextureVertically: true,
+  flipTextureHorizontally: false,
+  flipLongitude: true,
 }
 
 const colors = ["#06b6d4", "#3b82f6", "#6366f1"]
@@ -438,7 +466,7 @@ const links = [
     icon: <Newspaper className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
     href: "/news",
   },
-    {
+  {
     title: "About",
     icon: <IconFileInfo className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
     href: "/about",
@@ -448,7 +476,6 @@ const links = [
     icon: <IconUser className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
     href: "/login",
   }
-
 ]
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

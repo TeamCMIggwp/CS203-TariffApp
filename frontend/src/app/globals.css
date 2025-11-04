@@ -1,3 +1,4 @@
+/* stylelint-disable */
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -139,21 +140,30 @@
   }
 
   .home-title {
-    @apply text-6xl md:text-8xl font-bold text-white;
-    background: linear-gradient(to right, #22d3ee, #ffffff, #22d3ee);
+    @apply text-6xl md:text-8xl font-bold uppercase tracking-tight;
+    background: linear-gradient(135deg, #eef2f9 0%, #d3d8e4 30%, #aeb6c6 55%, #f6f7fb 85%, #c4ccd9 100%);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    color: white;
+    color: transparent;
+    text-shadow:
+      0 16px 32px rgba(7, 20, 40, 0.55),
+      0 4px 8px rgba(10, 22, 48, 0.4),
+      0 -2px 2px rgba(255, 255, 255, 0.6);
+    filter: drop-shadow(0 6px 12px rgba(6, 14, 28, 0.45));
   }
 
   .home-subtitle {
-    @apply text-xl md:text-2xl mt-6 max-w-2xl mx-auto font-medium;
-    background: linear-gradient(to right, #22d3ee, #ffffff, #22d3ee);
+    @apply text-xl md:text-2xl mt-6 max-w-2xl mx-auto font-medium tracking-wide;
+    background: linear-gradient(120deg, #dbe3ef 0%, #b7c2d5 45%, #eef2f9 80%);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    color: white;
+    color: transparent;
+    text-shadow:
+      0 8px 18px rgba(5, 14, 30, 0.4),
+      0 2px 4px rgba(12, 26, 52, 0.3),
+      0 -1px 1px rgba(255, 255, 255, 0.5);
   }
 
   /* globals.css */
