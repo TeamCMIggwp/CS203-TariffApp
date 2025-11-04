@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Color, Scene, Fog, PerspectiveCamera, Vector3 } from "three";
+import { Color, Vector3 } from "three";
 import ThreeGlobe from "three-globe";
 import * as THREE from 'three';
 import { useThree, Canvas, extend, useLoader, useFrame } from "@react-three/fiber";
-import { OrbitControls, AdaptiveDpr, AdaptiveEvents, PerformanceMonitor, Html, Effects } from "@react-three/drei";
+import { OrbitControls, Html, Effects } from "@react-three/drei";
 import { UnrealBloomPass, KTX2Loader } from 'three-stdlib';
 import countries from "@/data/globe.json";
 declare module "@react-three/fiber" {
@@ -22,16 +22,12 @@ let __ktx2Loader: KTX2Loader | null = null;
 function getKtx2Loader(gl: THREE.WebGLRenderer): KTX2Loader {
   if (!__ktx2Loader) {
     __ktx2Loader = new KTX2Loader().setTranscoderPath('/basis/');
-    // @ts-ignore KTX2Loader accepts WebGLRenderer
-  // @ts-ignore KTX2Loader accepts WebGLRenderer
     __ktx2Loader.detectSupport(gl);
   }
   return __ktx2Loader;
 }
 
 const RING_PROPAGATION_SPEED = 3;
-const aspect = 1.2;
-const cameraZ = 300;
 
 type Position = {
   order: number;
@@ -225,12 +221,11 @@ export function Globe({ globeConfig, data }: WorldProps) {
         loadKTX2(defaultProps.globeImageUrl, (tex) => {
           // Ensure proper color space so colors don't wash out
           tex.colorSpace = THREE.SRGBColorSpace;
-          const hasMipmaps = Array.isArray((tex as any).mipmaps) && (tex as any).mipmaps.length > 1;
+          const hasMipmaps = Array.isArray(tex.mipmaps) && tex.mipmaps.length > 1;
           tex.generateMipmaps = false;
           tex.minFilter = hasMipmaps ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
           tex.magFilter = THREE.LinearFilter;
           dayTexRef.current = tex;
-          (globeMaterial as any).map = tex;
           globeMaterial.map = tex;
           globeMaterial.needsUpdate = true;
         }, () => {
@@ -247,7 +242,6 @@ export function Globe({ globeConfig, data }: WorldProps) {
         try { bumpTexRef.current?.dispose(); } catch {}
         loadKTX2(defaultProps.bumpImageUrl, (tex) => {
           bumpTexRef.current = tex;
-          (globeMaterial as any).bumpMap = tex;
           globeMaterial.bumpMap = tex;
           globeMaterial.bumpScale = 0.4;
           globeMaterial.needsUpdate = true;
@@ -264,34 +258,31 @@ export function Globe({ globeConfig, data }: WorldProps) {
       // Dispose the previous one if any
       try { specularTexRef.current?.dispose(); } catch {}
       const onSpecularReady = (tex: THREE.Texture) => {
-        tex.colorSpace = (THREE as any).SRGBColorSpace;
+        tex.colorSpace = THREE.SRGBColorSpace;
         tex.wrapS = THREE.ClampToEdgeWrapping;
         tex.wrapT = THREE.ClampToEdgeWrapping;
-        const hasMipmaps = Array.isArray((tex as any).mipmaps) && (tex as any).mipmaps.length > 1;
+        const hasMipmaps = Array.isArray(tex.mipmaps) && tex.mipmaps.length > 1;
         tex.generateMipmaps = false;
         tex.minFilter = hasMipmaps ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
         tex.magFilter = THREE.LinearFilter;
         globeMaterial.specularMap = tex;
-        globeMaterial.specular = new Color(0x444444);
-          globeMaterial.specularMap = tex;
-          globeMaterial.needsUpdate = true;
+        globeMaterial.specular = new THREE.Color(0x444444);
+        globeMaterial.needsUpdate = true;
         specularTexRef.current = tex;
       };
       if (defaultProps.specularImageUrl.toLowerCase().endsWith('.ktx2')) {
         loadKTX2(defaultProps.specularImageUrl, onSpecularReady, () => {
           new THREE.TextureLoader().load(defaultProps.specularImageUrl!, onSpecularReady, undefined, () => {
-            globeMaterial.specularMap = null as any;
-          globeMaterial.specularMap = null;
-          globeMaterial.specularMap = null;
+            globeMaterial.specularMap = null;
           });
         });
       } else {
         new THREE.TextureLoader().load(defaultProps.specularImageUrl, onSpecularReady, undefined, () => {
-          globeMaterial.specularMap = null as any;
+          globeMaterial.specularMap = null;
         });
       }
     } else {
-      globeMaterial.specularMap = null as any;
+      globeMaterial.specularMap = null;
     }
   }, [
     isInitialized,
@@ -302,6 +293,9 @@ export function Globe({ globeConfig, data }: WorldProps) {
     defaultProps.globeImageUrl,
     defaultProps.bumpImageUrl,
     defaultProps.specularImageUrl,
+    defaultProps.flipTextureHorizontally,
+    defaultProps.flipTextureVertically,
+    gl,
   ]);
 
   // Dispose specular map on unmount
@@ -514,7 +508,7 @@ export function WebGLRendererConfig() {
 export function World(props: WorldProps) {
   const { globeConfig } = props;
   const worldCfg = { enableBloom: true, forceBloomInDev: false, ...globeConfig } as GlobeConfig;
-  const scene = new Scene();
+  const scene = new THREE.Scene();
   scene.fog = null;
   return (
     <Canvas
@@ -563,7 +557,7 @@ export function World(props: WorldProps) {
       {/* Subtle bloom for arcs/city lights (disabled by default in dev to reduce GPU pressure) */}
       {(worldCfg.enableBloom !== false) && (process.env.NODE_ENV !== 'development' || worldCfg.forceBloomInDev) && (
         <Effects disableGamma>
-          <primitive object={new UnrealBloomPass(undefined as unknown as THREE.Vector2, 0.4, 0.4, 0.9)} />
+          <primitive object={new UnrealBloomPass(new THREE.Vector2(1024, 1024), 0.4, 0.4, 0.9)} />
         </Effects>
       )}
       <OrbitControls

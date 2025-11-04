@@ -85,6 +85,7 @@ export default function SessionKeeper({ warnSeconds = 120, showBadge = false }: 
       setBusy(false);
       poll();
     } catch (_err: unknown) {
+      console.error("Token refresh error:", _err);
       // Fallback: cross-site refresh bridge (requires NEXT_PUBLIC_BACKEND_URL)
       setBusy(false);
       try {

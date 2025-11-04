@@ -158,6 +158,7 @@ export default function NewsPage() {
   }, []);
 
   // Fetch hidden sources count when isAdmin is determined
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchHiddenSources();
   }, [isAdmin]);
