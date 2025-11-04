@@ -43,6 +43,9 @@ public class SecurityConfig {
 				.requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
 				.requestMatchers("/hello").permitAll()
 
+				// JaCoCo coverage reports OPEN
+				.requestMatchers("/jacoco/**").permitAll()
+
 				// Auth endpoints open (login/signup/refresh/logout/me handled in controller)
 				.requestMatchers("/auth/**").permitAll()
 

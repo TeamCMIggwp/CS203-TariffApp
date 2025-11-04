@@ -21,7 +21,7 @@ jobs:
         cd backend/app
         mvn clean package -DskipTests
         
-    - name: Test
+    - name: Test and Generate Coverage
       env:
         GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         WTO_API_KEY: ${{ secrets.WTO_API_KEY }}
@@ -41,16 +41,16 @@ jobs:
         COOKIE_SAMESITE: ${{ secrets.COOKIE_SAMESITE }}
       run: |
         cd backend/app
-        mvn test
+        mvn clean verify
         
-    - name: Deploy
+    - name: Deploy JAR and JaCoCo Reports
       if: success()
       uses: appleboy/scp-action@v0.1.4
       with:
         host: ${{ secrets.AWS_HOST }}
         username: ${{ secrets.AWS_USERNAME }}
         key: ${{ secrets.AWS_PRIVATE_KEY }}
-        source: "backend/app/target/api-server-1.0.jar"
+        source: "backend/app/target/api-server-1.0.jar,backend/app/target/site/jacoco"
         target: "backend/app/target/"
         strip_components: 3
         
