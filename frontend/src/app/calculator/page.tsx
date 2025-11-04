@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts"
-import { BarChart3, Sparkles, Database, Globe } from "lucide-react"
+import { BarChart3, Sparkles, Database, Globe, Plus, Trash2 } from "lucide-react"
 
 type MetricValue = string | number
 
@@ -21,23 +21,34 @@ type GeminiApiResponse = {
   confidence?: string
 } | string | null
 
+type ProductRow = {
+  id: string
+  productCode: string
+  value: string
+  tariffRate: number | null
+  tariffAmount: number | null
+  dataSource: 'database' | 'wto' | null
+  status: 'idle' | 'loading' | 'success' | 'error'
+  errorMessage?: string
+}
+
 export default function CalculatorSection() {
   const calculatorY = useMotionValue(0)
   const [fromCountry, setFromCountry] = useState("004")
   const [toCountry, setToCountry] = useState("840")
-  const [product, setProduct] = useState("100630")
-  const [value, setValue] = useState("100")
   const [year, setYear] = useState("2024")
-  const [calculatedTariff, setCalculatedTariff] = useState<number | null>(null)
+  
+  // Changed to array of products
+  const [products, setProducts] = useState<ProductRow[]>([
+    { id: '1', productCode: '100630', value: '100', tariffRate: null, tariffAmount: null, dataSource: null, status: 'idle' }
+  ])
 
   const [apiResponse, setApiResponse] = useState<GeminiApiResponse | string | null>(null)
   const [isCalculatingTariff, setIsCalculatingTariff] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [inputError, setInputError] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
-  const [tariffPercentage, setTariffPercentage] = useState<string | null>(null)
   const [aiFinished, setAiFinished] = useState(false)
-  const [dataSource, setDataSource] = useState<"database" | "wto" | null>(null)
 
   const [showAIAnalysis, setShowAIAnalysis] = useState(false)
   const [showCharts, setShowCharts] = useState(false)
@@ -45,46 +56,29 @@ export default function CalculatorSection() {
   // Backend API base URL, configurable via environment for Amplify and local dev
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
 
-  const callGeminiApi = async (data: string, prompt?: string) => {
-    try {
-      console.log('   📤 Sending request to Gemini API...')
-      console.log('   📝 Data:', data)
-      console.log('   📝 Prompt:', prompt)
-      const url = `${API_BASE}/api/v1/gemini/analyses`
-      const startTime = performance.now()
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data, prompt })
-      })
-      
-      const responseTime = performance.now() - startTime
-      console.log(`   ⏱️  Gemini API response time: ${responseTime.toFixed(2)}ms`)
-      console.log('   📥 Response status:', response.status)
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
+  const addProduct = () => {
+    const newId = String(Date.now())
+    setProducts([...products, { 
+      id: newId, 
+      productCode: '100630', 
+      value: '', 
+      tariffRate: null, 
+      tariffAmount: null, 
+      dataSource: null, 
+      status: 'idle' 
+    }])
+  }
 
-      const result = await response.json()
-      console.log('   📊 Gemini API result:', result)
-      
-      if (result?.success && result?.analysis) {
-        setApiResponse(result.analysis)
-        console.log('   ✅ Analysis set successfully')
-      } else {
-        setApiResponse("No analysis data returned from API.")
-        console.log('   ⚠️  No analysis data in response')
-      }
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Unknown error occurred"
-      setApiError(errorMsg)
-      console.error('   ❌ Gemini API Error:', errorMsg)
-      if (err instanceof Error && err.stack) {
-        console.error('   ❌ Stack:', err.stack)
-      }
+  const removeProduct = (id: string) => {
+    if (products.length > 1) {
+      setProducts(products.filter(p => p.id !== id))
     }
+  }
+
+  const updateProduct = (id: string, field: 'productCode' | 'value', value: string) => {
+    setProducts(products.map(p => 
+      p.id === id ? { ...p, [field]: value } : p
+    ))
   }
 
   // NEW: Function to save tariff to database
@@ -150,241 +144,318 @@ export default function CalculatorSection() {
     }
   }
 
+  const callGeminiApi = async (data: string, prompt?: string) => {
+    try {
+      console.log('   📤 Sending request to Gemini API...')
+      console.log('   📝 Data:', data)
+      console.log('   📝 Prompt:', prompt)
+      const url = `${API_BASE}/api/v1/gemini/analyses`
+      const startTime = performance.now()
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data, prompt })
+      })
+      
+      const responseTime = performance.now() - startTime
+      console.log(`   ⏱️  Gemini API response time: ${responseTime.toFixed(2)}ms`)
+      console.log('   📥 Response status:', response.status)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+      console.log('   📊 Gemini API result:', result)
+      
+      if (result?.success && result?.analysis) {
+        setApiResponse(result.analysis)
+        console.log('   ✅ Analysis set successfully')
+      } else {
+        setApiResponse("No analysis data returned from API.")
+        console.log('   ⚠️  No analysis data in response')
+      }
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error occurred"
+      setApiError(errorMsg)
+      console.error('   ❌ Gemini API Error:', errorMsg)
+      if (err instanceof Error && err.stack) {
+        console.error('   ❌ Stack:', err.stack)
+      }
+    }
+  }
+
+  const queryTariffForProduct = async (productCode: string): Promise<{
+    rate: number | null
+    source: 'database' | 'wto' | null
+  }> => {
+    let parsedPercentage: number | null = null
+    let foundInDatabase = false
+
+    // STEP 1: Query your database first
+    console.log(`\n📊 STEP 1: Querying database for product ${productCode}...`)
+    const startDb = performance.now()
+    const productInt = parseInt(productCode, 10)
+    const dbUrl = `${API_BASE}/api/v1/tariffs?reporter=${encodeURIComponent(toCountry)}&partner=${encodeURIComponent(fromCountry)}&product=${productInt}&year=${encodeURIComponent(year)}&tariffTypeId=1`
+    console.log('   📍 Database API URL:', dbUrl)
+
+    try {
+      const dbResponse = await fetch(dbUrl, { 
+        method: 'GET',
+        headers: { 
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      })
+      
+      const dbTime = performance.now() - startDb
+      console.log(`   ⏱️  Database response time: ${dbTime.toFixed(2)}ms`)
+      console.log('   📥 Database response status:', dbResponse.status)
+
+      if (dbResponse.status === 204) {
+        console.log('   ❌ Database returned 204 No Content - tariff not found')
+      } else if (dbResponse.ok) {
+        const responseText = await dbResponse.text()
+        console.log('   📄 Database raw response length:', responseText.length, 'chars')
+        
+        if (!responseText || responseText.trim() === '') {
+          console.log('   ❌ Database returned empty response')
+        } else {
+          try {
+            const dbData = JSON.parse(responseText)
+            console.log('   ✅ Database parsed response:', JSON.stringify(dbData, null, 2))
+            
+            if (dbData && dbData.rate !== undefined && dbData.rate !== null) {
+              parsedPercentage = typeof dbData.rate === 'number' ? dbData.rate : parseFloat(String(dbData.rate))
+              
+              if (Number.isFinite(parsedPercentage)) {
+                console.log('   ✅ ✅ SUCCESS! Found tariff in database:', parsedPercentage, '%')
+                foundInDatabase = true
+                return { rate: parsedPercentage, source: 'database' }
+              }
+            } else {
+              console.log('   ❌ Database response missing rate field')
+            }
+          } catch (parseErr) {
+            console.error('   ❌ Failed to parse database JSON:', parseErr)
+          }
+        }
+      } else if (dbResponse.status === 404) {
+        console.log('   ❌ Tariff not found in database (404)')
+      } else if (dbResponse.status === 502) {
+        const errorText = await dbResponse.text()
+        console.error('   ❌ Database 502 error response:', errorText)
+      } else {
+        console.warn('   ⚠️  Database query returned status:', dbResponse.status)
+        const errorText = await dbResponse.text()
+        console.warn('   ⚠️  Error response:', errorText)
+      }
+    } catch (dbErr) {
+      console.error('   ❌ Database query exception:', dbErr)
+      if (dbErr instanceof Error) {
+        console.error('   ❌ Error details:', dbErr.message, dbErr.stack)
+      }
+    }
+
+    // STEP 2: If not found in database, query WTO API
+    if (!foundInDatabase) {
+      console.log('\n🌐 STEP 2: Querying WTO API as fallback...')
+      const startWto = performance.now()
+      const wtoUrl = `${API_BASE}/api/v1/indicators/HS_P_0070/observations?i=HS_P_0070&r=${toCountry}&p=${fromCountry}&pc=${productCode}&ps=${year}&fmt=json`
+      console.log('   📍 WTO API URL:', wtoUrl)
+      
+      try {
+        const wtoResponse = await fetch(wtoUrl, { 
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          mode: 'cors',
+          credentials: 'omit'
+        })
+        const wtoTime = performance.now() - startWto
+        console.log(`   ⏱️  WTO API response time: ${wtoTime.toFixed(2)}ms`)
+        console.log('   📥 WTO API response status:', wtoResponse.status)
+
+        if (wtoResponse.status === 204) {
+          console.log('   ❌ WTO API returned 204 No Content - tariff not found')
+        } else if (wtoResponse.ok) {
+          const responseText = await wtoResponse.text()
+          console.log('   📄 WTO API raw response length:', responseText.length, 'chars')
+          
+          if (!responseText || responseText.trim() === '') {
+            console.log('   ❌ WTO API returned empty response')
+          } else {
+            try {
+              const wtoData = JSON.parse(responseText)
+              console.log('   ✅ WTO API parsed data:', JSON.stringify(wtoData, null, 2))
+              
+              type WTORecord = { Year?: number; Value?: string | number; [key: string]: unknown }
+              if (wtoData.Dataset && Array.isArray(wtoData.Dataset) && wtoData.Dataset.length > 0) {
+                const records = (wtoData.Dataset as WTORecord[]).sort((a: WTORecord, b: WTORecord) => ((b.Year ?? 0) - (a.Year ?? 0)))
+                const latestRecord = records[0]
+                console.log('   📊 Latest WTO record:', latestRecord)
+                
+                if (latestRecord && latestRecord.Value !== undefined) {
+                  const v = latestRecord.Value
+                  const num = typeof v === 'number' ? v : parseFloat(String(v))
+                  parsedPercentage = Number.isFinite(num) ? num : null
+                  
+                  if (parsedPercentage !== null) {
+                    console.log('   ✅ ✅ SUCCESS! Found tariff in WTO API:', parsedPercentage, '%')
+                    
+                    // Save to database if found in WTO API (commented out for now)
+                    // await saveTariffToDatabase(
+                    //   toCountry,     // reporter (importer)
+                    //   fromCountry,   // partner (exporter)
+                    //   productInt,    // product code
+                    //   year,          // year
+                    //   parsedPercentage, // rate
+                    //   "percent"      // unit
+                    // )
+                    
+                    return { rate: parsedPercentage, source: 'wto' }
+                  }
+                }
+              } else {
+                console.log('   ❌ WTO API returned no dataset or empty dataset')
+              }
+            } catch (parseErr) {
+              console.error('   ❌ Failed to parse WTO API JSON:', parseErr)
+              console.log('   📄 Response text was:', responseText.substring(0, 500))
+            }
+          }
+          
+          if (parsedPercentage === null) {
+            console.warn('   ⚠️  Could not parse tariff rate from WTO API response')
+          }
+        } else if (wtoResponse.status === 404 || wtoResponse.status === 422) {
+          console.log('   ❌ Tariff not found in WTO API (404/422)')
+        } else if (wtoResponse.status === 502) {
+          const errorText = await wtoResponse.text()
+          console.error('   ❌ WTO API 502 error:', errorText)
+        } else {
+          console.warn('   ⚠️  WTO API returned status:', wtoResponse.status)
+        }
+      } catch (wtoErr) {
+        console.error('   ❌ WTO API fetch failed:', wtoErr)
+        if (wtoErr instanceof Error) {
+          console.error('   ❌ Error:', wtoErr.message)
+        }
+      }
+    } else {
+      console.log('\n⏭️  STEP 2: Skipping WTO API (data found in database)')
+    }
+
+    return { rate: null, source: null }
+  }
+
   const calculateTariff = async () => {
-    if (!fromCountry || !toCountry || !product || !value || !year) {
-      setInputError("Please fill in all required fields.")
+    // Validate all products have data
+    const hasEmptyProducts = products.some(p => !p.productCode || !p.value)
+    if (!fromCountry || !toCountry || !year || hasEmptyProducts) {
+      setInputError("Please fill in all required fields for all products.")
       return
     }
 
     console.log('═══════════════════════════════════════════')
     console.log('🚀 STARTING TARIFF CALCULATION')
     console.log('═══════════════════════════════════════════')
-    console.log('Parameters:', { fromCountry, toCountry, product, year, value })
+    console.log('Parameters:', { fromCountry, toCountry, year, productCount: products.length })
 
     setInputError(null)
     setApiError(null)
-    setTariffPercentage(null)
-    setCalculatedTariff(null)
     setApiResponse(null)
-    setDataSource(null)
     setIsCalculatingTariff(true)
     setIsAnalyzing(true)
     setAiFinished(false)
     setShowAIAnalysis(false)
     setShowCharts(false)
 
+    // Reset all products to loading state
+    setProducts(products.map(p => ({ 
+      ...p, 
+      status: 'loading' as const, 
+      tariffRate: null, 
+      tariffAmount: null,
+      dataSource: null 
+    })))
+
     try {
-      let parsedPercentage: number | null = null
-      let foundInDatabase = false
-
-      // STEP 1: Query your database first
-      console.log('\n📊 STEP 1: Querying database...')
-      const startDb = performance.now()
-      const productInt = parseInt(product, 10)
-      const dbUrl = `${API_BASE}/api/v1/tariffs?reporter=${encodeURIComponent(toCountry)}&partner=${encodeURIComponent(fromCountry)}&product=${productInt}&year=${encodeURIComponent(year)}&tariffTypeId=1`
-      console.log('   📍 Database API URL:', dbUrl)
-
-      try {
-        const dbResponse = await fetch(dbUrl, { 
-          method: 'GET',
-          headers: { 
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        })
-        
-        const dbTime = performance.now() - startDb
-        console.log(`   ⏱️  Database response time: ${dbTime.toFixed(2)}ms`)
-        console.log('   📥 Database response status:', dbResponse.status)
-
-        if (dbResponse.status === 204) {
-          console.log('   ❌ Database returned 204 No Content - tariff not found')
-        } else if (dbResponse.ok) {
-          const responseText = await dbResponse.text()
-          console.log('   📄 Database raw response length:', responseText.length, 'chars')
-          
-          if (!responseText || responseText.trim() === '') {
-            console.log('   ❌ Database returned empty response')
-          } else {
-            try {
-              const dbData = JSON.parse(responseText)
-              console.log('   ✅ Database parsed response:', JSON.stringify(dbData, null, 2))
-              
-              if (dbData && dbData.rate !== undefined && dbData.rate !== null) {
-                parsedPercentage = typeof dbData.rate === 'number' ? dbData.rate : parseFloat(String(dbData.rate))
-                
-                if (Number.isFinite(parsedPercentage)) {
-                  console.log('   ✅ ✅ SUCCESS! Found tariff in database:', parsedPercentage, '%')
-                  foundInDatabase = true
-                  setDataSource("database")
-                }
-              } else {
-                console.log('   ❌ Database response missing rate field')
-              }
-            } catch (parseErr) {
-              console.error('   ❌ Failed to parse database JSON:', parseErr)
-            }
-          }
-        } else if (dbResponse.status === 404) {
-          console.log('   ❌ Tariff not found in database (404)')
-        } else if (dbResponse.status === 502) {
-          const errorText = await dbResponse.text()
-          console.error('   ❌ Database 502 error response:', errorText)
-        } else {
-          console.warn('   ⚠️  Database query returned status:', dbResponse.status)
-          const errorText = await dbResponse.text()
-          console.warn('   ⚠️  Error response:', errorText)
-        }
-      } catch (dbErr) {
-        console.error('   ❌ Database query exception:', dbErr)
-        if (dbErr instanceof Error) {
-          console.error('   ❌ Error details:', dbErr.message, dbErr.stack)
-        }
-      }
-
-      // STEP 2: If not found in database, query WTO API
-      if (!foundInDatabase) {
-        console.log('\n🌐 STEP 2: Querying WTO API as fallback...')
-        const startWto = performance.now()
-        const wtoUrl = `${API_BASE}/api/v1/indicators/HS_P_0070/observations?i=HS_P_0070&r=${toCountry}&p=${fromCountry}&pc=${product}&ps=${year}&fmt=json`
-        console.log('   📍 WTO API URL:', wtoUrl)
+      // Query tariffs for each product
+      const updatedProducts: ProductRow[] = []
+      
+      for (const product of products) {
+        console.log(`\n🔍 Processing product ${product.productCode}...`)
         
         try {
-          const wtoResponse = await fetch(wtoUrl, { 
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json'
-            },
-            mode: 'cors',
-            credentials: 'omit'
-          })
-          const wtoTime = performance.now() - startWto
-          console.log(`   ⏱️  WTO API response time: ${wtoTime.toFixed(2)}ms`)
-          console.log('   📥 WTO API response status:', wtoResponse.status)
-
-          if (wtoResponse.status === 204) {
-            console.log('   ❌ WTO API returned 204 No Content - tariff not found')
-          } else if (wtoResponse.ok) {
-            const responseText = await wtoResponse.text()
-            console.log('   📄 WTO API raw response length:', responseText.length, 'chars')
-            
-            if (!responseText || responseText.trim() === '') {
-              console.log('   ❌ WTO API returned empty response')
-            } else {
-              try {
-                const wtoData = JSON.parse(responseText)
-                console.log('   ✅ WTO API parsed data:', JSON.stringify(wtoData, null, 2))
-                
-                type WTORecord = { Year?: number; Value?: string | number; [key: string]: unknown }
-                if (wtoData.Dataset && Array.isArray(wtoData.Dataset) && wtoData.Dataset.length > 0) {
-                  const records = (wtoData.Dataset as WTORecord[]).sort((a: WTORecord, b: WTORecord) => ((b.Year ?? 0) - (a.Year ?? 0)))
-                  const latestRecord = records[0]
-                  console.log('   📊 Latest WTO record:', latestRecord)
-                  
-                  if (latestRecord && latestRecord.Value !== undefined) {
-                    const v = latestRecord.Value
-                    const num = typeof v === 'number' ? v : parseFloat(String(v))
-                    parsedPercentage = Number.isFinite(num) ? num : null
-                    
-                    if (parsedPercentage !== null) {
-                      console.log('   ✅ ✅ SUCCESS! Found tariff in WTO API:', parsedPercentage, '%')
-                      setDataSource("wto")
-                    }
-                  }
-                } else {
-                  console.log('   ❌ WTO API returned no dataset or empty dataset')
-                }
-              } catch (parseErr) {
-                console.error('   ❌ Failed to parse WTO API JSON:', parseErr)
-                console.log('   📄 Response text was:', responseText.substring(0, 500))
-              }
-            }
-            
-            if (parsedPercentage === null) {
-              console.warn('   ⚠️  Could not parse tariff rate from WTO API response')
-            }
-          } else if (wtoResponse.status === 404 || wtoResponse.status === 422) {
-            console.log('   ❌ Tariff not found in WTO API (404/422)')
-          } else if (wtoResponse.status === 502) {
-            const errorText = await wtoResponse.text()
-            console.error('   ❌ WTO API 502 error:', errorText)
+          const result = await queryTariffForProduct(product.productCode)
+          const productValue = parseFloat(product.value)
+          
+          if (result.rate !== null && !isNaN(productValue)) {
+            const tariffAmount = (result.rate / 100) * productValue
+            updatedProducts.push({
+              ...product,
+              tariffRate: result.rate,
+              tariffAmount: tariffAmount,
+              dataSource: result.source,
+              status: 'success'
+            })
+            console.log(`   ✅ Tariff calculated: ${result.rate}% = ${tariffAmount}`)
           } else {
-            console.warn('   ⚠️  WTO API returned status:', wtoResponse.status)
+            updatedProducts.push({
+              ...product,
+              tariffRate: null,
+              tariffAmount: null,
+              dataSource: null,
+              status: 'error',
+              errorMessage: 'No tariff data found (MFN may apply)'
+            })
+            console.log(`   ⚠️ No tariff data found`)
           }
-        } catch (wtoErr) {
-          console.error('   ❌ WTO API fetch failed:', wtoErr)
-          if (wtoErr instanceof Error) {
-            console.error('   ❌ Error:', wtoErr.message)
-          }
+        } catch (err) {
+          updatedProducts.push({
+            ...product,
+            status: 'error',
+            errorMessage: err instanceof Error ? err.message : 'Unknown error'
+          })
+          console.error(`   ❌ Error processing product:`, err)
         }
-      } else {
-        console.log('\n⏭️  STEP 2: Skipping WTO API (data found in database)')
       }
 
-      // STEP 3: Set tariff results and show to user immediately
-      console.log('\n💰 STEP 3: Setting tariff results...')
-      // STEP 3: Save to database if we got data from WTO API
-      // if (!foundInDatabase && parsedPercentage !== null) {
-      //   console.log('\n💾 STEP 3: Saving WTO data to database for future use...')
-      //   await saveTariffToDatabase(
-      //     toCountry,     // reporter (importer)
-      //     fromCountry,   // partner (exporter)
-      //     productInt,    // product code
-      //     year,          // year
-      //     parsedPercentage, // rate
-      //     "percent"      // unit
-      //   )
-      // } else if (foundInDatabase) {
-      //   console.log('\n⏭️  STEP 3: Skipping database save (data already in database)')
-      // } else {
-      //   console.log('\n⏭️  STEP 3: Skipping database save (no tariff data found)')
-      // }
-
-      // STEP 4: Set tariff results and show to user immediately
-      console.log('\n💰 STEP 4: Setting tariff results...')
-      if (parsedPercentage !== null && !isNaN(parsedPercentage)) {
-        setTariffPercentage(`${parsedPercentage.toFixed(2)}%`)
-        const goodsValue = parseFloat(value)
-        const calculatedValue = (parsedPercentage / 100) * goodsValue
-        setCalculatedTariff(calculatedValue)
-        console.log('   ✅ Tariff Percentage:', `${parsedPercentage.toFixed(2)}%`)
-        console.log('   ✅ Calculated Tariff:', `${selectedCurrency} ${calculatedValue.toFixed(2)}`)
-      } else {
-        console.log('   ⚠️  No tariff data found in either source')
-        setTariffPercentage("MFN")
-        setCalculatedTariff(null)
-        setDataSource(null)
-        setApiError('No tariff data found in database or WTO API for this combination. This may indicate MFN (Most Favored Nation) rates apply, or data is not available for the selected year.')
-        console.log('   ⚠️  Showing MFN (data not available)')
-      }
-
-      // Show results immediately (don't wait for AI)
+      setProducts(updatedProducts)
       setIsCalculatingTariff(false)
       setAiFinished(true)
       console.log('   ✅ Tariff results displayed to user')
 
-      // STEP 4: Start AI analysis in parallel (non-blocking)
-      console.log('\n🤖 STEP 4: Starting Gemini AI analysis (parallel)...')
-      // STEP 5: Start AI analysis in parallel (non-blocking)
-      console.log('\n🤖 STEP 5: Starting Gemini AI analysis (parallel)...')
-      const startAi = performance.now()
-      const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${product}, Value: $${value}, Year: ${year}. Tariff Rate: ${parsedPercentage !== null ? `${parsedPercentage}%` : 'MFN'}. Data source: ${foundInDatabase ? 'Internal Database' : 'WTO API'}`
-      const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors. Note: 000 represents 'World' in country codes."
-      
-      // Call AI without await - let it run in background
-      callGeminiApi(apiData, prompt).then(() => {
-        const aiTime = performance.now() - startAi
-        console.log(`   ✅ Gemini AI analysis completed in ${aiTime.toFixed(2)}ms`)
-        console.log('   ✅ AI analysis ready for display')
-      }).catch((err) => {
-        console.error('   ❌ Gemini AI analysis failed:', err)
-      }).finally(() => {
-        setIsAnalyzing(false)
-      })
+      // STEP: Start AI analysis for FIRST PRODUCT ONLY (non-blocking)
+      const firstProduct = updatedProducts[0]
+      if (firstProduct && firstProduct.tariffRate !== null) {
+        console.log('\n🤖 Starting Gemini AI analysis for FIRST PRODUCT...')
+        const startAi = performance.now()
+        const productName = agriculturalProducts.find(p => p.hs_code === firstProduct.productCode)?.name || firstProduct.productCode
+        const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${productName} (${firstProduct.productCode}), Value: $${firstProduct.value}, Year: ${year}. Tariff Rate: ${firstProduct.tariffRate}%. Data source: ${firstProduct.dataSource === 'database' ? 'Internal Database' : 'WTO API'}`
+        const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors. Note: 000 represents 'World' in country codes."
+        
+        // Call AI without await - let it run in background
+        callGeminiApi(apiData, prompt).then(() => {
+          const aiTime = performance.now() - startAi
+          console.log(`   ✅ Gemini AI analysis completed in ${aiTime.toFixed(2)}ms`)
+          console.log('   ✅ AI analysis ready for display')
+        }).catch((err) => {
+          console.error('   ❌ Gemini AI analysis failed:', err)
+        }).finally(() => {
+          setIsAnalyzing(false)
+        })
 
-      console.log('   🚀 AI analysis started (running in background)')
+        console.log('   🚀 AI analysis started (running in background)')
+      } else {
+        setIsAnalyzing(false)
+      }
+
       console.log('\n═══════════════════════════════════════════')
       console.log('✅ TARIFF CALCULATION COMPLETE')
       console.log('═══════════════════════════════════════════\n')
@@ -392,8 +463,6 @@ export default function CalculatorSection() {
     } catch (err) {
       console.error('\n❌❌❌ ERROR in calculateTariff:', err)
       setApiError(err instanceof Error ? err.message : "Unknown error occurred")
-      if (!tariffPercentage) setTariffPercentage("MFN")
-      setCalculatedTariff(null)
       setAiFinished(true)
       console.error('   Stack trace:', err instanceof Error ? err.stack : 'N/A')
     } finally {
@@ -406,6 +475,11 @@ export default function CalculatorSection() {
     const country = countries.find(c => c.code === code)
     return country ? country.name : code
   }
+
+  // Calculate totals
+  const totalValue = products.reduce((sum, p) => sum + (parseFloat(p.value) || 0), 0)
+  const totalTariff = products.reduce((sum, p) => sum + (p.tariffAmount || 0), 0)
+  const totalCost = totalValue + totalTariff
 
   const dummyChartData = [
     { product: "Wheat", tariff: 5.2 },
@@ -453,25 +527,6 @@ export default function CalculatorSection() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="product">Agricultural Product</Label>
-                <Select value={product} onValueChange={setProduct}>
-                  <SelectTrigger>
-                    <SelectValue>{agriculturalProducts.find(p => p.hs_code === product)?.name}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {agriculturalProducts.map(p => (
-                      <SelectItem key={p.hs_code} value={p.hs_code}>{p.name} ({p.hs_code})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="value">Value of Goods ({selectedCurrency})</Label>
-                <Input type="number" value={value} onChange={e => setValue(e.target.value)} placeholder="Enter value" />
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="year">Year</Label>
                 <Select value={year} onValueChange={setYear}>
                   <SelectTrigger>
@@ -486,9 +541,78 @@ export default function CalculatorSection() {
               </div>
             </div>
 
+            {/* Products Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>Products</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addProduct}
+                  disabled={isCalculatingTariff}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Product
+                </Button>
+              </div>
+
+              {products.map((product, index) => (
+                <div key={product.id} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg relative">
+                  {products.length > 1 && !isCalculatingTariff && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                      onClick={() => removeProduct(product.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor={`product-${product.id}`}>Agricultural Product {index + 1}</Label>
+                    <Select 
+                      value={product.productCode} 
+                      onValueChange={(val) => updateProduct(product.id, 'productCode', val)}
+                      disabled={isCalculatingTariff}
+                    >
+                      <SelectTrigger>
+                        <SelectValue>{agriculturalProducts.find(p => p.hs_code === product.productCode)?.name}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {agriculturalProducts.map(p => (
+                          <SelectItem key={p.hs_code} value={p.hs_code}>{p.name} ({p.hs_code})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`value-${product.id}`}>Value of Goods ({selectedCurrency})</Label>
+                    <Input 
+                      type="number" 
+                      value={product.value} 
+                      onChange={e => updateProduct(product.id, 'value', e.target.value)} 
+                      placeholder="Enter value"
+                      disabled={isCalculatingTariff}
+                    />
+                  </div>
+
+                  {product.status === 'loading' && (
+                    <div className="col-span-2 text-center text-sm text-gray-500">
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
+                      Loading tariff data...
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
             <Button
               onClick={calculateTariff}
-              disabled={!fromCountry || !toCountry || !product || !value || isCalculatingTariff || isAnalyzing}
+              disabled={!fromCountry || !toCountry || isCalculatingTariff || isAnalyzing}
               className="w-full py-4"
             >
               {isCalculatingTariff ? "Calculating..." : isAnalyzing ? "Analyzing..." : "Calculate Tariff"}
@@ -501,26 +625,9 @@ export default function CalculatorSection() {
           </CardContent>
         </Card>
 
-        {aiFinished && tariffPercentage && (
+        {aiFinished && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="calculator-results mt-8 space-y-6">
             <h3 className="text-2xl font-bold text-white mb-4">Tariff Calculation Results</h3>
-
-            {dataSource && (
-              <div className="flex items-center gap-2 bg-blue-600/20 border border-blue-600 rounded-lg p-3 text-blue-200">
-                {dataSource === "database" ? (
-                  <>
-                    <Database className="w-5 h-5" />
-                    <span className="font-semibold">Data Source: Internal Database</span>
-                  </>
-                ) : (
-                  <>
-                    <Globe className="w-5 h-5" />
-                    <span className="font-semibold">Data Source: WTO API</span>
-                    <span className="font-semibold">Data Source: WTO API (Saved to Database)</span>
-                  </>
-                )}
-              </div>
-            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white">
               <div>
@@ -528,29 +635,86 @@ export default function CalculatorSection() {
                 <p className="font-semibold">{getCountryName(fromCountry)} → {getCountryName(toCountry)}</p>
               </div>
               <div>
-                <p className="text-gray-300">Product:</p>
-                <p className="font-semibold">{agriculturalProducts.find(p => p.hs_code === product)?.name || product}</p>
+                <p className="text-gray-300">Year:</p>
+                <p className="font-semibold">{year}</p>
               </div>
-              <div>
-                <p className="text-gray-300">Goods Value:</p>
-                <p className="font-semibold">{selectedCurrency} {Number.parseFloat(value).toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-gray-300">Tariff Percentage:</p>
-                <p className="font-semibold">{tariffPercentage}</p>
-              </div>
-              <div className="md:col-span-2">
-                <p className="text-gray-300">Estimated Tariff:</p>
-                <p className="font-semibold">
-                  {calculatedTariff !== null
-                    ? `${selectedCurrency} ${calculatedTariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                    : "Data Not Available"}
-                </p>
-                {calculatedTariff === null && (
-                  <p className="text-sm text-yellow-300 mt-1">
-                    No tariff data found in our database or WTO API. This could mean MFN rates apply or data is unavailable for this combination.
-                  </p>
-                )}
+            </div>
+
+            {/* Individual Product Results */}
+            <div className="space-y-4">
+              {products.map((product, index) => {
+                const productName = agriculturalProducts.find(p => p.hs_code === product.productCode)?.name || product.productCode
+                
+                return (
+                  <div key={product.id} className="bg-white/10 backdrop-blur-sm p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-white">Product {index + 1}: {productName}</h4>
+                      {product.dataSource && (
+                        <div className="flex items-center gap-2 bg-blue-600/20 border border-blue-600 rounded-lg px-3 py-1 text-blue-200">
+                          {product.dataSource === "database" ? (
+                            <>
+                              <Database className="w-4 h-4" />
+                              <span className="text-sm">Database</span>
+                            </>
+                          ) : (
+                            <>
+                              <Globe className="w-4 h-4" />
+                              <span className="text-sm">WTO API</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {product.status === 'success' && product.tariffRate !== null ? (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white">
+                        <div>
+                          <p className="text-gray-300 text-sm">Goods Value:</p>
+                          <p className="font-semibold">{selectedCurrency} {Number.parseFloat(product.value).toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-300 text-sm">Tariff Rate:</p>
+                          <p className="font-semibold">{product.tariffRate.toFixed(2)}%</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-300 text-sm">Tariff Amount:</p>
+                          <p className="font-semibold text-red-300">
+                            {selectedCurrency} {product.tariffAmount?.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-300 text-sm">Total Cost:</p>
+                          <p className="font-semibold text-green-300">
+                            {selectedCurrency} {((parseFloat(product.value) + (product.tariffAmount || 0))).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-yellow-300">
+                        {product.errorMessage || "Data Not Available - MFN rates may apply"}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Overall Totals */}
+            <div className="bg-white/20 backdrop-blur-sm p-6 rounded-lg border-2 border-white/30">
+              <h4 className="text-xl font-bold text-white mb-4">Overall Totals</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-white">
+                <div>
+                  <p className="text-gray-300">Total Import Value:</p>
+                  <p className="text-2xl font-bold">{selectedCurrency} {totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                </div>
+                <div>
+                  <p className="text-gray-300">Total Tariff:</p>
+                  <p className="text-2xl font-bold text-red-300">{selectedCurrency} {totalTariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                </div>
+                <div>
+                  <p className="text-gray-300">Total Cost:</p>
+                  <p className="text-2xl font-bold text-green-300">{selectedCurrency} {totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                </div>
               </div>
             </div>
 
@@ -569,7 +733,7 @@ export default function CalculatorSection() {
                     {isAnalyzing ? 'AI Analyzing...' : 'AI Analysis'}
                   </div>
                   <div className="text-xs opacity-80">
-                    {isAnalyzing ? 'Please wait, analyzing data' : 'View intelligent insights and recommendations'}
+                    {isAnalyzing ? 'Analyzing first product' : 'View insights for first product'}
                   </div>
                 </div>
               </Button>
@@ -596,7 +760,7 @@ export default function CalculatorSection() {
                     <CardContent className="p-8 text-center">
                       <Sparkles className="w-12 h-12 mx-auto mb-4 animate-spin text-primary" />
                       <h3 className="text-xl font-semibold mb-2">AI Analysis in Progress...</h3>
-                      <p className="text-muted-foreground">Our AI is analyzing the trade data and generating insights</p>
+                      <p className="text-muted-foreground">Analyzing the first product in your list</p>
                     </CardContent>
                   </Card>
                 ) : apiResponse && typeof apiResponse === "object" && !Array.isArray(apiResponse) ? (
@@ -604,7 +768,7 @@ export default function CalculatorSection() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Sparkles className="w-5 h-5" />
-                        Gemini API Analysis
+                        Gemini API Analysis (First Product)
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
