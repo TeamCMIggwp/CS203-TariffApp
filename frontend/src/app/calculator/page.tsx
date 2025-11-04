@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { motion, useMotionValue } from "framer-motion"
+import { useState, useEffect, useMemo } from "react"
+import { motion, useMotionValue, AnimatePresence } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label"
 import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts"
 import { BarChart3, Sparkles, Database, Globe, Plus, Trash2 } from "lucide-react"
+import { getCurrencyCode } from "@/lib/fx"
+import { ChevronDown } from "lucide-react"
 
 type MetricValue = string | number
 
@@ -52,6 +54,63 @@ export default function CalculatorSection() {
 
   const [showAIAnalysis, setShowAIAnalysis] = useState(false)
   const [showCharts, setShowCharts] = useState(false)
+
+  // === Auto FX (standalone; does NOT use selectedCurrency) ===
+  type ExchangeApiResponse = {
+    baseCurrency: string
+    conversionRates: Record<string, number>
+  }
+
+  const [impCurrency, setImpCurrency] = useState<string>("USD")
+  const [fxRateToImp, setFxRateToImp] = useState<number | null>(null)
+  const [fxAutoLoading, setFxAutoLoading] = useState<boolean>(false)
+  const [fxAutoError, setFxAutoError] = useState<string | null>(null)
+
+  // Helper to get importer name by numeric code then resolve currency via fx.ts
+  const getImporterCurrency = (code?: string) => {
+    const importerName = code ? countries.find(c => c.code === code)?.name : undefined
+    return getCurrencyCode(importerName) || "USD"
+  }
+
+  // When importer (toCountry) changes, resolve its currency via fx.ts
+  useEffect(() => {
+    setImpCurrency(getImporterCurrency(toCountry))
+  }, [toCountry])
+
+  // Fetch USD -> importer currency rate immediately whenever currency changes
+  useEffect(() => {
+    let aborted = false
+    const fetchRate = async () => {
+      setFxAutoError(null)
+      if (!impCurrency) return
+
+      if (impCurrency === "USD") {
+        setFxRateToImp(1)
+        return
+      }
+
+      setFxAutoLoading(true)
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/exchange?base=USD`, {
+          headers: { Accept: "application/json" }
+        })
+        if (!res.ok) throw new Error(`FX API ${res.status}`)
+        const data: ExchangeApiResponse = await res.json()
+        const r = data?.conversionRates?.[impCurrency]
+        if (typeof r !== "number" || !isFinite(r)) throw new Error(`No FX for ${impCurrency}`)
+        if (!aborted) setFxRateToImp(r)
+      } catch (e: any) {
+        if (!aborted) setFxAutoError(e?.message || "FX fetch failed")
+      } finally {
+        if (!aborted) setFxAutoLoading(false)
+      }
+    }
+    fetchRate()
+    return () => { aborted = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [impCurrency])
+
+  const [showConvertedBox, setShowConvertedBox] = useState<boolean>(false)
 
   // Backend API base URL, configurable via environment for Amplify and local dev
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
@@ -481,6 +540,16 @@ export default function CalculatorSection() {
   const totalTariff = products.reduce((sum, p) => sum + (p.tariffAmount || 0), 0)
   const totalCost = totalValue + totalTariff
 
+  const convertedTotals = useMemo(() => {
+    if (fxRateToImp == null) return null
+    return {
+      value: totalValue * fxRateToImp,
+      tariff: totalTariff * fxRateToImp,
+      cost: totalCost * fxRateToImp
+    }
+  }, [fxRateToImp, totalValue, totalTariff, totalCost])
+
+
   const dummyChartData = [
     { product: "Wheat", tariff: 5.2 },
     { product: "Rice", tariff: 12.5 },
@@ -556,310 +625,390 @@ export default function CalculatorSection() {
                 </Button>
               </div>
 
-            {products.map((product, index) => (
-              <div key={product.id} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg relative">
-                {products.length > 1 && !isCalculatingTariff && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute top-2 right-2"
-                    onClick={() => removeProduct(product.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
+              {products.map((product, index) => (
+                <div key={product.id} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg relative">
+                  {products.length > 1 && !isCalculatingTariff && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                      onClick={() => removeProduct(product.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
 
-                <div className="space-y-2">
-                  <Label htmlFor={`product-${product.id}`}>Agricultural Product {index + 1}</Label>
-                  <Select
-                    value={product.productCode}
-                    onValueChange={(val) => updateProduct(product.id, 'productCode', val)}
-                    disabled={isCalculatingTariff}
-                  >
-                    <SelectTrigger>
-                      <SelectValue>{agriculturalProducts.find(p => p.hs_code === product.productCode)?.name}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {agriculturalProducts.map(p => (
-                        <SelectItem key={p.hs_code} value={p.hs_code}>{p.name} ({p.hs_code})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={`value-${product.id}`}>Value of Goods ({selectedCurrency})</Label>
-                  <Input
-                    type="number"
-                    value={product.value}
-                    onChange={e => updateProduct(product.id, 'value', e.target.value)}
-                    placeholder="Enter value"
-                    disabled={isCalculatingTariff}
-                  />
-                </div>
-
-                {product.status === 'loading' && (
-                  <div className="col-span-2 text-center text-sm text-gray-500">
-                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
-                    Loading tariff data...
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <Button
-            onClick={calculateTariff}
-            disabled={!fromCountry || !toCountry || isCalculatingTariff || isAnalyzing}
-            className="w-full py-4"
-          >
-            {isCalculatingTariff ? "Calculating..." : isAnalyzing ? "Analyzing..." : "Calculate Tariff"}
-          </Button>
-
-          {inputError && <div className="bg-red-600 text-white p-4 rounded-lg">{inputError}</div>}
-          {apiError && !inputError && (
-            <div className="bg-yellow-600 text-white p-4 rounded-lg">{apiError}</div>
-          )}
-        </CardContent>
-      </Card>
-
-      {aiFinished && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="calculator-results mt-8 space-y-6">
-          <h3 className="text-2xl font-bold text-white mb-4">Tariff Calculation Results</h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white">
-            <div>
-              <p className="text-gray-300">Trade Route:</p>
-              <p className="font-semibold">{getCountryName(fromCountry)} → {getCountryName(toCountry)}</p>
-            </div>
-            <div>
-              <p className="text-gray-300">Year:</p>
-              <p className="font-semibold">{year}</p>
-            </div>
-          </div>
-
-          {/* Individual Product Results */}
-          <div className="space-y-4">
-            {products.map((product, index) => {
-              const productName = agriculturalProducts.find(p => p.hs_code === product.productCode)?.name || product.productCode
-
-              return (
-                <div key={product.id} className="bg-white/10 backdrop-blur-sm p-4 rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-white">Product {index + 1}: {productName}</h4>
-                    {product.dataSource && (
-                      <div className="flex items-center gap-2 bg-blue-600/20 border border-blue-600 rounded-lg px-3 py-1 text-blue-200">
-                        {product.dataSource === "database" ? (
-                          <>
-                            <Database className="w-4 h-4" />
-                            <span className="text-sm">Database</span>
-                          </>
-                        ) : (
-                          <>
-                            <Globe className="w-4 h-4" />
-                            <span className="text-sm">WTO API</span>
-                          </>
-                        )}
-                      </div>
-                    )}
+                  <div className="space-y-2">
+                    <Label htmlFor={`product-${product.id}`}>Agricultural Product {index + 1}</Label>
+                    <Select
+                      value={product.productCode}
+                      onValueChange={(val) => updateProduct(product.id, 'productCode', val)}
+                      disabled={isCalculatingTariff}
+                    >
+                      <SelectTrigger>
+                        <SelectValue>{agriculturalProducts.find(p => p.hs_code === product.productCode)?.name}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {agriculturalProducts.map(p => (
+                          <SelectItem key={p.hs_code} value={p.hs_code}>{p.name} ({p.hs_code})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  {product.status === 'success' && product.tariffRate !== null ? (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white">
-                      <div>
-                        <p className="text-gray-300 text-sm">Goods Value:</p>
-                        <p className="font-semibold">{selectedCurrency} {Number.parseFloat(product.value).toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-300 text-sm">Tariff Rate:</p>
-                        <p className="font-semibold">{product.tariffRate.toFixed(2)}%</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-300 text-sm">Tariff Amount:</p>
-                        <p className="font-semibold text-red-300">
-                          {selectedCurrency} {product.tariffAmount?.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-300 text-sm">Total Cost:</p>
-                        <p className="font-semibold text-green-300">
-                          {selectedCurrency} {((parseFloat(product.value) + (product.tariffAmount || 0))).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-yellow-300">
-                      {product.errorMessage || "Data Not Available - MFN rates may apply"}
+                  <div className="space-y-2">
+                    <Label htmlFor={`value-${product.id}`}>Value of Goods ({selectedCurrency})</Label>
+                    <Input
+                      type="number"
+                      value={product.value}
+                      onChange={e => updateProduct(product.id, 'value', e.target.value)}
+                      placeholder="Enter value"
+                      disabled={isCalculatingTariff}
+                    />
+                  </div>
+
+                  {product.status === 'loading' && (
+                    <div className="col-span-2 text-center text-sm text-gray-500">
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
+                      Loading tariff data...
                     </div>
                   )}
                 </div>
-              )
-            })}
-          </div>
+              ))}
+            </div>
 
-          {/* Overall Totals */}
-          <div className="bg-white/20 backdrop-blur-sm p-6 rounded-lg border-2 border-white/30">
-            <h4 className="text-xl font-bold text-white mb-4">Overall Totals</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-white">
+            <Button
+              onClick={calculateTariff}
+              disabled={!fromCountry || !toCountry || isCalculatingTariff || isAnalyzing}
+              className="w-full py-4"
+            >
+              {isCalculatingTariff ? "Calculating..." : isAnalyzing ? "Analyzing..." : "Calculate Tariff"}
+            </Button>
+
+            {inputError && <div className="bg-red-600 text-white p-4 rounded-lg">{inputError}</div>}
+            {apiError && !inputError && (
+              <div className="bg-yellow-600 text-white p-4 rounded-lg">{apiError}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {aiFinished && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="calculator-results mt-8 space-y-6">
+            <h3 className="text-2xl font-bold text-white mb-4">Tariff Calculation Results</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white">
               <div>
-                <p className="text-gray-300">Total Import Value:</p>
-                <p className="text-2xl font-bold">{selectedCurrency} {totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                <p className="text-gray-300">Trade Route:</p>
+                <p className="font-semibold">{getCountryName(fromCountry)} → {getCountryName(toCountry)}</p>
               </div>
               <div>
-                <p className="text-gray-300">Total Tariff:</p>
-                <p className="text-2xl font-bold text-red-300">{selectedCurrency} {totalTariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
-              </div>
-              <div>
-                <p className="text-gray-300">Total Cost:</p>
-                <p className="text-2xl font-bold text-green-300">{selectedCurrency} {totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                <p className="text-gray-300">Year:</p>
+                <p className="font-semibold">{year}</p>
               </div>
             </div>
-          </div>
 
-          <div className="grid gap-4 md:grid-cols-2 mt-6">
-            <Button
-              onClick={() => { setShowAIAnalysis(!showAIAnalysis); setShowCharts(false); }}
-              size="lg"
-              disabled={isAnalyzing}
-              className={`py-6 border-2 transition-all ${showAIAnalysis ? 'bg-primary text-white border-primary hover:bg-primary/90' : 'bg-white text-black border-white hover:bg-gray-100'
-                }`}
-            >
-              <Sparkles className={`w-5 h-5 mr-2 ${isAnalyzing ? 'animate-pulse' : ''}`} />
-              <div className="text-left">
-                <div className="font-semibold">
-                  {isAnalyzing ? 'AI Analyzing...' : 'AI Analysis'}
+            {/* Individual Product Results */}
+            <div className="space-y-4">
+              {products.map((product, index) => {
+                const productName = agriculturalProducts.find(p => p.hs_code === product.productCode)?.name || product.productCode
+
+                return (
+                  <div key={product.id} className="bg-white/10 backdrop-blur-sm p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-white">Product {index + 1}: {productName}</h4>
+                      {product.dataSource && (
+                        <div className="flex items-center gap-2 bg-blue-600/20 border border-blue-600 rounded-lg px-3 py-1 text-blue-200">
+                          {product.dataSource === "database" ? (
+                            <>
+                              <Database className="w-4 h-4" />
+                              <span className="text-sm">Database</span>
+                            </>
+                          ) : (
+                            <>
+                              <Globe className="w-4 h-4" />
+                              <span className="text-sm">WTO API</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {product.status === 'success' && product.tariffRate !== null ? (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white">
+                        <div>
+                          <p className="text-gray-300 text-sm">Goods Value:</p>
+                          <p className="font-semibold">{selectedCurrency} {Number.parseFloat(product.value).toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-300 text-sm">Tariff Rate:</p>
+                          <p className="font-semibold">{product.tariffRate.toFixed(2)}%</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-300 text-sm">Tariff Amount:</p>
+                          <p className="font-semibold text-red-300">
+                            {selectedCurrency} {product.tariffAmount?.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-300 text-sm">Total Cost:</p>
+                          <p className="font-semibold text-green-300">
+                            {selectedCurrency} {((parseFloat(product.value) + (product.tariffAmount || 0))).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-yellow-300">
+                        {product.errorMessage || "Data Not Available - MFN rates may apply"}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Overall Totals */}
+            <div className="bg-white/20 backdrop-blur-sm p-6 rounded-lg border-2 border-white/30">
+              <h4 className="text-xl font-bold text-white mb-4">Overall Totals</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-white">
+                <div>
+                  <p className="text-gray-300">Total Import Value:</p>
+                  <p className="text-2xl font-bold">{selectedCurrency} {totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
                 </div>
-                <div className="text-xs opacity-80">
-                  {isAnalyzing ? 'Analyzing first product' : 'View insights for first product'}
+                <div>
+                  <p className="text-gray-300">Total Tariff:</p>
+                  <p className="text-2xl font-bold text-red-300">{selectedCurrency} {totalTariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                </div>
+                <div>
+                  <p className="text-gray-300">Total Cost:</p>
+                  <p className="text-2xl font-bold text-green-300">{selectedCurrency} {totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
                 </div>
               </div>
-            </Button>
+            </div>
 
-            <Button
-              onClick={() => { setShowCharts(!showCharts); setShowAIAnalysis(false); }}
-              size="lg"
-              className={`py-6 border-2 transition-all ${showCharts ? 'bg-primary text-white border-primary hover:bg-primary/90' : 'bg-white text-black border-white hover:bg-gray-100'
-                }`}
-            >
-              <BarChart3 className="w-5 h-5 mr-2" />
-              <div className="text-left">
-                <div className="font-semibold">Charts & Diagrams</div>
-                <div className="text-xs opacity-80">Visualize tariff comparisons</div>
-              </div>
-            </Button>
-          </div>
+            {/* 🔽 Collapsible: Auto-Converted Totals (Importer Currency) */}
+            <div className="bg-white/20 backdrop-blur-sm rounded-lg border-2 border-white/30 mt-6 overflow-hidden">
+              {/* Header — acts like a button */}
+              <button
+                type="button"
+                onClick={() => setShowConvertedBox(v => !v)}
+                className="w-full flex items-center justify-between px-6 py-4 text-left focus:outline-none focus:ring-2 focus:ring-white/60"
+                aria-expanded={showConvertedBox}
+                aria-controls="converted-totals-panel"
+              >
+                <div className="flex items-center gap-3">
+                  <h4 className="text-xl font-bold text-white">
+                    USD → {impCurrency}
+                  </h4>
+                </div>
+                <ChevronDown
+                  className={`h-5 w-5 text-white transition-transform ${showConvertedBox ? "rotate-180" : ""}`}
+                  aria-hidden="true"
+                />
+              </button>
 
-          {showAIAnalysis && (
-            <>
-              {isAnalyzing ? (
-                <Card className="shadow-lg border-primary animate-pulse">
-                  <CardContent className="p-8 text-center">
-                    <Sparkles className="w-12 h-12 mx-auto mb-4 animate-spin text-primary" />
-                    <h3 className="text-xl font-semibold mb-2">AI Analysis in Progress...</h3>
-                    <p className="text-muted-foreground">Analyzing the first product in your list</p>
-                  </CardContent>
-                </Card>
-              ) : apiResponse && typeof apiResponse === "object" && !Array.isArray(apiResponse) ? (
-                <Card className="shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500 border-primary">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Sparkles className="w-5 h-5" />
-                      Gemini API Analysis (First Product)
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      {apiResponse.summary && (
-                        <>
-                          <h4 className="font-semibold text-lg mb-2">Summary</h4>
-                          <p>{apiResponse.summary}</p>
-                        </>
+              {/* Collapsible content */}
+              <AnimatePresence initial={false}>
+                {showConvertedBox && (
+                  <motion.div
+                    id="converted-totals-panel"
+                    key="converted-totals-panel"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="px-6 pb-6 pt-2">
+                      {/* Loading / Error states */}
+                      {fxAutoLoading && (
+                        <div className="text-white text-sm flex items-center">
+                          <span className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+                          Fetching FX rate...
+                        </div>
                       )}
 
-                      {apiResponse.metrics && (
-                        <>
-                          <h4 className="font-semibold text-lg mt-4 mb-2">Key Metrics</h4>
-                          <ul className="space-y-1 list-disc pl-4">
-                            {Object.entries(apiResponse.metrics).map(([key, value], idx) => (
-                              <li key={idx}>
-                                <strong>{key.replace(/_/g, " ")}:</strong> {value}
-                              </li>
-                            ))}
-                          </ul>
-                        </>
+                      {fxAutoError && (
+                        <div className="bg-red-600 text-white p-3 rounded-lg">{fxAutoError}</div>
                       )}
 
-                      {apiResponse.insights && apiResponse.insights.length > 0 && (
+                      {/* Values */}
+                      {!fxAutoLoading && !fxAutoError && fxRateToImp !== null && convertedTotals && (
                         <>
-                          <h4 className="font-semibold text-lg mt-4 mb-2">Insights</h4>
-                          <ul className="space-y-2 list-disc pl-4">
-                            {apiResponse.insights.map((insight, idx) => (
-                              <li key={idx}>
-                                {insight.split("**").map((part, i) =>
-                                  i % 2 === 1 ? <strong key={i}>{part}</strong> : part
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </>
-                      )}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-white">
+                            <div>
+                              <p className="text-gray-300">Total Import Value:</p>
+                              <p className="text-2xl font-bold">
+                                {impCurrency} {convertedTotals.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-300">Total Tariff:</p>
+                              <p className="text-2xl font-bold text-red-300">
+                                {impCurrency} {convertedTotals.tariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-300">Total Cost:</p>
+                              <p className="text-2xl font-bold text-green-300">
+                                {impCurrency} {convertedTotals.cost.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                          </div>
 
-                      {apiResponse.recommendations && apiResponse.recommendations.length > 0 && (
-                        <>
-                          <h4 className="font-semibold text-lg mt-4 mb-2">Recommendations</h4>
-                          <ul className="space-y-2 list-disc pl-4">
-                            {apiResponse.recommendations.map((rec, idx) => (
-                              <li key={idx}>
-                                {rec.split("**").map((part, i) =>
-                                  i % 2 === 1 ? <strong key={i}>{part}</strong> : part
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </>
-                      )}
-
-                      {apiResponse.confidence && (
-                        <>
-                          <h4 className="font-semibold text-lg mt-4 mb-2">Confidence</h4>
-                          <p>{apiResponse.confidence}</p>
+                          <div className="mt-4 text-sm text-gray-200">
+                            Using FX: 1 USD = {fxRateToImp.toLocaleString(undefined, { maximumFractionDigits: 6 })} {impCurrency}
+                          </div>
                         </>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card className="shadow-lg border-yellow-500">
-                  <CardContent className="p-6">
-                    <p className="text-muted-foreground">No AI analysis available. Please try again.</p>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-          {showCharts && (
-            <Card className="shadow-lg border-primary p-4 mt-4 bg-white dark:bg-gray-900">
-              <h4 className="text-lg font-semibold mb-2">Tariff Comparisons</h4>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={dummyChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="product" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="tariff" fill="hsl(var(--chart-1))" />
-                </BarChart>
-              </ResponsiveContainer>
-              <p className="text-center text-sm text-muted-foreground mt-2">
-                This bar chart compares tariffs for different agricultural products.
-              </p>
-            </Card>
-          )}
-        </motion.div>
-      )}
-    </div>
+            <div className="grid gap-4 md:grid-cols-2 mt-6">
+              <Button
+                onClick={() => { setShowAIAnalysis(!showAIAnalysis); setShowCharts(false); }}
+                size="lg"
+                disabled={isAnalyzing}
+                className={`py-6 border-2 transition-all ${showAIAnalysis ? 'bg-primary text-white border-primary hover:bg-primary/90' : 'bg-white text-black border-white hover:bg-gray-100'
+                  }`}
+              >
+                <Sparkles className={`w-5 h-5 mr-2 ${isAnalyzing ? 'animate-pulse' : ''}`} />
+                <div className="text-left">
+                  <div className="font-semibold">
+                    {isAnalyzing ? 'AI Analyzing...' : 'AI Analysis'}
+                  </div>
+                  <div className="text-xs opacity-80">
+                    {isAnalyzing ? 'Analyzing first product' : 'View insights for first product'}
+                  </div>
+                </div>
+              </Button>
+
+              <Button
+                onClick={() => { setShowCharts(!showCharts); setShowAIAnalysis(false); }}
+                size="lg"
+                className={`py-6 border-2 transition-all ${showCharts ? 'bg-primary text-white border-primary hover:bg-primary/90' : 'bg-white text-black border-white hover:bg-gray-100'
+                  }`}
+              >
+                <BarChart3 className="w-5 h-5 mr-2" />
+                <div className="text-left">
+                  <div className="font-semibold">Charts & Diagrams</div>
+                  <div className="text-xs opacity-80">Visualize tariff comparisons</div>
+                </div>
+              </Button>
+            </div>
+
+            {showAIAnalysis && (
+              <>
+                {isAnalyzing ? (
+                  <Card className="shadow-lg border-primary animate-pulse">
+                    <CardContent className="p-8 text-center">
+                      <Sparkles className="w-12 h-12 mx-auto mb-4 animate-spin text-primary" />
+                      <h3 className="text-xl font-semibold mb-2">AI Analysis in Progress...</h3>
+                      <p className="text-muted-foreground">Analyzing the first product in your list</p>
+                    </CardContent>
+                  </Card>
+                ) : apiResponse && typeof apiResponse === "object" && !Array.isArray(apiResponse) ? (
+                  <Card className="shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500 border-primary">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Sparkles className="w-5 h-5" />
+                        Gemini API Analysis (First Product)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        {apiResponse.summary && (
+                          <>
+                            <h4 className="font-semibold text-lg mb-2">Summary</h4>
+                            <p>{apiResponse.summary}</p>
+                          </>
+                        )}
+
+                        {apiResponse.metrics && (
+                          <>
+                            <h4 className="font-semibold text-lg mt-4 mb-2">Key Metrics</h4>
+                            <ul className="space-y-1 list-disc pl-4">
+                              {Object.entries(apiResponse.metrics).map(([key, value], idx) => (
+                                <li key={idx}>
+                                  <strong>{key.replace(/_/g, " ")}:</strong> {value}
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+
+                        {apiResponse.insights && apiResponse.insights.length > 0 && (
+                          <>
+                            <h4 className="font-semibold text-lg mt-4 mb-2">Insights</h4>
+                            <ul className="space-y-2 list-disc pl-4">
+                              {apiResponse.insights.map((insight, idx) => (
+                                <li key={idx}>
+                                  {insight.split("**").map((part, i) =>
+                                    i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+
+                        {apiResponse.recommendations && apiResponse.recommendations.length > 0 && (
+                          <>
+                            <h4 className="font-semibold text-lg mt-4 mb-2">Recommendations</h4>
+                            <ul className="space-y-2 list-disc pl-4">
+                              {apiResponse.recommendations.map((rec, idx) => (
+                                <li key={idx}>
+                                  {rec.split("**").map((part, i) =>
+                                    i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+
+                        {apiResponse.confidence && (
+                          <>
+                            <h4 className="font-semibold text-lg mt-4 mb-2">Confidence</h4>
+                            <p>{apiResponse.confidence}</p>
+                          </>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="shadow-lg border-yellow-500">
+                    <CardContent className="p-6">
+                      <p className="text-muted-foreground">No AI analysis available. Please try again.</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+
+            {showCharts && (
+              <Card className="shadow-lg border-primary p-4 mt-4 bg-white dark:bg-gray-900">
+                <h4 className="text-lg font-semibold mb-2">Tariff Comparisons</h4>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={dummyChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="product" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="tariff" fill="hsl(var(--chart-1))" />
+                  </BarChart>
+                </ResponsiveContainer>
+                <p className="text-center text-sm text-muted-foreground mt-2">
+                  This bar chart compares tariffs for different agricultural products.
+                </p>
+              </Card>
+            )}
+          </motion.div>
+        )}
+      </div>
     </motion.section >
   )
 }
