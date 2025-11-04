@@ -37,7 +37,7 @@ export default function CalculatorSection() {
   const [fromCountry, setFromCountry] = useState("004")
   const [toCountry, setToCountry] = useState("840")
   const [year, setYear] = useState("2024")
-  
+
   // Changed to array of products
   const [products, setProducts] = useState<ProductRow[]>([
     { id: '1', productCode: '100630', value: '100', tariffRate: null, tariffAmount: null, dataSource: null, status: 'idle' }
@@ -58,14 +58,14 @@ export default function CalculatorSection() {
 
   const addProduct = () => {
     const newId = String(Date.now())
-    setProducts([...products, { 
-      id: newId, 
-      productCode: '100630', 
-      value: '', 
-      tariffRate: null, 
-      tariffAmount: null, 
-      dataSource: null, 
-      status: 'idle' 
+    setProducts([...products, {
+      id: newId,
+      productCode: '100630',
+      value: '',
+      tariffRate: null,
+      tariffAmount: null,
+      dataSource: null,
+      status: 'idle'
     }])
   }
 
@@ -76,7 +76,7 @@ export default function CalculatorSection() {
   }
 
   const updateProduct = (id: string, field: 'productCode' | 'value', value: string) => {
-    setProducts(products.map(p => 
+    setProducts(products.map(p =>
       p.id === id ? { ...p, [field]: value } : p
     ))
   }
@@ -94,7 +94,7 @@ export default function CalculatorSection() {
       console.log('\n💾 SAVING TO DATABASE...')
       const saveUrl = `${API_BASE}/api/v1/tariffs`
       const startTime = performance.now()
-      
+
       const payload = {
         reporter: reporter,
         partner: partner,
@@ -104,9 +104,9 @@ export default function CalculatorSection() {
         rate: rate,
         unit: unit
       }
-      
+
       console.log('   📤 Payload:', JSON.stringify(payload, null, 2))
-      
+
       const response = await fetch(saveUrl, {
         method: 'POST',
         headers: {
@@ -116,11 +116,11 @@ export default function CalculatorSection() {
         credentials: 'include',
         body: JSON.stringify(payload)
       })
-      
+
       const saveTime = performance.now() - startTime
       console.log(`   ⏱️  Save response time: ${saveTime.toFixed(2)}ms`)
       console.log('   📥 Save response status:', response.status)
-      
+
       if (response.status === 201) {
         const result = await response.json()
         console.log('   ✅ Successfully saved tariff to database!')
@@ -151,24 +151,24 @@ export default function CalculatorSection() {
       console.log('   📝 Prompt:', prompt)
       const url = `${API_BASE}/api/v1/gemini/analyses`
       const startTime = performance.now()
-      
+
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ data, prompt })
       })
-      
+
       const responseTime = performance.now() - startTime
       console.log(`   ⏱️  Gemini API response time: ${responseTime.toFixed(2)}ms`)
       console.log('   📥 Response status:', response.status)
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
       const result = await response.json()
       console.log('   📊 Gemini API result:', result)
-      
+
       if (result?.success && result?.analysis) {
         setApiResponse(result.analysis)
         console.log('   ✅ Analysis set successfully')
@@ -201,15 +201,15 @@ export default function CalculatorSection() {
     console.log('   📍 Database API URL:', dbUrl)
 
     try {
-      const dbResponse = await fetch(dbUrl, { 
+      const dbResponse = await fetch(dbUrl, {
         method: 'GET',
-        headers: { 
+        headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
         },
         credentials: 'include'
       })
-      
+
       const dbTime = performance.now() - startDb
       console.log(`   ⏱️  Database response time: ${dbTime.toFixed(2)}ms`)
       console.log('   📥 Database response status:', dbResponse.status)
@@ -219,17 +219,17 @@ export default function CalculatorSection() {
       } else if (dbResponse.ok) {
         const responseText = await dbResponse.text()
         console.log('   📄 Database raw response length:', responseText.length, 'chars')
-        
+
         if (!responseText || responseText.trim() === '') {
           console.log('   ❌ Database returned empty response')
         } else {
           try {
             const dbData = JSON.parse(responseText)
             console.log('   ✅ Database parsed response:', JSON.stringify(dbData, null, 2))
-            
+
             if (dbData && dbData.rate !== undefined && dbData.rate !== null) {
               parsedPercentage = typeof dbData.rate === 'number' ? dbData.rate : parseFloat(String(dbData.rate))
-              
+
               if (Number.isFinite(parsedPercentage)) {
                 console.log('   ✅ ✅ SUCCESS! Found tariff in database:', parsedPercentage, '%')
                 foundInDatabase = true
@@ -265,9 +265,9 @@ export default function CalculatorSection() {
       const startWto = performance.now()
       const wtoUrl = `${API_BASE}/api/v1/indicators/HS_P_0070/observations?i=HS_P_0070&r=${toCountry}&p=${fromCountry}&pc=${productCode}&ps=${year}&fmt=json`
       console.log('   📍 WTO API URL:', wtoUrl)
-      
+
       try {
-        const wtoResponse = await fetch(wtoUrl, { 
+        const wtoResponse = await fetch(wtoUrl, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
@@ -285,28 +285,28 @@ export default function CalculatorSection() {
         } else if (wtoResponse.ok) {
           const responseText = await wtoResponse.text()
           console.log('   📄 WTO API raw response length:', responseText.length, 'chars')
-          
+
           if (!responseText || responseText.trim() === '') {
             console.log('   ❌ WTO API returned empty response')
           } else {
             try {
               const wtoData = JSON.parse(responseText)
               console.log('   ✅ WTO API parsed data:', JSON.stringify(wtoData, null, 2))
-              
-              type WTORecord = { Year?: number; Value?: string | number; [key: string]: unknown }
+
+              type WTORecord = { Year?: number; Value?: string | number;[key: string]: unknown }
               if (wtoData.Dataset && Array.isArray(wtoData.Dataset) && wtoData.Dataset.length > 0) {
                 const records = (wtoData.Dataset as WTORecord[]).sort((a: WTORecord, b: WTORecord) => ((b.Year ?? 0) - (a.Year ?? 0)))
                 const latestRecord = records[0]
                 console.log('   📊 Latest WTO record:', latestRecord)
-                
+
                 if (latestRecord && latestRecord.Value !== undefined) {
                   const v = latestRecord.Value
                   const num = typeof v === 'number' ? v : parseFloat(String(v))
                   parsedPercentage = Number.isFinite(num) ? num : null
-                  
+
                   if (parsedPercentage !== null) {
                     console.log('   ✅ ✅ SUCCESS! Found tariff in WTO API:', parsedPercentage, '%')
-                    
+
                     // Save to database if found in WTO API (commented out for now)
                     // await saveTariffToDatabase(
                     //   toCountry,     // reporter (importer)
@@ -316,7 +316,7 @@ export default function CalculatorSection() {
                     //   parsedPercentage, // rate
                     //   "percent"      // unit
                     // )
-                    
+
                     return { rate: parsedPercentage, source: 'wto' }
                   }
                 }
@@ -328,7 +328,7 @@ export default function CalculatorSection() {
               console.log('   📄 Response text was:', responseText.substring(0, 500))
             }
           }
-          
+
           if (parsedPercentage === null) {
             console.warn('   ⚠️  Could not parse tariff rate from WTO API response')
           }
@@ -376,25 +376,25 @@ export default function CalculatorSection() {
     setShowCharts(false)
 
     // Reset all products to loading state
-    setProducts(products.map(p => ({ 
-      ...p, 
-      status: 'loading' as const, 
-      tariffRate: null, 
+    setProducts(products.map(p => ({
+      ...p,
+      status: 'loading' as const,
+      tariffRate: null,
       tariffAmount: null,
-      dataSource: null 
+      dataSource: null
     })))
 
     try {
       // Query tariffs for each product
       const updatedProducts: ProductRow[] = []
-      
+
       for (const product of products) {
         console.log(`\n🔍 Processing product ${product.productCode}...`)
-        
+
         try {
           const result = await queryTariffForProduct(product.productCode)
           const productValue = parseFloat(product.value)
-          
+
           if (result.rate !== null && !isNaN(productValue)) {
             const tariffAmount = (result.rate / 100) * productValue
             updatedProducts.push({
@@ -439,7 +439,7 @@ export default function CalculatorSection() {
         const productName = agriculturalProducts.find(p => p.hs_code === firstProduct.productCode)?.name || firstProduct.productCode
         const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${productName} (${firstProduct.productCode}), Value: $${firstProduct.value}, Year: ${year}. Tariff Rate: ${firstProduct.tariffRate}%. Data source: ${firstProduct.dataSource === 'database' ? 'Internal Database' : 'WTO API'}`
         const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors. Note: 000 represents 'World' in country codes."
-        
+
         // Call AI without await - let it run in background
         callGeminiApi(apiData, prompt).then(() => {
           const aiTime = performance.now() - startAi
@@ -497,372 +497,369 @@ export default function CalculatorSection() {
             <CardTitle className="calculator-title">Agricultural Tariff Calculator</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-  {/* Top row: From, To, Year all in one line */}
-  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-    <div className="space-y-2">
-      <Label htmlFor="from-country">From Country (Exporter)</Label>
-      <Select value={fromCountry} onValueChange={setFromCountry}>
-        <SelectTrigger>
-          <SelectValue>{getCountryName(fromCountry)}</SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {countries.map(c => (
-            <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+            {/* Top row: From, To, Year all in one line */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="from-country">From Country (Exporter)</Label>
+                <Select value={fromCountry} onValueChange={setFromCountry}>
+                  <SelectTrigger>
+                    <SelectValue>{getCountryName(fromCountry)}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {countries.map(c => (
+                      <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-    <div className="space-y-2">
-      <Label htmlFor="to-country">To Country (Importer)</Label>
-      <Select value={toCountry} onValueChange={setToCountry}>
-        <SelectTrigger>
-          <SelectValue>{getCountryName(toCountry)}</SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {countries.map(c => (
-            <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+              <div className="space-y-2">
+                <Label htmlFor="to-country">To Country (Importer)</Label>
+                <Select value={toCountry} onValueChange={setToCountry}>
+                  <SelectTrigger>
+                    <SelectValue>{getCountryName(toCountry)}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {countries.map(c => (
+                      <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-    <div className="space-y-2">
-      <Label htmlFor="year">Year</Label>
-      <Select value={year} onValueChange={setYear}>
-        <SelectTrigger>
-          <SelectValue>{year}</SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {[2024, 2023, 2022, 2021, 2020, 2019].map(y => (
-            <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  </div>
+              <div className="space-y-2">
+                <Label htmlFor="year">Year</Label>
+                <Select value={year} onValueChange={setYear}>
+                  <SelectTrigger>
+                    <SelectValue>{year}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[2024, 2023, 2022, 2021, 2020, 2019].map(y => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             {/* Products Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label>Products</Label>
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
                   onClick={addProduct}
                   disabled={isCalculatingTariff}
+                  className="flex items-center bg-black hover:bg-neutral-800 text-white font-medium rounded-lg px-4 py-2 shadow-md transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Product
+                  <Plus className="w-4 h-4 mr-1" /> {/* tighter spacing */}
+                  <span>Add Product</span>
                 </Button>
               </div>
 
-              {products.map((product, index) => (
-                <div key={product.id} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg relative">
-                  {products.length > 1 && !isCalculatingTariff && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-2 right-2"
-                      onClick={() => removeProduct(product.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor={`product-${product.id}`}>Agricultural Product {index + 1}</Label>
-                    <Select 
-                      value={product.productCode} 
-                      onValueChange={(val) => updateProduct(product.id, 'productCode', val)}
-                      disabled={isCalculatingTariff}
-                    >
-                      <SelectTrigger>
-                        <SelectValue>{agriculturalProducts.find(p => p.hs_code === product.productCode)?.name}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {agriculturalProducts.map(p => (
-                          <SelectItem key={p.hs_code} value={p.hs_code}>{p.name} ({p.hs_code})</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+            {products.map((product, index) => (
+              <div key={product.id} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg relative">
+                {products.length > 1 && !isCalculatingTariff && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute top-2 right-2"
+                    onClick={() => removeProduct(product.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor={`value-${product.id}`}>Value of Goods ({selectedCurrency})</Label>
-                    <Input 
-                      type="number" 
-                      value={product.value} 
-                      onChange={e => updateProduct(product.id, 'value', e.target.value)} 
-                      placeholder="Enter value"
-                      disabled={isCalculatingTariff}
-                    />
-                  </div>
-
-                  {product.status === 'loading' && (
-                    <div className="col-span-2 text-center text-sm text-gray-500">
-                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
-                      Loading tariff data...
-                    </div>
-                  )}
+                <div className="space-y-2">
+                  <Label htmlFor={`product-${product.id}`}>Agricultural Product {index + 1}</Label>
+                  <Select
+                    value={product.productCode}
+                    onValueChange={(val) => updateProduct(product.id, 'productCode', val)}
+                    disabled={isCalculatingTariff}
+                  >
+                    <SelectTrigger>
+                      <SelectValue>{agriculturalProducts.find(p => p.hs_code === product.productCode)?.name}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {agriculturalProducts.map(p => (
+                        <SelectItem key={p.hs_code} value={p.hs_code}>{p.name} ({p.hs_code})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              ))}
-            </div>
 
-            <Button
-              onClick={calculateTariff}
-              disabled={!fromCountry || !toCountry || isCalculatingTariff || isAnalyzing}
-              className="w-full py-4"
-            >
-              {isCalculatingTariff ? "Calculating..." : isAnalyzing ? "Analyzing..." : "Calculate Tariff"}
-            </Button>
+                <div className="space-y-2">
+                  <Label htmlFor={`value-${product.id}`}>Value of Goods ({selectedCurrency})</Label>
+                  <Input
+                    type="number"
+                    value={product.value}
+                    onChange={e => updateProduct(product.id, 'value', e.target.value)}
+                    placeholder="Enter value"
+                    disabled={isCalculatingTariff}
+                  />
+                </div>
 
-            {inputError && <div className="bg-red-600 text-white p-4 rounded-lg">{inputError}</div>}
-            {apiError && !inputError && (
-              <div className="bg-yellow-600 text-white p-4 rounded-lg">{apiError}</div>
-            )}
-          </CardContent>
-        </Card>
-
-        {aiFinished && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="calculator-results mt-8 space-y-6">
-            <h3 className="text-2xl font-bold text-white mb-4">Tariff Calculation Results</h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white">
-              <div>
-                <p className="text-gray-300">Trade Route:</p>
-                <p className="font-semibold">{getCountryName(fromCountry)} → {getCountryName(toCountry)}</p>
+                {product.status === 'loading' && (
+                  <div className="col-span-2 text-center text-sm text-gray-500">
+                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
+                    Loading tariff data...
+                  </div>
+                )}
               </div>
-              <div>
-                <p className="text-gray-300">Year:</p>
-                <p className="font-semibold">{year}</p>
-              </div>
+            ))}
+          </div>
+
+          <Button
+            onClick={calculateTariff}
+            disabled={!fromCountry || !toCountry || isCalculatingTariff || isAnalyzing}
+            className="w-full py-4"
+          >
+            {isCalculatingTariff ? "Calculating..." : isAnalyzing ? "Analyzing..." : "Calculate Tariff"}
+          </Button>
+
+          {inputError && <div className="bg-red-600 text-white p-4 rounded-lg">{inputError}</div>}
+          {apiError && !inputError && (
+            <div className="bg-yellow-600 text-white p-4 rounded-lg">{apiError}</div>
+          )}
+        </CardContent>
+      </Card>
+
+      {aiFinished && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="calculator-results mt-8 space-y-6">
+          <h3 className="text-2xl font-bold text-white mb-4">Tariff Calculation Results</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white">
+            <div>
+              <p className="text-gray-300">Trade Route:</p>
+              <p className="font-semibold">{getCountryName(fromCountry)} → {getCountryName(toCountry)}</p>
             </div>
+            <div>
+              <p className="text-gray-300">Year:</p>
+              <p className="font-semibold">{year}</p>
+            </div>
+          </div>
 
-            {/* Individual Product Results */}
-            <div className="space-y-4">
-              {products.map((product, index) => {
-                const productName = agriculturalProducts.find(p => p.hs_code === product.productCode)?.name || product.productCode
-                
-                return (
-                  <div key={product.id} className="bg-white/10 backdrop-blur-sm p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-white">Product {index + 1}: {productName}</h4>
-                      {product.dataSource && (
-                        <div className="flex items-center gap-2 bg-blue-600/20 border border-blue-600 rounded-lg px-3 py-1 text-blue-200">
-                          {product.dataSource === "database" ? (
-                            <>
-                              <Database className="w-4 h-4" />
-                              <span className="text-sm">Database</span>
-                            </>
-                          ) : (
-                            <>
-                              <Globe className="w-4 h-4" />
-                              <span className="text-sm">WTO API</span>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
+          {/* Individual Product Results */}
+          <div className="space-y-4">
+            {products.map((product, index) => {
+              const productName = agriculturalProducts.find(p => p.hs_code === product.productCode)?.name || product.productCode
 
-                    {product.status === 'success' && product.tariffRate !== null ? (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white">
-                        <div>
-                          <p className="text-gray-300 text-sm">Goods Value:</p>
-                          <p className="font-semibold">{selectedCurrency} {Number.parseFloat(product.value).toLocaleString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-300 text-sm">Tariff Rate:</p>
-                          <p className="font-semibold">{product.tariffRate.toFixed(2)}%</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-300 text-sm">Tariff Amount:</p>
-                          <p className="font-semibold text-red-300">
-                            {selectedCurrency} {product.tariffAmount?.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-300 text-sm">Total Cost:</p>
-                          <p className="font-semibold text-green-300">
-                            {selectedCurrency} {((parseFloat(product.value) + (product.tariffAmount || 0))).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-yellow-300">
-                        {product.errorMessage || "Data Not Available - MFN rates may apply"}
+              return (
+                <div key={product.id} className="bg-white/10 backdrop-blur-sm p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-white">Product {index + 1}: {productName}</h4>
+                    {product.dataSource && (
+                      <div className="flex items-center gap-2 bg-blue-600/20 border border-blue-600 rounded-lg px-3 py-1 text-blue-200">
+                        {product.dataSource === "database" ? (
+                          <>
+                            <Database className="w-4 h-4" />
+                            <span className="text-sm">Database</span>
+                          </>
+                        ) : (
+                          <>
+                            <Globe className="w-4 h-4" />
+                            <span className="text-sm">WTO API</span>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
-                )
-              })}
-            </div>
 
-            {/* Overall Totals */}
-            <div className="bg-white/20 backdrop-blur-sm p-6 rounded-lg border-2 border-white/30">
-              <h4 className="text-xl font-bold text-white mb-4">Overall Totals</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-white">
-                <div>
-                  <p className="text-gray-300">Total Import Value:</p>
-                  <p className="text-2xl font-bold">{selectedCurrency} {totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                  {product.status === 'success' && product.tariffRate !== null ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white">
+                      <div>
+                        <p className="text-gray-300 text-sm">Goods Value:</p>
+                        <p className="font-semibold">{selectedCurrency} {Number.parseFloat(product.value).toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-300 text-sm">Tariff Rate:</p>
+                        <p className="font-semibold">{product.tariffRate.toFixed(2)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-300 text-sm">Tariff Amount:</p>
+                        <p className="font-semibold text-red-300">
+                          {selectedCurrency} {product.tariffAmount?.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-300 text-sm">Total Cost:</p>
+                        <p className="font-semibold text-green-300">
+                          {selectedCurrency} {((parseFloat(product.value) + (product.tariffAmount || 0))).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-yellow-300">
+                      {product.errorMessage || "Data Not Available - MFN rates may apply"}
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <p className="text-gray-300">Total Tariff:</p>
-                  <p className="text-2xl font-bold text-red-300">{selectedCurrency} {totalTariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
-                </div>
-                <div>
-                  <p className="text-gray-300">Total Cost:</p>
-                  <p className="text-2xl font-bold text-green-300">{selectedCurrency} {totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
-                </div>
+              )
+            })}
+          </div>
+
+          {/* Overall Totals */}
+          <div className="bg-white/20 backdrop-blur-sm p-6 rounded-lg border-2 border-white/30">
+            <h4 className="text-xl font-bold text-white mb-4">Overall Totals</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-white">
+              <div>
+                <p className="text-gray-300">Total Import Value:</p>
+                <p className="text-2xl font-bold">{selectedCurrency} {totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+              </div>
+              <div>
+                <p className="text-gray-300">Total Tariff:</p>
+                <p className="text-2xl font-bold text-red-300">{selectedCurrency} {totalTariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+              </div>
+              <div>
+                <p className="text-gray-300">Total Cost:</p>
+                <p className="text-2xl font-bold text-green-300">{selectedCurrency} {totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
               </div>
             </div>
+          </div>
 
-            <div className="grid gap-4 md:grid-cols-2 mt-6">
-              <Button
-                onClick={() => { setShowAIAnalysis(!showAIAnalysis); setShowCharts(false); }}
-                size="lg"
-                disabled={isAnalyzing}
-                className={`py-6 border-2 transition-all ${
-                  showAIAnalysis ? 'bg-primary text-white border-primary hover:bg-primary/90' : 'bg-white text-black border-white hover:bg-gray-100'
+          <div className="grid gap-4 md:grid-cols-2 mt-6">
+            <Button
+              onClick={() => { setShowAIAnalysis(!showAIAnalysis); setShowCharts(false); }}
+              size="lg"
+              disabled={isAnalyzing}
+              className={`py-6 border-2 transition-all ${showAIAnalysis ? 'bg-primary text-white border-primary hover:bg-primary/90' : 'bg-white text-black border-white hover:bg-gray-100'
                 }`}
-              >
-                <Sparkles className={`w-5 h-5 mr-2 ${isAnalyzing ? 'animate-pulse' : ''}`} />
-                <div className="text-left">
-                  <div className="font-semibold">
-                    {isAnalyzing ? 'AI Analyzing...' : 'AI Analysis'}
-                  </div>
-                  <div className="text-xs opacity-80">
-                    {isAnalyzing ? 'Analyzing first product' : 'View insights for first product'}
-                  </div>
+            >
+              <Sparkles className={`w-5 h-5 mr-2 ${isAnalyzing ? 'animate-pulse' : ''}`} />
+              <div className="text-left">
+                <div className="font-semibold">
+                  {isAnalyzing ? 'AI Analyzing...' : 'AI Analysis'}
                 </div>
-              </Button>
+                <div className="text-xs opacity-80">
+                  {isAnalyzing ? 'Analyzing first product' : 'View insights for first product'}
+                </div>
+              </div>
+            </Button>
 
-              <Button
-                onClick={() => { setShowCharts(!showCharts); setShowAIAnalysis(false); }}
-                size="lg"
-                className={`py-6 border-2 transition-all ${
-                  showCharts ? 'bg-primary text-white border-primary hover:bg-primary/90' : 'bg-white text-black border-white hover:bg-gray-100'
+            <Button
+              onClick={() => { setShowCharts(!showCharts); setShowAIAnalysis(false); }}
+              size="lg"
+              className={`py-6 border-2 transition-all ${showCharts ? 'bg-primary text-white border-primary hover:bg-primary/90' : 'bg-white text-black border-white hover:bg-gray-100'
                 }`}
-              >
-                <BarChart3 className="w-5 h-5 mr-2" />
-                <div className="text-left">
-                  <div className="font-semibold">Charts & Diagrams</div>
-                  <div className="text-xs opacity-80">Visualize tariff comparisons</div>
-                </div>
-              </Button>
-            </div>
+            >
+              <BarChart3 className="w-5 h-5 mr-2" />
+              <div className="text-left">
+                <div className="font-semibold">Charts & Diagrams</div>
+                <div className="text-xs opacity-80">Visualize tariff comparisons</div>
+              </div>
+            </Button>
+          </div>
 
-            {showAIAnalysis && (
-              <>
-                {isAnalyzing ? (
-                  <Card className="shadow-lg border-primary animate-pulse">
-                    <CardContent className="p-8 text-center">
-                      <Sparkles className="w-12 h-12 mx-auto mb-4 animate-spin text-primary" />
-                      <h3 className="text-xl font-semibold mb-2">AI Analysis in Progress...</h3>
-                      <p className="text-muted-foreground">Analyzing the first product in your list</p>
-                    </CardContent>
-                  </Card>
-                ) : apiResponse && typeof apiResponse === "object" && !Array.isArray(apiResponse) ? (
-                  <Card className="shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500 border-primary">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Sparkles className="w-5 h-5" />
-                        Gemini API Analysis (First Product)
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        {apiResponse.summary && (
-                          <>
-                            <h4 className="font-semibold text-lg mb-2">Summary</h4>
-                            <p>{apiResponse.summary}</p>
-                          </>
-                        )}
+          {showAIAnalysis && (
+            <>
+              {isAnalyzing ? (
+                <Card className="shadow-lg border-primary animate-pulse">
+                  <CardContent className="p-8 text-center">
+                    <Sparkles className="w-12 h-12 mx-auto mb-4 animate-spin text-primary" />
+                    <h3 className="text-xl font-semibold mb-2">AI Analysis in Progress...</h3>
+                    <p className="text-muted-foreground">Analyzing the first product in your list</p>
+                  </CardContent>
+                </Card>
+              ) : apiResponse && typeof apiResponse === "object" && !Array.isArray(apiResponse) ? (
+                <Card className="shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500 border-primary">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5" />
+                      Gemini API Analysis (First Product)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      {apiResponse.summary && (
+                        <>
+                          <h4 className="font-semibold text-lg mb-2">Summary</h4>
+                          <p>{apiResponse.summary}</p>
+                        </>
+                      )}
 
-                        {apiResponse.metrics && (
-                          <>
-                            <h4 className="font-semibold text-lg mt-4 mb-2">Key Metrics</h4>
-                            <ul className="space-y-1 list-disc pl-4">
-                              {Object.entries(apiResponse.metrics).map(([key, value], idx) => (
-                                <li key={idx}>
-                                  <strong>{key.replace(/_/g, " ")}:</strong> {value}
-                                </li>
-                              ))}
-                            </ul>
-                          </>
-                        )}
+                      {apiResponse.metrics && (
+                        <>
+                          <h4 className="font-semibold text-lg mt-4 mb-2">Key Metrics</h4>
+                          <ul className="space-y-1 list-disc pl-4">
+                            {Object.entries(apiResponse.metrics).map(([key, value], idx) => (
+                              <li key={idx}>
+                                <strong>{key.replace(/_/g, " ")}:</strong> {value}
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
 
-                        {apiResponse.insights && apiResponse.insights.length > 0 && (
-                          <>
-                            <h4 className="font-semibold text-lg mt-4 mb-2">Insights</h4>
-                            <ul className="space-y-2 list-disc pl-4">
-                              {apiResponse.insights.map((insight, idx) => (
-                                <li key={idx}>
-                                  {insight.split("**").map((part, i) =>
-                                    i % 2 === 1 ? <strong key={i}>{part}</strong> : part
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          </>
-                        )}
+                      {apiResponse.insights && apiResponse.insights.length > 0 && (
+                        <>
+                          <h4 className="font-semibold text-lg mt-4 mb-2">Insights</h4>
+                          <ul className="space-y-2 list-disc pl-4">
+                            {apiResponse.insights.map((insight, idx) => (
+                              <li key={idx}>
+                                {insight.split("**").map((part, i) =>
+                                  i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
 
-                        {apiResponse.recommendations && apiResponse.recommendations.length > 0 && (
-                          <>
-                            <h4 className="font-semibold text-lg mt-4 mb-2">Recommendations</h4>
-                            <ul className="space-y-2 list-disc pl-4">
-                              {apiResponse.recommendations.map((rec, idx) => (
-                                <li key={idx}>
-                                  {rec.split("**").map((part, i) =>
-                                    i % 2 === 1 ? <strong key={i}>{part}</strong> : part
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          </>
-                        )}
+                      {apiResponse.recommendations && apiResponse.recommendations.length > 0 && (
+                        <>
+                          <h4 className="font-semibold text-lg mt-4 mb-2">Recommendations</h4>
+                          <ul className="space-y-2 list-disc pl-4">
+                            {apiResponse.recommendations.map((rec, idx) => (
+                              <li key={idx}>
+                                {rec.split("**").map((part, i) =>
+                                  i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
 
-                        {apiResponse.confidence && (
-                          <>
-                            <h4 className="font-semibold text-lg mt-4 mb-2">Confidence</h4>
-                            <p>{apiResponse.confidence}</p>
-                          </>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card className="shadow-lg border-yellow-500">
-                    <CardContent className="p-6">
-                      <p className="text-muted-foreground">No AI analysis available. Please try again.</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
+                      {apiResponse.confidence && (
+                        <>
+                          <h4 className="font-semibold text-lg mt-4 mb-2">Confidence</h4>
+                          <p>{apiResponse.confidence}</p>
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="shadow-lg border-yellow-500">
+                  <CardContent className="p-6">
+                    <p className="text-muted-foreground">No AI analysis available. Please try again.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
 
-            {showCharts && (
-              <Card className="shadow-lg border-primary p-4 mt-4 bg-white dark:bg-gray-900">
-                <h4 className="text-lg font-semibold mb-2">Tariff Comparisons</h4>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={dummyChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="product" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="tariff" fill="hsl(var(--chart-1))" />
-                  </BarChart>
-                </ResponsiveContainer>
-                <p className="text-center text-sm text-muted-foreground mt-2">
-                  This bar chart compares tariffs for different agricultural products.
-                </p>
-              </Card>
-            )}
-          </motion.div>
-        )}
-      </div>
-    </motion.section>
+          {showCharts && (
+            <Card className="shadow-lg border-primary p-4 mt-4 bg-white dark:bg-gray-900">
+              <h4 className="text-lg font-semibold mb-2">Tariff Comparisons</h4>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={dummyChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="product" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="tariff" fill="hsl(var(--chart-1))" />
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="text-center text-sm text-muted-foreground mt-2">
+                This bar chart compares tariffs for different agricultural products.
+              </p>
+            </Card>
+          )}
+        </motion.div>
+      )}
+    </div>
+    </motion.section >
   )
 }
