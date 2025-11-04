@@ -15,7 +15,7 @@ declare module "@react-three/fiber" {
   }
 }
 
-extend({ ThreeGlobe: ThreeGlobe, UnrealBloomPass: UnrealBloomPass as any });
+extend({ ThreeGlobe: ThreeGlobe });
 
 // Reuse a single KTX2Loader across the app to avoid multiple active instances
 let __ktx2Loader: KTX2Loader | null = null;
@@ -23,6 +23,7 @@ function getKtx2Loader(gl: THREE.WebGLRenderer): KTX2Loader {
   if (!__ktx2Loader) {
     __ktx2Loader = new KTX2Loader().setTranscoderPath('/basis/');
     // @ts-ignore KTX2Loader accepts WebGLRenderer
+  // @ts-ignore KTX2Loader accepts WebGLRenderer
     __ktx2Loader.detectSupport(gl);
   }
   return __ktx2Loader;
@@ -179,7 +180,11 @@ export function Globe({ globeConfig, data }: WorldProps) {
       color: Color;
       emissive: Color;
       specular?: Color;
-      specularMap?: THREE.Texture | null;
+  specularMap?: THREE.Texture | null;
+  map?: THREE.Texture | null;
+  bumpMap?: THREE.Texture | null;
+  bumpScale?: number;
+  needsUpdate?: boolean;
       emissiveIntensity: number;
       shininess: number;
     };
@@ -192,7 +197,7 @@ export function Globe({ globeConfig, data }: WorldProps) {
 
     // Prepare KTX2 loader once
     if (!ktx2Ref.current) {
-      try { ktx2Ref.current = getKtx2Loader(gl as any); } catch {}
+  try { ktx2Ref.current = getKtx2Loader(gl as unknown as THREE.WebGLRenderer); } catch {}
     }
 
     const applyTextureFlip = (tex: THREE.Texture) => {
@@ -219,14 +224,15 @@ export function Globe({ globeConfig, data }: WorldProps) {
         try { dayTexRef.current?.dispose(); } catch {}
         loadKTX2(defaultProps.globeImageUrl, (tex) => {
           // Ensure proper color space so colors don't wash out
-          (tex as any).colorSpace = (THREE as any).SRGBColorSpace;
+          tex.colorSpace = THREE.SRGBColorSpace;
           const hasMipmaps = Array.isArray((tex as any).mipmaps) && (tex as any).mipmaps.length > 1;
           tex.generateMipmaps = false;
           tex.minFilter = hasMipmaps ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
           tex.magFilter = THREE.LinearFilter;
           dayTexRef.current = tex;
           (globeMaterial as any).map = tex;
-          (globeMaterial as any).needsUpdate = true;
+          globeMaterial.map = tex;
+          globeMaterial.needsUpdate = true;
         }, () => {
           globeRef.current!.globeImageUrl(defaultProps.globeImageUrl!);
         });
@@ -242,8 +248,9 @@ export function Globe({ globeConfig, data }: WorldProps) {
         loadKTX2(defaultProps.bumpImageUrl, (tex) => {
           bumpTexRef.current = tex;
           (globeMaterial as any).bumpMap = tex;
-          (globeMaterial as any).bumpScale = 0.4;
-          (globeMaterial as any).needsUpdate = true;
+          globeMaterial.bumpMap = tex;
+          globeMaterial.bumpScale = 0.4;
+          globeMaterial.needsUpdate = true;
         }, () => {
           globeRef.current!.bumpImageUrl(defaultProps.bumpImageUrl!);
         });
@@ -266,13 +273,16 @@ export function Globe({ globeConfig, data }: WorldProps) {
         tex.magFilter = THREE.LinearFilter;
         globeMaterial.specularMap = tex;
         globeMaterial.specular = new Color(0x444444);
-        (globeMaterial as any).needsUpdate = true;
+          globeMaterial.specularMap = tex;
+          globeMaterial.needsUpdate = true;
         specularTexRef.current = tex;
       };
       if (defaultProps.specularImageUrl.toLowerCase().endsWith('.ktx2')) {
         loadKTX2(defaultProps.specularImageUrl, onSpecularReady, () => {
           new THREE.TextureLoader().load(defaultProps.specularImageUrl!, onSpecularReady, undefined, () => {
             globeMaterial.specularMap = null as any;
+          globeMaterial.specularMap = null;
+          globeMaterial.specularMap = null;
           });
         });
       } else {
@@ -314,7 +324,8 @@ export function Globe({ globeConfig, data }: WorldProps) {
     const altitude = defaultProps.initialPosition?.altitude ?? 2.1;
     requestAnimationFrame(() => {
       try {
-        (globeRef.current as any)?.pointOfView({ lat, lng, altitude }, 0);
+        // @ts-expect-error pointOfView exists on three-globe instance but is missing in its type defs
+        globeRef.current?.pointOfView({ lat, lng, altitude }, 0);
       } catch {}
     });
     if (groupRef.current) {
@@ -393,6 +404,8 @@ export function Globe({ globeConfig, data }: WorldProps) {
       .arcEndLat((d) => (d as { endLat: number }).endLat * 1)
       .arcEndLng((d) => (d as { endLng: number }).endLng * 1)
       .arcColor((d: any) => [d.color, 'rgba(255,255,255,0)'])
+  // @ts-expect-error typings don't reflect gradient accessor by data; runtime supports [start,end]
+  .arcColor((d: Position) => [d.color, 'rgba(255,255,255,0)'])
       .arcAltitude((e) => (e as { arcAlt: number }).arcAlt * 1)
       .arcStroke(() => 1.0)
       // Animate dash to create motion along the arc when enabled
@@ -502,7 +515,7 @@ export function World(props: WorldProps) {
   const { globeConfig } = props;
   const worldCfg = { enableBloom: true, forceBloomInDev: false, ...globeConfig } as GlobeConfig;
   const scene = new Scene();
-  scene.fog = undefined as any;
+  scene.fog = null;
   return (
     <Canvas
       scene={scene}
@@ -550,8 +563,7 @@ export function World(props: WorldProps) {
       {/* Subtle bloom for arcs/city lights (disabled by default in dev to reduce GPU pressure) */}
       {(worldCfg.enableBloom !== false) && (process.env.NODE_ENV !== 'development' || worldCfg.forceBloomInDev) && (
         <Effects disableGamma>
-          {/* @ts-ignore */}
-          <unrealBloomPass threshold={0.9} strength={0.4} radius={0.4} />
+          <primitive object={new UnrealBloomPass(undefined as unknown as THREE.Vector2, 0.4, 0.4, 0.9)} />
         </Effects>
       )}
       <OrbitControls
@@ -573,10 +585,10 @@ export function World(props: WorldProps) {
 // Subtle atmospheric glow using a BackSide sphere and additive blending
 function Atmosphere({ color = "#66a6ff", intensity = 0.25, radius = 102 }: { color?: string; intensity?: number; radius?: number }) {
   const glowColor = new THREE.Color(color);
-  const uniforms = {
+  const uniforms: { glowColor: { value: THREE.Vector3 }; glowIntensity: { value: number } } = {
     glowColor: { value: new THREE.Vector3(glowColor.r, glowColor.g, glowColor.b) },
     glowIntensity: { value: intensity },
-  } as any;
+  };
   return (
     <mesh>
       <sphereGeometry args={[radius, 48, 48]} />
@@ -612,6 +624,7 @@ function Atmosphere({ color = "#66a6ff", intensity = 0.25, radius = 102 }: { col
 function Starfield({ count = 2000, radius = 1200 }: { count?: number; radius?: number }) {
   const geomRef = useRef<THREE.BufferGeometry | null>(null);
   useEffect(() => {
+    const geometry = geomRef.current;
     const positions = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
       const r = radius * (0.8 + 0.2 * Math.random());
@@ -624,12 +637,16 @@ function Starfield({ count = 2000, radius = 1200 }: { count?: number; radius?: n
       positions[i * 3 + 1] = y;
       positions[i * 3 + 2] = z;
     }
-    geomRef.current?.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    return () => geomRef.current?.dispose();
+    if (geometry) {
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    }
+    return () => {
+      geometry?.dispose();
+    };
   }, [count, radius]);
   return (
     <points>
-      <bufferGeometry ref={geomRef as any} />
+      <bufferGeometry ref={geomRef} />
       <pointsMaterial color={0xffffff} size={0.9} sizeAttenuation transparent opacity={0.9} />
     </points>
   );
@@ -637,10 +654,8 @@ function Starfield({ count = 2000, radius = 1200 }: { count?: number; radius?: n
 
 // Sky sphere background using a texture (e.g., Milky Way)
 function SkySphere({ textureUrl = "/stars_milky.jpg", radius = 1800 }: { textureUrl?: string; radius?: number }) {
-  const texture = useLoader(THREE.TextureLoader, textureUrl, (ldr: any) => {
-    try { ldr.setCrossOrigin?.('anonymous'); } catch {}
-  });
-  texture.colorSpace = THREE.SRGBColorSpace as any;
+  const texture = useLoader(THREE.TextureLoader, textureUrl);
+  texture.colorSpace = THREE.SRGBColorSpace;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.generateMipmaps = true;
   useEffect(() => {
@@ -735,27 +750,29 @@ function NightLights({ nightImageUrl, lightDir, flipTextureVertically, flipTextu
   const [texture, setTexture] = useState<THREE.Texture | undefined>(undefined);
   useEffect(() => {
     let disposed = false;
-    let loader: any;
+    let loader: KTX2Loader | THREE.TextureLoader | undefined;
+    let loadedTexture: THREE.Texture | undefined;
     if (!nightImageUrl) {
       setTexture(undefined);
       return;
     }
     const done = (tex: THREE.Texture) => {
       if (disposed) { try { tex.dispose(); } catch {} return; }
-      tex.colorSpace = THREE.SRGBColorSpace as any;
-      const hasMipmaps = Array.isArray((tex as any).mipmaps) && (tex as any).mipmaps.length > 1;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const hasMipmaps = Array.isArray(tex.mipmaps) && tex.mipmaps.length > 1;
       tex.generateMipmaps = false;
       tex.minFilter = hasMipmaps ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
       tex.magFilter = THREE.LinearFilter;
-  const flipX = flipTextureHorizontally ?? false;
-  const flipY = flipTextureVertically ?? false;
+      const flipX = flipTextureHorizontally ?? false;
+      const flipY = flipTextureVertically ?? false;
       tex.repeat.set(flipX ? -1 : 1, flipY ? -1 : 1);
       tex.offset.set(flipX ? 1 : 0, flipY ? 1 : 0);
       tex.needsUpdate = true;
+      loadedTexture = tex;
       setTexture(tex);
     };
     if (nightImageUrl.toLowerCase().endsWith('.ktx2')) {
-  loader = getKtx2Loader(gl as any);
+      loader = getKtx2Loader(gl as unknown as THREE.WebGLRenderer);
       loader.load(nightImageUrl, done, undefined, () => setTexture(undefined));
     } else {
       loader = new THREE.TextureLoader();
@@ -763,11 +780,11 @@ function NightLights({ nightImageUrl, lightDir, flipTextureVertically, flipTextu
     }
     return () => {
       disposed = true;
-      try { texture?.dispose(); } catch {}
+      try { loadedTexture?.dispose(); } catch {}
     };
   }, [nightImageUrl, gl, flipTextureVertically, flipTextureHorizontally]);
   if (!texture) return null;
-  const uniforms: any = {
+  const uniforms: { map: { value: THREE.Texture }; lightDir: { value: THREE.Vector3 }; threshold: { value: number }; intensity: { value: number } } = {
     map: { value: texture },
     lightDir: { value: lightDir.clone().normalize() },
     threshold: { value: 0.05 },
@@ -818,24 +835,26 @@ function Clouds({ cloudsImageUrl, speed = 0.0025, flipTextureVertically, flipTex
   const meshRef = useRef<THREE.Mesh>(null);
   useEffect(() => {
     let disposed = false;
-    let loader: any;
+    let loader: KTX2Loader | THREE.TextureLoader | undefined;
+    let loadedTexture: THREE.Texture | undefined;
     const done = (tex: THREE.Texture) => {
       if (disposed) { try { tex.dispose(); } catch {} return; }
-      tex.colorSpace = THREE.SRGBColorSpace as any;
-      const hasMipmaps = Array.isArray((tex as any).mipmaps) && (tex as any).mipmaps.length > 1;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const hasMipmaps = Array.isArray(tex.mipmaps) && tex.mipmaps.length > 1;
       tex.generateMipmaps = false;
       tex.minFilter = hasMipmaps ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
       tex.magFilter = THREE.LinearFilter;
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  const flipX = flipTextureHorizontally ?? false;
-  const flipY = flipTextureVertically ?? false;
+      const flipX = flipTextureHorizontally ?? false;
+      const flipY = flipTextureVertically ?? false;
       tex.repeat.set(flipX ? -1 : 1, flipY ? -1 : 1);
       tex.offset.set(flipX ? 1 : 0, flipY ? 1 : 0);
       tex.needsUpdate = true;
+      loadedTexture = tex;
       setTexture(tex);
     };
     if (cloudsImageUrl?.toLowerCase().endsWith('.ktx2')) {
-      loader = getKtx2Loader(gl as any);
+      loader = getKtx2Loader(gl as unknown as THREE.WebGLRenderer);
       loader.load(cloudsImageUrl, done, undefined, () => setTexture(undefined));
     } else if (cloudsImageUrl) {
       loader = new THREE.TextureLoader();
@@ -845,7 +864,7 @@ function Clouds({ cloudsImageUrl, speed = 0.0025, flipTextureVertically, flipTex
     }
     return () => {
       disposed = true;
-      try { texture?.dispose(); } catch {}
+      try { loadedTexture?.dispose(); } catch {}
     };
   }, [cloudsImageUrl, gl, flipTextureVertically, flipTextureHorizontally]);
   useFrame((_s, delta) => {
