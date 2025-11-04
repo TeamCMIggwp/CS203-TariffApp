@@ -1,36 +1,33 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { Color, Scene, Fog, PerspectiveCamera, Vector3 } from "three";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
+import { Effects, Html, OrbitControls } from "@react-three/drei";
 import ThreeGlobe from "three-globe";
-import * as THREE from 'three';
-import { useThree, Canvas, extend, useLoader, useFrame } from "@react-three/fiber";
-import { OrbitControls, AdaptiveDpr, AdaptiveEvents, PerformanceMonitor, Html, Effects } from "@react-three/drei";
-import { UnrealBloomPass, KTX2Loader } from 'three-stdlib';
+import { UnrealBloomPass, KTX2Loader } from "three-stdlib";
 import countries from "@/data/globe.json";
-declare module "@react-three/fiber" {
-  interface ThreeElements {
-    threeGlobe: ThreeElements["mesh"] & {
-      new (): ThreeGlobe;
-    };
-  }
-}
-
-extend({ ThreeGlobe: ThreeGlobe, UnrealBloomPass: UnrealBloomPass as any });
-
-// Reuse a single KTX2Loader across the app to avoid multiple active instances
-let __ktx2Loader: KTX2Loader | null = null;
-function getKtx2Loader(gl: THREE.WebGLRenderer): KTX2Loader {
-  if (!__ktx2Loader) {
-    __ktx2Loader = new KTX2Loader().setTranscoderPath('/basis/');
-    // @ts-ignore KTX2Loader accepts WebGLRenderer
-    __ktx2Loader.detectSupport(gl);
-  }
-  return __ktx2Loader;
-}
-
-const RING_PROPAGATION_SPEED = 3;
-const aspect = 1.2;
-const cameraZ = 300;
+import {
+  AdditiveBlending,
+  BackSide,
+  BufferAttribute,
+  BufferGeometry,
+  ClampToEdgeWrapping,
+  Color,
+  FrontSide,
+  LinearFilter,
+  LinearMipmapLinearFilter,
+  MathUtils,
+  Mesh,
+  MeshPhongMaterial,
+  RepeatWrapping,
+  Scene,
+  SRGBColorSpace,
+  Texture,
+  TextureLoader,
+  Vector3,
+  WebGLRenderer,
+} from "three";
+import type { IUniform, Uniforms } from "three";
 
 type Position = {
   order: number;
@@ -42,15 +39,13 @@ type Position = {
   color: string;
 };
 
-// type Arc = {
-//   startLat: number;
-//   startLng: number;
-//   endLat: number;
-//   endLng: number;
-//   color: string;
-//   arcAlt: number;
-//   order: number;
-// };
+type GlobePoint = {
+  size: number;
+  order: number;
+  color: string;
+  lat: number;
+  lng: number;
+};
 
 export type GlobeConfig = {
   pointSize?: number;
@@ -65,6 +60,7 @@ export type GlobeConfig = {
   atmosphereAltitude?: number;
   nightImageUrl?: string;
   showNightLights?: boolean;
+  nightLightsStrength?: number;
   emissive?: string;
   emissiveIntensity?: number;
   shininess?: number;
@@ -76,16 +72,14 @@ export type GlobeConfig = {
   pointLight?: string;
   ambientIntensity?: number;
   directionalIntensity?: number;
-  arcDensity?: number;      // 0..1 fraction of arcs to render
-  maxArcs?: number;         // hard cap on number of arcs to render
-  // Arc animation controls (moving arcs)
-  arcTime?: number;         // total time to animate dash (ms)
-  arcLength?: number;       // dash length portion (0..1); <1 enables motion
-  arcAnimate?: boolean;     // enable moving dash animation
-  arcGap?: number;          // dash gap portion (0..1)
+  arcDensity?: number;
+  maxArcs?: number;
+  arcTime?: number;
+  arcLength?: number;
+  arcAnimate?: boolean;
+  arcGap?: number;
   rings?: number;
   maxRings?: number;
-  // Toggle animated pulse rings at arc endpoints
   showRings?: boolean;
   initialPosition?: {
     lat: number;
@@ -98,15 +92,168 @@ export type GlobeConfig = {
   flipTextureVertically?: boolean;
   flipTextureHorizontally?: boolean;
   flipLongitude?: boolean;
-  // Background
   useSkybox?: boolean;
   starsBackgroundUrl?: string;
   starfieldCount?: number;
-  // Postprocessing
   enableBloom?: boolean;
-  // When true, keeps bloom active even in development (not recommended)
   forceBloomInDev?: boolean;
+  themeBlend?: number;
 };
+
+type ResolvedGlobeConfig = GlobeConfig & {
+  pointSize: number;
+  globeColor: string;
+  showAtmosphere: boolean;
+  atmosphereColor: string;
+  atmosphereAltitude: number;
+  polygonColor: string;
+  cloudsSpeed: number;
+  emissive: string;
+  emissiveIntensity: number;
+  shininess: number;
+  arcDensity: number;
+  arcTime: number;
+  arcLength: number;
+  arcAnimate: boolean;
+  arcGap: number;
+  rings: number;
+  maxRings: number;
+  showRings: boolean;
+  flipPoles: boolean;
+  flipTextureVertically: boolean;
+  flipTextureHorizontally: boolean;
+  flipLongitude: boolean;
+  useSkybox: boolean;
+  starfieldCount: number;
+  enableBloom: boolean;
+  forceBloomInDev: boolean;
+  nightLightsStrength: number;
+  themeBlend: number;
+};
+
+const DEFAULT_GLOBE_CONFIG: ResolvedGlobeConfig = {
+  pointSize: 1,
+  globeColor: "#1d072e",
+  globeImageUrl: undefined,
+  bumpImageUrl: undefined,
+  specularImageUrl: undefined,
+  nightImageUrl: "/earth_nightmap.jpg",
+  nightLightsStrength: 1.2,
+  cloudsImageUrl: undefined,
+  cloudsSpeed: 0.0025,
+  showAtmosphere: true,
+  atmosphereColor: "#ffffff",
+  atmosphereAltitude: 0.1,
+  polygonColor: "rgba(255,255,255,0.7)",
+  showHexPolygons: false,
+  ambientLight: "#7fb1ff",
+  ambientIntensity: 0.75,
+  directionalLeftLight: "#f0f5ff",
+  directionalTopLight: "#deebff",
+  directionalIntensity: 0.72,
+  pointLight: "#ffffff",
+  emissive: "#000000",
+  emissiveIntensity: 0.1,
+  shininess: 20,
+  arcDensity: 0.2,
+  maxArcs: undefined,
+  arcTime: 2000,
+  arcLength: 0.25,
+  arcAnimate: true,
+  arcGap: 0.95,
+  rings: 1,
+  maxRings: 3,
+  showRings: true,
+  initialPosition: { lat: 0, lng: 0, altitude: 2.1 },
+  autoRotate: true,
+  autoRotateSpeed: 0.06,
+  flipPoles: false,
+  flipTextureVertically: false,
+  flipTextureHorizontally: false,
+  flipLongitude: false,
+  useSkybox: true,
+  starsBackgroundUrl: "/stars_milky.jpg",
+  starfieldCount: 2000,
+  enableBloom: true,
+  forceBloomInDev: false,
+  themeBlend: 0,
+};
+
+type BlendUniforms = Uniforms & {
+  uDayMap: IUniform<Texture | null>;
+  uNightMap: IUniform<Texture | null>;
+  uMix: IUniform<number>;
+};
+
+const RING_PROPAGATION_SPEED = 3;
+
+let sharedKtx2Loader: KTX2Loader | null = null;
+
+function disposeTexture(texture: Texture | null | undefined) {
+  if (texture) {
+    texture.dispose();
+  }
+}
+
+function getSharedKtx2Loader(renderer: WebGLRenderer): KTX2Loader {
+  if (!sharedKtx2Loader) {
+    sharedKtx2Loader = new KTX2Loader().setTranscoderPath("/basis/");
+    sharedKtx2Loader.detectSupport(renderer);
+  }
+  return sharedKtx2Loader;
+}
+
+interface LoadTextureOptions {
+  flipX?: boolean;
+  flipY?: boolean;
+  wrapMode?: THREE.Wrapping;
+  repeat?: boolean;
+  minFilter?: THREE.TextureFilter;
+  magFilter?: THREE.TextureFilter;
+}
+
+function loadTextureResource(
+  renderer: WebGLRenderer,
+  url: string,
+  options: LoadTextureOptions = {},
+): Promise<Texture> {
+  const flipX = options.flipX ?? false;
+  const flipY = options.flipY ?? false;
+  const wrapMode = options.repeat ? RepeatWrapping : options.wrapMode ?? ClampToEdgeWrapping;
+  const desiredMinFilter = options.minFilter;
+  const desiredMagFilter = options.magFilter;
+
+  return new Promise<Texture>((resolve, reject) => {
+    const finalize = (texture: Texture) => {
+      texture.wrapS = wrapMode;
+      texture.wrapT = wrapMode;
+      texture.repeat.set(flipX ? -1 : 1, flipY ? -1 : 1);
+      texture.offset.set(flipX ? 1 : 0, flipY ? 1 : 0);
+      texture.colorSpace = SRGBColorSpace;
+      const hasMipmaps = texture.mipmaps.length > 1;
+      texture.generateMipmaps = false;
+      texture.minFilter = desiredMinFilter ?? (hasMipmaps ? LinearMipmapLinearFilter : LinearFilter);
+      texture.magFilter = desiredMagFilter ?? LinearFilter;
+      texture.needsUpdate = true;
+      resolve(texture);
+    };
+
+    if (url.toLowerCase().endsWith(".ktx2")) {
+      try {
+        const loader = getSharedKtx2Loader(renderer);
+        loader.load(url, finalize, undefined, () => {
+          reject(new Error(`Failed to load KTX2 texture: ${url}`));
+        });
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error("Failed to initialise KTX2 loader"));
+      }
+    } else {
+      new TextureLoader().load(url, finalize, undefined, () => {
+        reject(new Error(`Failed to load texture: ${url}`));
+      });
+    }
+  });
+}
 
 interface WorldProps {
   globeConfig: GlobeConfig;
@@ -118,51 +265,25 @@ export function Globe({ globeConfig, data }: WorldProps) {
   const globeRef = useRef<ThreeGlobe | null>(null);
   const groupRef = useRef<THREE.Group | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const specularTexRef = useRef<THREE.Texture | null>(null);
-  const dayTexRef = useRef<THREE.Texture | null>(null);
-  const bumpTexRef = useRef<THREE.Texture | null>(null);
-  const ktx2Ref = useRef<KTX2Loader | null>(null);
 
-  const defaultProps = {
-    pointSize: 1,
-    atmosphereColor: "#ffffff",
-    showAtmosphere: true,
-    atmosphereAltitude: 0.1,
-    polygonColor: "rgba(255,255,255,0.7)",
-    globeColor: "#1d072e",
-    globeImageUrl: undefined as string | undefined,
-    bumpImageUrl: undefined as string | undefined,
-    specularImageUrl: undefined as string | undefined,
-    nightImageUrl: "/earth_nightmap.jpg" as string | undefined,
-    cloudsImageUrl: undefined as string | undefined,
-    cloudsSpeed: 0.0025,
-    emissive: "#000000",
-    emissiveIntensity: 0.1,
-    shininess: 20,
-    arcDensity: 0.2,
-  maxArcs: undefined as number | undefined,
-    // Moving arc defaults (tasteful glint)
-    arcTime: 2000,
-    arcLength: 0.25,
-    arcAnimate: true,
-    arcGap: 0.95,
-  rings: 1,
-  maxRings: 3,
-  showRings: true,
-  flipPoles: false,
-  flipTextureVertically: false,
-  flipTextureHorizontally: false,
-  flipLongitude: false,
-    showHexPolygons: false,
-    useSkybox: true,
-    starsBackgroundUrl: "/stars_milky.jpg",
-    starfieldCount: 2000,
-    enableBloom: true,
-    forceBloomInDev: false,
-    ...globeConfig,
-  };
+  const dayTextureRef = useRef<Texture | null>(null);
+  const nightTextureRef = useRef<Texture | null>(null);
+  const bumpTextureRef = useRef<Texture | null>(null);
+  const specularTextureRef = useRef<Texture | null>(null);
+  const shaderUniformsRef = useRef<BlendUniforms | null>(null);
+  const materialPatchedRef = useRef(false);
+  const applyThemeBlendRef = useRef<(value: number) => void>(() => undefined);
 
-  // Initialize globe only once
+  const mergedConfig = useMemo<ResolvedGlobeConfig>(
+    () => ({
+      ...DEFAULT_GLOBE_CONFIG,
+      ...globeConfig,
+      nightLightsStrength: globeConfig.nightLightsStrength ?? DEFAULT_GLOBE_CONFIG.nightLightsStrength,
+      themeBlend: globeConfig.themeBlend ?? DEFAULT_GLOBE_CONFIG.themeBlend,
+    }),
+    [globeConfig],
+  );
+
   useEffect(() => {
     if (!globeRef.current && groupRef.current) {
       globeRef.current = new ThreeGlobe();
@@ -171,327 +292,399 @@ export function Globe({ globeConfig, data }: WorldProps) {
     }
   }, []);
 
-  // Build material when globe is initialized or when relevant props change
   useEffect(() => {
-    if (!globeRef.current || !isInitialized) return;
-
-    const globeMaterial = globeRef.current.globeMaterial() as unknown as {
-      color: Color;
-      emissive: Color;
-      specular?: Color;
-      specularMap?: THREE.Texture | null;
-      emissiveIntensity: number;
-      shininess: number;
-    };
-    const useTex = !!defaultProps.globeImageUrl;
-    const baseColor = useTex ? "#ffffff" : globeConfig.globeColor;
-    globeMaterial.color = new Color(baseColor);
-    globeMaterial.emissive = new Color(globeConfig.emissive);
-    globeMaterial.emissiveIntensity = globeConfig.emissiveIntensity || 0.1;
-    globeMaterial.shininess = globeConfig.shininess || 20;
-
-    // Prepare KTX2 loader once
-    if (!ktx2Ref.current) {
-      try { ktx2Ref.current = getKtx2Loader(gl as any); } catch {}
+    if (!globeRef.current || !isInitialized) {
+      return;
     }
 
-    const applyTextureFlip = (tex: THREE.Texture) => {
-      const flipX = defaultProps.flipTextureHorizontally ?? false;
-      const flipY = defaultProps.flipTextureVertically ?? false;
-      tex.repeat.set(flipX ? -1 : 1, flipY ? -1 : 1);
-      tex.offset.set(flipX ? 1 : 0, flipY ? 1 : 0);
-      tex.needsUpdate = true;
+    const material = globeRef.current.globeMaterial() as MeshPhongMaterial;
+    const useTextureBase = Boolean(mergedConfig.globeImageUrl);
+    material.color = new Color(useTextureBase ? "#ffffff" : mergedConfig.globeColor);
+    material.emissive = new Color(mergedConfig.emissive);
+    material.emissiveIntensity = mergedConfig.emissiveIntensity;
+    material.shininess = mergedConfig.shininess;
+
+    const flipX = mergedConfig.flipTextureHorizontally;
+    const flipY = mergedConfig.flipTextureVertically;
+
+    const updateBlendUniform = (value: number) => {
+      if (shaderUniformsRef.current) {
+        shaderUniformsRef.current.uMix.value = MathUtils.clamp(value, 0, 1);
+      }
     };
 
-    const loadKTX2 = (url: string, onLoad: (t: THREE.Texture) => void, onError?: () => void) => {
-      if (!ktx2Ref.current) return onError?.();
-      ktx2Ref.current.load(url, (tex) => {
-        tex.wrapS = THREE.ClampToEdgeWrapping;
-        tex.wrapT = THREE.ClampToEdgeWrapping;
-        applyTextureFlip(tex);
-        onLoad(tex);
-      }, undefined, () => onError?.());
+    applyThemeBlendRef.current = updateBlendUniform;
+
+    const ensureBlendShader = (dayTexture: Texture | null, nightTexture: Texture | null) => {
+      if (!globeRef.current || !dayTexture) {
+        return;
+      }
+
+      const activeNightTexture = nightTexture ?? dayTexture;
+      material.map = dayTexture;
+      material.defines = { ...(material.defines ?? {}), USE_MAP: "", USE_UV: "" };
+
+      if (!materialPatchedRef.current) {
+        material.onBeforeCompile = (shader) => {
+          const uniforms = shader.uniforms as BlendUniforms;
+          uniforms.uDayMap = { value: dayTexture } as IUniform<Texture | null>;
+          uniforms.uNightMap = { value: activeNightTexture } as IUniform<Texture | null>;
+          uniforms.uMix = { value: MathUtils.clamp(mergedConfig.themeBlend, 0, 1) } as IUniform<number>;
+
+          if (!shader.fragmentShader.includes("uniform sampler2D uDayMap")) {
+            shader.fragmentShader = `uniform sampler2D uDayMap;\nuniform sampler2D uNightMap;\nuniform float uMix;\n${shader.fragmentShader}`;
+          }
+
+          shader.fragmentShader = shader.fragmentShader.replace(
+            "#include <map_fragment>",
+            `#ifdef USE_MAP\n  vec4 texelColorDay = texture( uDayMap, vUv );\n  vec4 texelColorNight = texture( uNightMap, vUv );\n  vec3 dayLinear = pow( max( texelColorDay.rgb, vec3( 0.0001 ) ), vec3( 2.0 ) );\n  vec3 nightLinear = pow( max( texelColorNight.rgb, vec3( 0.0001 ) ), vec3( 2.0 ) );\n  float mixAmount = clamp( uMix, 0.0, 1.0 );\n  vec3 softenedNight = max( nightLinear, dayLinear * 0.32 );\n  vec3 blendedLinear = mix( dayLinear, softenedNight, mixAmount );\n  blendedLinear = mix( blendedLinear, normalize( blendedLinear + vec3( 0.08 ) ), mixAmount * 0.35 );\n  float alphaBlend = mix( texelColorDay.a, texelColorNight.a, mixAmount );\n  vec4 texelColor = vec4( blendedLinear, alphaBlend );\n  diffuseColor *= texelColor;\n#else\n  vec4 texelColor = vec4( 1.0 );\n#endif`,
+          );
+
+          shaderUniformsRef.current = uniforms;
+        };
+
+        material.customProgramCacheKey = () => `globe-mix-${mergedConfig.nightImageUrl ? 1 : 0}`;
+        material.needsUpdate = true;
+        materialPatchedRef.current = true;
+      }
+
+      if (shaderUniformsRef.current) {
+        shaderUniformsRef.current.uDayMap.value = dayTexture;
+        shaderUniformsRef.current.uNightMap.value = activeNightTexture;
+        shaderUniformsRef.current.uMix.value = MathUtils.clamp(mergedConfig.themeBlend, 0, 1);
+      }
     };
 
-    // Apply globe (day) texture
-    if (defaultProps.globeImageUrl) {
-      if (defaultProps.globeImageUrl.toLowerCase().endsWith('.ktx2')) {
-        try { dayTexRef.current?.dispose(); } catch {}
-        loadKTX2(defaultProps.globeImageUrl, (tex) => {
-          // Ensure proper color space so colors don't wash out
-          (tex as any).colorSpace = (THREE as any).SRGBColorSpace;
-          const hasMipmaps = Array.isArray((tex as any).mipmaps) && (tex as any).mipmaps.length > 1;
-          tex.generateMipmaps = false;
-          tex.minFilter = hasMipmaps ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
-          tex.magFilter = THREE.LinearFilter;
-          dayTexRef.current = tex;
-          (globeMaterial as any).map = tex;
-          (globeMaterial as any).needsUpdate = true;
-        }, () => {
-          globeRef.current!.globeImageUrl(defaultProps.globeImageUrl!);
-        });
-      } else {
-        globeRef.current.globeImageUrl(defaultProps.globeImageUrl);
-      }
-    }
+    let cancelled = false;
 
-    // Apply bump texture
-    if (defaultProps.bumpImageUrl) {
-      if (defaultProps.bumpImageUrl.toLowerCase().endsWith('.ktx2')) {
-        try { bumpTexRef.current?.dispose(); } catch {}
-        loadKTX2(defaultProps.bumpImageUrl, (tex) => {
-          bumpTexRef.current = tex;
-          (globeMaterial as any).bumpMap = tex;
-          (globeMaterial as any).bumpScale = 0.4;
-          (globeMaterial as any).needsUpdate = true;
-        }, () => {
-          globeRef.current!.bumpImageUrl(defaultProps.bumpImageUrl!);
-        });
-      } else {
-        globeRef.current.bumpImageUrl(defaultProps.bumpImageUrl);
+    const assignDayTexture = async () => {
+      if (!mergedConfig.globeImageUrl) {
+        disposeTexture(dayTextureRef.current);
+        dayTextureRef.current = null;
+        ensureBlendShader(null, nightTextureRef.current);
+        return;
       }
-    }
 
-    // Optional specular map to enhance ocean highlights
-    if (defaultProps.specularImageUrl) {
-      // Dispose the previous one if any
-      try { specularTexRef.current?.dispose(); } catch {}
-      const onSpecularReady = (tex: THREE.Texture) => {
-        tex.colorSpace = (THREE as any).SRGBColorSpace;
-        tex.wrapS = THREE.ClampToEdgeWrapping;
-        tex.wrapT = THREE.ClampToEdgeWrapping;
-        const hasMipmaps = Array.isArray((tex as any).mipmaps) && (tex as any).mipmaps.length > 1;
-        tex.generateMipmaps = false;
-        tex.minFilter = hasMipmaps ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
-        tex.magFilter = THREE.LinearFilter;
-        globeMaterial.specularMap = tex;
-        globeMaterial.specular = new Color(0x444444);
-        (globeMaterial as any).needsUpdate = true;
-        specularTexRef.current = tex;
-      };
-      if (defaultProps.specularImageUrl.toLowerCase().endsWith('.ktx2')) {
-        loadKTX2(defaultProps.specularImageUrl, onSpecularReady, () => {
-          new THREE.TextureLoader().load(defaultProps.specularImageUrl!, onSpecularReady, undefined, () => {
-            globeMaterial.specularMap = null as any;
-          });
-        });
-      } else {
-        new THREE.TextureLoader().load(defaultProps.specularImageUrl, onSpecularReady, undefined, () => {
-          globeMaterial.specularMap = null as any;
-        });
+      try {
+        const texture = await loadTextureResource(gl, mergedConfig.globeImageUrl, { flipX, flipY });
+        if (cancelled) {
+          disposeTexture(texture);
+          return;
+        }
+        disposeTexture(dayTextureRef.current);
+        dayTextureRef.current = texture;
+        ensureBlendShader(texture, nightTextureRef.current);
+      } catch (error) {
+        if (!cancelled) {
+          globeRef.current?.globeImageUrl(mergedConfig.globeImageUrl);
+        }
       }
-    } else {
-      globeMaterial.specularMap = null as any;
-    }
+    };
+
+    const assignNightTexture = async () => {
+      if (!mergedConfig.nightImageUrl) {
+        disposeTexture(nightTextureRef.current);
+        nightTextureRef.current = null;
+        ensureBlendShader(dayTextureRef.current, null);
+        return;
+      }
+
+      try {
+        const texture = await loadTextureResource(gl, mergedConfig.nightImageUrl, { flipX, flipY });
+        if (cancelled) {
+          disposeTexture(texture);
+          return;
+        }
+        disposeTexture(nightTextureRef.current);
+        nightTextureRef.current = texture;
+        ensureBlendShader(dayTextureRef.current, texture);
+      } catch {
+        if (!cancelled) {
+          disposeTexture(nightTextureRef.current);
+          nightTextureRef.current = null;
+          ensureBlendShader(dayTextureRef.current, null);
+        }
+      }
+    };
+
+    const assignBumpTexture = async () => {
+      if (!mergedConfig.bumpImageUrl) {
+        disposeTexture(bumpTextureRef.current);
+        bumpTextureRef.current = null;
+        material.bumpMap = null;
+        material.needsUpdate = true;
+        return;
+      }
+
+      try {
+        const texture = await loadTextureResource(gl, mergedConfig.bumpImageUrl, { flipX, flipY });
+        if (cancelled) {
+          disposeTexture(texture);
+          return;
+        }
+        disposeTexture(bumpTextureRef.current);
+        bumpTextureRef.current = texture;
+        material.bumpMap = texture;
+        material.bumpScale = 0.4;
+        material.needsUpdate = true;
+      } catch {
+        globeRef.current?.bumpImageUrl(mergedConfig.bumpImageUrl!);
+      }
+    };
+
+    const assignSpecularTexture = async () => {
+      if (!mergedConfig.specularImageUrl) {
+        disposeTexture(specularTextureRef.current);
+        specularTextureRef.current = null;
+        material.specularMap = null;
+        material.needsUpdate = true;
+        return;
+      }
+
+      try {
+        const texture = await loadTextureResource(gl, mergedConfig.specularImageUrl, { flipX, flipY });
+        if (cancelled) {
+          disposeTexture(texture);
+          return;
+        }
+        disposeTexture(specularTextureRef.current);
+        specularTextureRef.current = texture;
+        material.specularMap = texture;
+        material.specular = new Color(0x444444);
+        material.needsUpdate = true;
+      } catch {
+        globeRef.current?.specularImageUrl(mergedConfig.specularImageUrl!);
+      }
+    };
+
+    assignDayTexture();
+    assignNightTexture();
+    assignBumpTexture();
+    assignSpecularTexture();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
+    gl,
     isInitialized,
-    globeConfig.globeColor,
-    globeConfig.emissive,
-    globeConfig.emissiveIntensity,
-    globeConfig.shininess,
-    defaultProps.globeImageUrl,
-    defaultProps.bumpImageUrl,
-    defaultProps.specularImageUrl,
+    mergedConfig.arcAnimate,
+    mergedConfig.bumpImageUrl,
+    mergedConfig.emissive,
+    mergedConfig.emissiveIntensity,
+    mergedConfig.flipTextureHorizontally,
+    mergedConfig.flipTextureVertically,
+    mergedConfig.globeColor,
+    mergedConfig.globeImageUrl,
+    mergedConfig.nightImageUrl,
+    mergedConfig.specularImageUrl,
+    mergedConfig.themeBlend,
+    mergedConfig.shininess,
   ]);
 
-  // Dispose specular map on unmount
   useEffect(() => {
-    return () => {
-      try { specularTexRef.current?.dispose(); } catch {}
-      try { dayTexRef.current?.dispose(); } catch {}
-      try { bumpTexRef.current?.dispose(); } catch {}
-      specularTexRef.current = null;
-      dayTexRef.current = null;
-      bumpTexRef.current = null;
-    };
-  }, []);
+    applyThemeBlendRef.current(mergedConfig.themeBlend);
+  }, [mergedConfig.themeBlend]);
 
-  // One-time orientation to focus the Western Hemisphere by default
   useEffect(() => {
-    if (!globeRef.current || !isInitialized) return;
-    const lat = defaultProps.initialPosition?.lat ?? 0;
-    const lng = defaultProps.initialPosition?.lng ?? 0;
-    const altitude = defaultProps.initialPosition?.altitude ?? 2.1;
+    if (!globeRef.current || !isInitialized) {
+      return;
+    }
+
+    const { lat, lng, altitude } = mergedConfig.initialPosition ?? DEFAULT_GLOBE_CONFIG.initialPosition!;
+    const altitudeValue = altitude ?? DEFAULT_GLOBE_CONFIG.initialPosition!.altitude!;
+
     requestAnimationFrame(() => {
-      try {
-        (globeRef.current as any)?.pointOfView({ lat, lng, altitude }, 0);
-      } catch {}
+      globeRef.current?.pointOfView({ lat, lng, altitude: altitudeValue }, 0);
     });
+
     if (groupRef.current) {
       groupRef.current.rotation.set(0, 0, 0);
-      if (defaultProps.flipLongitude) {
+      if (mergedConfig.flipLongitude) {
         groupRef.current.rotation.y = Math.PI;
       }
-      if (defaultProps.flipPoles) {
+      if (mergedConfig.flipPoles) {
         groupRef.current.rotation.z = Math.PI;
       }
     }
-  }, [isInitialized, defaultProps.initialPosition?.lat, defaultProps.initialPosition?.lng, defaultProps.initialPosition?.altitude, defaultProps.flipPoles, defaultProps.flipLongitude]);
+  }, [
+    isInitialized,
+    mergedConfig.initialPosition?.altitude,
+    mergedConfig.initialPosition?.lat,
+    mergedConfig.initialPosition?.lng,
+    mergedConfig.flipLongitude,
+    mergedConfig.flipPoles,
+  ]);
 
-  // Build data when globe is initialized or when data changes
   useEffect(() => {
-    if (!globeRef.current || !isInitialized || !data) return;
-
-    // Reduce arc frequency by sampling based on arcDensity and optional cap
-    const density = Math.min(Math.max(defaultProps.arcDensity ?? 0.2, 0), 1);
-    let arcs: Position[] = [];
-    if (density > 0 && data.length > 0) {
-      const step = Math.max(1, Math.round(1 / density));
-      const pre = data.filter((_, i) => i % step === 0);
-      arcs = defaultProps.maxArcs != null ? pre.slice(0, defaultProps.maxArcs) : pre;
+    if (!globeRef.current || !isInitialized || data.length === 0) {
+      return;
     }
-    const points = [];
-    for (let i = 0; i < arcs.length; i++) {
-      const arc = arcs[i];
-      points.push({
-        size: defaultProps.pointSize,
+
+    const density = Math.max(0, Math.min(1, mergedConfig.arcDensity));
+    const step = density === 0 ? Number.POSITIVE_INFINITY : Math.max(1, Math.round(1 / density));
+    const sampledArcs = density === 0 ? [] : data.filter((_, index) => index % step === 0);
+    const arcs = mergedConfig.maxArcs != null ? sampledArcs.slice(0, mergedConfig.maxArcs) : sampledArcs;
+
+    const points: GlobePoint[] = arcs.flatMap((arc) => [
+      {
+        size: mergedConfig.pointSize,
         order: arc.order,
         color: arc.color,
         lat: arc.startLat,
         lng: arc.startLng,
-      });
-      points.push({
-        size: defaultProps.pointSize,
+      },
+      {
+        size: mergedConfig.pointSize,
         order: arc.order,
         color: arc.color,
         lat: arc.endLat,
         lng: arc.endLng,
-      });
-    }
+      },
+    ]);
 
-    // remove duplicates for same lat and lng
-    const filteredPoints = points.filter(
-      (v, i, a) =>
-        a.findIndex((v2) =>
-          ["lat", "lng"].every(
-            (k) => v2[k as "lat" | "lng"] === v[k as "lat" | "lng"],
-          ),
-        ) === i,
-    );
+    const seenPoints = new Set<string>();
+    const filteredPoints = points.filter((point) => {
+      const key = `${point.lat.toFixed(4)}|${point.lng.toFixed(4)}`;
+      if (seenPoints.has(key)) {
+        return false;
+      }
+      seenPoints.add(key);
+      return true;
+    });
 
-    if (defaultProps.showHexPolygons) {
-      globeRef.current
+    const globe = globeRef.current;
+
+    if (mergedConfig.showHexPolygons) {
+      globe
         .hexPolygonsData(countries.features)
         .hexPolygonResolution(3)
         .hexPolygonMargin(0.7)
-        .showAtmosphere(defaultProps.showAtmosphere)
-        .atmosphereColor(defaultProps.atmosphereColor)
-        .atmosphereAltitude(defaultProps.atmosphereAltitude)
-        .hexPolygonColor(() => defaultProps.polygonColor);
+        .showAtmosphere(mergedConfig.showAtmosphere)
+        .atmosphereColor(mergedConfig.atmosphereColor)
+        .atmosphereAltitude(mergedConfig.atmosphereAltitude)
+        .hexPolygonColor(() => mergedConfig.polygonColor);
     } else {
-      globeRef.current
+      globe
         .hexPolygonsData([])
-        .showAtmosphere(defaultProps.showAtmosphere)
-        .atmosphereColor(defaultProps.atmosphereColor)
-        .atmosphereAltitude(defaultProps.atmosphereAltitude);
+        .showAtmosphere(mergedConfig.showAtmosphere)
+        .atmosphereColor(mergedConfig.atmosphereColor)
+        .atmosphereAltitude(mergedConfig.atmosphereAltitude);
     }
 
-    globeRef.current
+    globe
       .arcsData(arcs)
-      .arcStartLat((d) => (d as { startLat: number }).startLat * 1)
-      .arcStartLng((d) => (d as { startLng: number }).startLng * 1)
-      .arcEndLat((d) => (d as { endLat: number }).endLat * 1)
-      .arcEndLng((d) => (d as { endLng: number }).endLng * 1)
-      .arcColor((d: any) => [d.color, 'rgba(255,255,255,0)'])
-      .arcAltitude((e) => (e as { arcAlt: number }).arcAlt * 1)
-      .arcStroke(() => 1.0)
-      // Animate dash to create motion along the arc when enabled
-      .arcDashLength(defaultProps.arcAnimate ? Math.min(Math.max(defaultProps.arcLength ?? 0.25, 0.01), 0.99) : 1)
-      .arcDashInitialGap((e) => (defaultProps.arcAnimate ? (e as { order: number }).order * 1 : 0))
-      .arcDashGap(defaultProps.arcAnimate ? Math.min(Math.max(defaultProps.arcGap ?? 0.95, 0), 2) : 0)
-      .arcDashAnimateTime(defaultProps.arcAnimate ? (defaultProps.arcTime ?? 2000) : 0);
+      .arcStartLat((d: Position) => d.startLat)
+      .arcStartLng((d: Position) => d.startLng)
+      .arcEndLat((d: Position) => d.endLat)
+      .arcEndLng((d: Position) => d.endLng)
+      .arcColor((d: Position) => [d.color, "rgba(255,255,255,0)"])
+      .arcAltitude((d: Position) => d.arcAlt)
+      .arcStroke(() => 1)
+      .arcDashLength(mergedConfig.arcAnimate ? Math.min(Math.max(mergedConfig.arcLength, 0.01), 0.99) : 1)
+      .arcDashInitialGap((d: Position) => (mergedConfig.arcAnimate ? d.order : 0))
+      .arcDashGap(mergedConfig.arcAnimate ? Math.min(Math.max(mergedConfig.arcGap, 0), 2) : 0)
+      .arcDashAnimateTime(mergedConfig.arcAnimate ? mergedConfig.arcTime : 0);
 
-    globeRef.current
+    globe
       .pointsData(filteredPoints)
-      .pointColor((e) => (e as { color: string }).color)
+      .pointColor((point: GlobePoint) => point.color)
       .pointsMerge(true)
-      .pointAltitude(0.0)
-      // Tiny dots at arc starts/ends
+      .pointAltitude(0)
       .pointRadius(0.25);
 
-    // Initialize ring settings (cleared by default). If showRings is false, we won't animate/update them later.
-    globeRef.current
+    globe
       .ringsData([])
-      .ringColor(() => defaultProps.polygonColor)
-      .ringMaxRadius(defaultProps.maxRings)
+      .ringColor(() => mergedConfig.polygonColor)
+      .ringMaxRadius(mergedConfig.maxRings)
       .ringPropagationSpeed(RING_PROPAGATION_SPEED)
-      .ringRepeatPeriod(
-        (defaultProps.arcTime * defaultProps.arcLength) / Math.max(defaultProps.rings, 1),
-      );
+      .ringRepeatPeriod((mergedConfig.arcTime * mergedConfig.arcLength) / Math.max(mergedConfig.rings, 1));
   }, [
-    isInitialized,
     data,
-    defaultProps.pointSize,
-    defaultProps.showAtmosphere,
-    defaultProps.atmosphereColor,
-    defaultProps.atmosphereAltitude,
-    defaultProps.polygonColor,
-    defaultProps.arcLength,
-    defaultProps.arcTime,
-    defaultProps.rings,
-    defaultProps.maxRings,
+    isInitialized,
+    mergedConfig.arcAnimate,
+    mergedConfig.arcDensity,
+    mergedConfig.arcGap,
+    mergedConfig.arcLength,
+    mergedConfig.arcTime,
+    mergedConfig.atmosphereAltitude,
+    mergedConfig.atmosphereColor,
+    mergedConfig.maxArcs,
+    mergedConfig.maxRings,
+    mergedConfig.pointSize,
+    mergedConfig.polygonColor,
+    mergedConfig.rings,
+    mergedConfig.showAtmosphere,
+    mergedConfig.showHexPolygons,
   ]);
 
-  // Handle rings animation with cleanup
   useEffect(() => {
-    if (!globeRef.current || !isInitialized || !data) return;
-    if (!defaultProps.showRings) {
-      // Ensure no rings are displayed and skip scheduling
+    if (!globeRef.current || !isInitialized || data.length === 0) {
+      return;
+    }
+
+    if (!mergedConfig.showRings) {
       globeRef.current.ringsData([]);
       return;
     }
 
-    const interval = setInterval(() => {
-      if (!globeRef.current) return;
+    const interval = window.setInterval(() => {
+      if (!globeRef.current) {
+        return;
+      }
 
-      const newNumbersOfRings = genRandomNumbers(
-        0,
-        data.length,
-        Math.floor((data.length * 4) / 5),
-      );
+      const sampleSize = Math.floor((data.length * 4) / 5);
+      const indices = genRandomNumbers(0, data.length, sampleSize);
 
       const ringsData = data
-        .filter((d, i) => newNumbersOfRings.includes(i))
-        .map((d) => ({
-          lat: d.startLat,
-          lng: d.startLng,
-          color: d.color,
+        .filter((_, index) => indices.includes(index))
+        .map((entry) => ({
+          lat: entry.startLat,
+          lng: entry.startLng,
+          color: entry.color,
         }));
 
       globeRef.current.ringsData(ringsData);
     }, 2000);
 
     return () => {
-      clearInterval(interval);
+      window.clearInterval(interval);
     };
-  }, [isInitialized, data, defaultProps.showRings]);
+  }, [data, isInitialized, mergedConfig.showRings]);
+
+  useEffect(() => () => {
+    disposeTexture(dayTextureRef.current);
+    disposeTexture(nightTextureRef.current);
+    disposeTexture(bumpTextureRef.current);
+    disposeTexture(specularTextureRef.current);
+    shaderUniformsRef.current = null;
+    materialPatchedRef.current = false;
+  }, []);
 
   return <group ref={groupRef} />;
 }
 
-export function WebGLRendererConfig() {
+function WebGLRendererConfig() {
   const { gl, size } = useThree();
 
   useEffect(() => {
-    // Cap DPR to reduce GPU memory pressure and avoid WebGL context loss
     gl.setPixelRatio(1);
     gl.setSize(size.width, size.height);
     gl.setClearColor(0x000010, 1);
 
-    // Guard against WebGL context loss; allow the browser to attempt restore
     const canvas = gl.domElement as HTMLCanvasElement;
-    const onLost = (e: Event) => {
-      e.preventDefault();
-      // three/fiber will re-render on restore automatically
+
+    const onLost = (event: WebGLContextEvent) => {
+      event.preventDefault();
     };
-    const onRestored = () => {
-      // no-op, R3F should resume
-    };
-    canvas.addEventListener('webglcontextlost', onLost as EventListener, false);
-    canvas.addEventListener('webglcontextrestored', onRestored as EventListener, false);
+    const onRestored = () => undefined;
+
+    canvas.addEventListener("webglcontextlost", onLost, false);
+    canvas.addEventListener("webglcontextrestored", onRestored, false);
+
     return () => {
-      canvas.removeEventListener('webglcontextlost', onLost as EventListener, false);
-      canvas.removeEventListener('webglcontextrestored', onRestored as EventListener, false);
+      canvas.removeEventListener("webglcontextlost", onLost, false);
+      canvas.removeEventListener("webglcontextrestored", onRestored, false);
     };
   }, [gl, size.height, size.width]);
 
@@ -500,66 +693,91 @@ export function WebGLRendererConfig() {
 
 export function World(props: WorldProps) {
   const { globeConfig } = props;
-  const worldCfg = { enableBloom: true, forceBloomInDev: false, ...globeConfig } as GlobeConfig;
-  const scene = new Scene();
-  scene.fog = undefined as any;
+  const scene = useMemo(() => {
+    const customScene = new Scene();
+    customScene.fog = null;
+    return customScene;
+  }, []);
+
+  const bloomPass = useMemo(() => {
+    const pass = new UnrealBloomPass();
+    pass.threshold = 0.9;
+    pass.strength = 0.4;
+    pass.radius = 0.4;
+    return pass;
+  }, []);
+
+  const nightLightsIntensity = useMemo(
+    () =>
+      (globeConfig.nightLightsStrength ?? DEFAULT_GLOBE_CONFIG.nightLightsStrength) *
+      MathUtils.clamp(globeConfig.themeBlend ?? 0, 0, 1),
+    [globeConfig.nightLightsStrength, globeConfig.themeBlend],
+  );
+
+  const cloudOpacity = useMemo(
+    () => Math.max(0.08, 0.35 - 0.27 * MathUtils.clamp(globeConfig.themeBlend ?? 0, 0, 1)),
+    [globeConfig.themeBlend],
+  );
+
   return (
     <Canvas
       scene={scene}
       camera={{ fov: 50, near: 180, far: 1800, position: [0, 0, 300] }}
       dpr={[1, 1]}
-      gl={{ powerPreference: 'high-performance', antialias: false, alpha: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: false }}
+      gl={{
+        powerPreference: "high-performance",
+        antialias: false,
+        alpha: false,
+        stencil: false,
+        premultipliedAlpha: false,
+        preserveDrawingBuffer: false,
+      }}
     >
       <WebGLRendererConfig />
-  <ambientLight color={globeConfig.ambientLight} intensity={globeConfig.ambientIntensity ?? 0.35} />
+      <ambientLight color={globeConfig.ambientLight} intensity={globeConfig.ambientIntensity ?? 0.35} />
       <directionalLight
         color={globeConfig.directionalLeftLight}
         position={new Vector3(-400, 100, 400)}
         intensity={globeConfig.directionalIntensity ?? 1.5}
       />
-      {/* Background */}
       {globeConfig.useSkybox ? (
         <SkySphere textureUrl={globeConfig.starsBackgroundUrl} />
       ) : (
-        <Starfield count={globeConfig.starfieldCount ?? 2000} />
+        <Starfield count={globeConfig.starfieldCount ?? DEFAULT_GLOBE_CONFIG.starfieldCount} />
       )}
-      {/* Atmosphere glow around Earth */}
-      {globeConfig.showAtmosphere !== false && (
-        <Atmosphere color="#66a6ff" intensity={0.25} radius={102} />
-      )}
-      {/* Night-side city lights (requires a night lights texture) */}
+      {globeConfig.showAtmosphere !== false && <Atmosphere color="#66a6ff" intensity={0.25} radius={102} />}
       {globeConfig.showNightLights !== false && globeConfig.nightImageUrl && (
         <NightLights
           nightImageUrl={globeConfig.nightImageUrl}
           lightDir={new Vector3(-400, 100, 400)}
           flipTextureVertically={globeConfig.flipTextureVertically}
           flipTextureHorizontally={globeConfig.flipTextureHorizontally}
+          intensity={nightLightsIntensity}
         />
       )}
-      {/* Cloud layer */}
       {globeConfig.cloudsImageUrl && (
         <Clouds
           cloudsImageUrl={globeConfig.cloudsImageUrl}
-          speed={globeConfig.cloudsSpeed ?? 0.0025}
+          speed={globeConfig.cloudsSpeed ?? DEFAULT_GLOBE_CONFIG.cloudsSpeed}
           flipTextureVertically={globeConfig.flipTextureVertically}
           flipTextureHorizontally={globeConfig.flipTextureHorizontally}
+          opacity={cloudOpacity}
         />
       )}
       <Globe {...props} />
       <HoverMarkers data={props.data} />
-      {/* Subtle bloom for arcs/city lights (disabled by default in dev to reduce GPU pressure) */}
-      {(worldCfg.enableBloom !== false) && (process.env.NODE_ENV !== 'development' || worldCfg.forceBloomInDev) && (
-        <Effects disableGamma>
-          {/* @ts-ignore */}
-          <unrealBloomPass threshold={0.9} strength={0.4} radius={0.4} />
-        </Effects>
-      )}
+      {globeConfig.enableBloom !== false &&
+        (process.env.NODE_ENV !== "development" || globeConfig.forceBloomInDev) && (
+          <Effects disableGamma>
+            <primitive object={bloomPass} />
+          </Effects>
+        )}
       <OrbitControls
         enablePan={false}
-        enableZoom={true}
+        enableZoom
         minDistance={220}
         maxDistance={600}
-        autoRotateSpeed={globeConfig.autoRotateSpeed ?? 1.2}
+        autoRotateSpeed={globeConfig.autoRotateSpeed ?? DEFAULT_GLOBE_CONFIG.autoRotateSpeed}
         autoRotate={globeConfig.autoRotate !== false}
         enableDamping
         dampingFactor={0.06}
@@ -570,21 +788,29 @@ export function World(props: WorldProps) {
   );
 }
 
-// Subtle atmospheric glow using a BackSide sphere and additive blending
-function Atmosphere({ color = "#66a6ff", intensity = 0.25, radius = 102 }: { color?: string; intensity?: number; radius?: number }) {
-  const glowColor = new THREE.Color(color);
-  const uniforms = {
-    glowColor: { value: new THREE.Vector3(glowColor.r, glowColor.g, glowColor.b) },
+function Atmosphere({
+  color = "#66a6ff",
+  intensity = 0.25,
+  radius = 102,
+}: {
+  color?: string;
+  intensity?: number;
+  radius?: number;
+}) {
+  const glowColor = new Color(color);
+  const uniforms: Record<string, IUniform> = {
+    glowColor: { value: new Vector3(glowColor.r, glowColor.g, glowColor.b) },
     glowIntensity: { value: intensity },
-  } as any;
+  };
+
   return (
     <mesh>
       <sphereGeometry args={[radius, 48, 48]} />
       <shaderMaterial
         transparent
         depthWrite={false}
-        blending={THREE.AdditiveBlending}
-        side={THREE.BackSide}
+        blending={AdditiveBlending}
+        side={BackSide}
         uniforms={uniforms}
         vertexShader={`
           varying vec3 vNormal;
@@ -608,263 +834,13 @@ function Atmosphere({ color = "#66a6ff", intensity = 0.25, radius = 102 }: { col
   );
 }
 
-// Procedural starfield background
 function Starfield({ count = 2000, radius = 1200 }: { count?: number; radius?: number }) {
-  const geomRef = useRef<THREE.BufferGeometry | null>(null);
+  const geometryRef = useRef<BufferGeometry | null>(null);
+
   useEffect(() => {
-    const positions = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      const r = radius * (0.8 + 0.2 * Math.random());
-      const theta = Math.acos(2 * Math.random() - 1);
-      const phi = 2 * Math.PI * Math.random();
-      const x = r * Math.sin(theta) * Math.cos(phi);
-      const y = r * Math.sin(theta) * Math.sin(phi);
-      const z = r * Math.cos(theta);
-      positions[i * 3 + 0] = x;
-      positions[i * 3 + 1] = y;
-      positions[i * 3 + 2] = z;
-    }
-    geomRef.current?.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    return () => geomRef.current?.dispose();
-  }, [count, radius]);
-  return (
-    <points>
-      <bufferGeometry ref={geomRef as any} />
-      <pointsMaterial color={0xffffff} size={0.9} sizeAttenuation transparent opacity={0.9} />
-    </points>
-  );
-}
-
-// Sky sphere background using a texture (e.g., Milky Way)
-function SkySphere({ textureUrl = "/stars_milky.jpg", radius = 1800 }: { textureUrl?: string; radius?: number }) {
-  const texture = useLoader(THREE.TextureLoader, textureUrl, (ldr: any) => {
-    try { ldr.setCrossOrigin?.('anonymous'); } catch {}
-  });
-  texture.colorSpace = THREE.SRGBColorSpace as any;
-  texture.minFilter = THREE.LinearMipmapLinearFilter;
-  texture.generateMipmaps = true;
-  useEffect(() => {
-    return () => {
-      try { texture.dispose(); } catch {}
-    };
-  }, [texture]);
-  return (
-    <mesh>
-      <sphereGeometry args={[radius, 60, 60]} />
-      <meshBasicMaterial map={texture} side={THREE.BackSide} depthWrite={false} />
-    </mesh>
-  );
-}
-
-export function hexToRgb(hex: string) {
-  const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
-  hex = hex.replace(shorthandRegex, function (m, r, g, b) {
-    return r + r + g + g + b + b;
-  });
-
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16),
-      }
-    : null;
-}
-
-export function genRandomNumbers(min: number, max: number, count: number) {
-  const arr = [];
-  while (arr.length < count) {
-    const r = Math.floor(Math.random() * (max - min)) + min;
-    if (arr.indexOf(r) === -1) arr.push(r);
-  }
-
-  return arr;
-}
-
-// Utility to convert lat/lng to 3D position on sphere
-function latLngToVec3(radius: number, lat: number, lng: number) {
-  const phi = THREE.MathUtils.degToRad(90 - lat);
-  const theta = THREE.MathUtils.degToRad(lng + 180);
-  const x = -radius * Math.sin(phi) * Math.cos(theta);
-  const z = radius * Math.sin(phi) * Math.sin(theta);
-  const y = radius * Math.cos(phi);
-  return new THREE.Vector3(x, y, z);
-}
-
-// Lightweight hover markers with HTML tooltips
-function HoverMarkers({ data, radius = 100 }: { data: Position[]; radius?: number }) {
-  const [hover, setHover] = useState<{ pos: [number, number, number]; text: string } | null>(null);
-  return (
-    <group>
-      {data.map((d, i) => {
-        const p = latLngToVec3(radius + 0.6, d.startLat, d.startLng);
-        const label = `lat ${d.startLat.toFixed(2)}, lng ${d.startLng.toFixed(2)}`;
-        return (
-          <mesh
-            key={`m-${i}`}
-            position={p}
-            onPointerOver={(e) => {
-              e.stopPropagation();
-              setHover({ pos: [p.x, p.y, p.z], text: label });
-            }}
-            onPointerOut={(e) => {
-              e.stopPropagation();
-              setHover((h) => (h && h.text === label ? null : h));
-            }}
-          >
-            <sphereGeometry args={[0.3, 8, 8]} />
-            <meshBasicMaterial color={d.color} transparent opacity={0.15} depthWrite={false} />
-          </mesh>
-        );
-      })}
-      {hover && (
-        <Html position={hover.pos} style={{ pointerEvents: 'none' }}>
-          <div style={{ background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '4px 6px', borderRadius: 4, fontSize: 12 }}>
-            {hover.text}
-          </div>
-        </Html>
-      )}
-    </group>
-  );
-}
-
-// Night city lights overlay masked to the dark side
-function NightLights({ nightImageUrl, lightDir, flipTextureVertically, flipTextureHorizontally }: { nightImageUrl?: string; lightDir: Vector3; flipTextureVertically?: boolean; flipTextureHorizontally?: boolean }) {
-  const { gl } = useThree();
-  const [texture, setTexture] = useState<THREE.Texture | undefined>(undefined);
-  useEffect(() => {
-    let disposed = false;
-    let loader: any;
-    if (!nightImageUrl) {
-      setTexture(undefined);
+    const geometry = geometryRef.current;
+    if (!geometry) {
       return;
     }
-    const done = (tex: THREE.Texture) => {
-      if (disposed) { try { tex.dispose(); } catch {} return; }
-      tex.colorSpace = THREE.SRGBColorSpace as any;
-      const hasMipmaps = Array.isArray((tex as any).mipmaps) && (tex as any).mipmaps.length > 1;
-      tex.generateMipmaps = false;
-      tex.minFilter = hasMipmaps ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
-      tex.magFilter = THREE.LinearFilter;
-  const flipX = flipTextureHorizontally ?? false;
-  const flipY = flipTextureVertically ?? false;
-      tex.repeat.set(flipX ? -1 : 1, flipY ? -1 : 1);
-      tex.offset.set(flipX ? 1 : 0, flipY ? 1 : 0);
-      tex.needsUpdate = true;
-      setTexture(tex);
-    };
-    if (nightImageUrl.toLowerCase().endsWith('.ktx2')) {
-  loader = getKtx2Loader(gl as any);
-      loader.load(nightImageUrl, done, undefined, () => setTexture(undefined));
-    } else {
-      loader = new THREE.TextureLoader();
-      loader.load(nightImageUrl, done, undefined, () => setTexture(undefined));
-    }
-    return () => {
-      disposed = true;
-      try { texture?.dispose(); } catch {}
-    };
-  }, [nightImageUrl, gl, flipTextureVertically, flipTextureHorizontally]);
-  if (!texture) return null;
-  const uniforms: any = {
-    map: { value: texture },
-    lightDir: { value: lightDir.clone().normalize() },
-    threshold: { value: 0.05 },
-    intensity: { value: 1.2 },
-  };
-  return (
-    <mesh>
-      <sphereGeometry args={[100.6, 48, 48]} />
-      <shaderMaterial
-        transparent
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-        uniforms={uniforms}
-        vertexShader={`
-          varying vec2 vUv;
-          varying vec3 vNormalWorld;
-          void main() {
-            vUv = uv;
-            vNormalWorld = normalize(mat3(modelMatrix) * normal);
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }
-        `}
-        fragmentShader={`
-          uniform sampler2D map;
-          uniform vec3 lightDir;
-          uniform float threshold;
-          uniform float intensity;
-          varying vec2 vUv;
-          varying vec3 vNormalWorld;
-          void main() {
-            vec3 L = normalize(-lightDir);
-            float ndl = dot(normalize(vNormalWorld), L);
-            if (ndl > threshold) discard;
-            vec4 tex = texture2D(map, vUv);
-            vec3 warmed = tex.rgb * vec3(1.2, 1.05, 0.8);
-            gl_FragColor = vec4(warmed * intensity, tex.a);
-          }
-        `}
-      />
-    </mesh>
-  );
-}
 
-// Subtle moving cloud layer above the globe
-function Clouds({ cloudsImageUrl, speed = 0.0025, flipTextureVertically, flipTextureHorizontally }: { cloudsImageUrl: string; speed?: number; flipTextureVertically?: boolean; flipTextureHorizontally?: boolean }) {
-  const { gl } = useThree();
-  const [texture, setTexture] = useState<THREE.Texture | undefined>(undefined);
-  const meshRef = useRef<THREE.Mesh>(null);
-  useEffect(() => {
-    let disposed = false;
-    let loader: any;
-    const done = (tex: THREE.Texture) => {
-      if (disposed) { try { tex.dispose(); } catch {} return; }
-      tex.colorSpace = THREE.SRGBColorSpace as any;
-      const hasMipmaps = Array.isArray((tex as any).mipmaps) && (tex as any).mipmaps.length > 1;
-      tex.generateMipmaps = false;
-      tex.minFilter = hasMipmaps ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
-      tex.magFilter = THREE.LinearFilter;
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  const flipX = flipTextureHorizontally ?? false;
-  const flipY = flipTextureVertically ?? false;
-      tex.repeat.set(flipX ? -1 : 1, flipY ? -1 : 1);
-      tex.offset.set(flipX ? 1 : 0, flipY ? 1 : 0);
-      tex.needsUpdate = true;
-      setTexture(tex);
-    };
-    if (cloudsImageUrl?.toLowerCase().endsWith('.ktx2')) {
-      loader = getKtx2Loader(gl as any);
-      loader.load(cloudsImageUrl, done, undefined, () => setTexture(undefined));
-    } else if (cloudsImageUrl) {
-      loader = new THREE.TextureLoader();
-      loader.load(cloudsImageUrl, done, undefined, () => setTexture(undefined));
-    } else {
-      setTexture(undefined);
-    }
-    return () => {
-      disposed = true;
-      try { texture?.dispose(); } catch {}
-    };
-  }, [cloudsImageUrl, gl, flipTextureVertically, flipTextureHorizontally]);
-  useFrame((_s, delta) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y += speed * delta * 60; // approx frame-normalized
-    }
-  });
-  if (!texture) return null;
-  return (
-    <mesh ref={meshRef}>
-      <sphereGeometry args={[101.0, 48, 48]} />
-      <meshPhongMaterial
-        map={texture}
-        transparent
-        opacity={0.35}
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-        side={THREE.FrontSide}
-      />
-    </mesh>
-  );
-}
+``` and so on

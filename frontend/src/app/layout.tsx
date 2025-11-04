@@ -61,16 +61,16 @@ const globeConfig = {
   maxRings: 3,
   showRings: false, // disable translucent pulse rings entirely
   // Start centered over Singapore (lat ~1.35N, lng ~103.82E)
-  initialPosition: { lat: 300.35, lng: 103.82, altitude: 2.2 },
+  initialPosition: { lat: 350.35, lng: 103.82, altitude: 2.2 },
   autoRotate: true,
   autoRotateSpeed: 0.06,  // a hair slower
   useSkybox: !isDev,
   starsBackgroundUrl: "/stars_milky.jpg",
   starfieldCount: isDev ? 1200 : 2000,
   enableBloom: !isDev,
-  flipPoles: false,
-  flipTextureVertically: true,
-  flipTextureHorizontally: false,
+  flipPoles: true,
+  flipTextureVertically: false,
+  flipTextureHorizontally: true,
   flipLongitude: true,
 }
 
