@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/user/hidden-sources`, {
+    const response = await fetch(`${BACKEND_URL}/api/v1/user/news`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -35,25 +35,15 @@ export async function POST(request: NextRequest) {
 
     const url = new URL(request.url);
     const newsLink = url.searchParams.get('newsLink');
-    const action = url.searchParams.get('action'); // 'hide' or 'unhide'
 
     if (!newsLink) {
       return NextResponse.json({ message: 'newsLink parameter required' }, { status: 400 });
     }
 
-    let backendUrl: string;
-    let method: string;
-
-    if (action === 'unhide') {
-      backendUrl = `${BACKEND_URL}/api/v1/user/hidden-sources/unhide?newsLink=${encodeURIComponent(newsLink)}`;
-      method = 'DELETE';
-    } else {
-      backendUrl = `${BACKEND_URL}/api/v1/user/hidden-sources/hide?newsLink=${encodeURIComponent(newsLink)}`;
-      method = 'POST';
-    }
+    const backendUrl = `${BACKEND_URL}/api/v1/user/news?newsLink=${encodeURIComponent(newsLink)}`;
 
     const response = await fetch(backendUrl, {
-      method,
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
       },
@@ -80,18 +70,18 @@ export async function DELETE(request: NextRequest) {
     }
 
     const url = new URL(request.url);
-    const unhideAll = url.searchParams.get('unhideAll') === 'true';
+    const newsLink = url.searchParams.get('newsLink');
+    const all = url.searchParams.get('all') === 'true';
 
     let backendUrl: string;
 
-    if (unhideAll) {
-      backendUrl = `${BACKEND_URL}/api/v1/user/hidden-sources/unhide-all`;
+    if (all) {
+      backendUrl = `${BACKEND_URL}/api/v1/user/news?all=true`;
     } else {
-      const newsLink = url.searchParams.get('newsLink');
       if (!newsLink) {
-        return NextResponse.json({ message: 'newsLink parameter required' }, { status: 400 });
+        return NextResponse.json({ message: 'newsLink parameter required when all=false' }, { status: 400 });
       }
-      backendUrl = `${BACKEND_URL}/api/v1/user/hidden-sources/unhide?newsLink=${encodeURIComponent(newsLink)}`;
+      backendUrl = `${BACKEND_URL}/api/v1/user/news?newsLink=${encodeURIComponent(newsLink)}`;
     }
 
     const response = await fetch(backendUrl, {

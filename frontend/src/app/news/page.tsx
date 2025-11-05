@@ -96,7 +96,7 @@ export default function NewsPage() {
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
   // Proxied path that goes through Next.js so middleware can inject Authorization from access_token cookie
   const NEWS_API = '/api/v1/news'
-  const USER_HIDDEN_API = '/api/user-hidden-sources' // Proxied through Next.js to access HttpOnly cookie
+  const USER_HIDDEN_API = '/api/user/news' // Proxied through Next.js to access HttpOnly cookie
   const GEMINI_API = `${API_BASE}/api/v1/gemini/analyses`
 
   /**
@@ -843,7 +843,7 @@ Return ONLY valid JSON (no markdown, no explanation):
         });
       } else {
         // Regular user: Use UserHiddenSources endpoint (proxied through Next.js)
-        response = await fetch(`${USER_HIDDEN_API}?newsLink=${encodeURIComponent(article.url)}&action=hide`, {
+        response = await fetch(`${USER_HIDDEN_API}?newsLink=${encodeURIComponent(article.url)}`, {
           method: 'POST',
           cache: 'no-store'
         });
@@ -1031,7 +1031,7 @@ Return ONLY valid JSON (no markdown, no explanation):
 
       } else {
         // Regular user: Use single DELETE endpoint to unhide all (proxied through Next.js)
-        const response = await fetch(`${USER_HIDDEN_API}?unhideAll=true`, {
+        const response = await fetch(`${USER_HIDDEN_API}?all=true`, {
           method: 'DELETE',
           cache: 'no-store'
         });
