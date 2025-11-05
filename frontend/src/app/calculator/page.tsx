@@ -99,8 +99,8 @@ export default function CalculatorSection() {
         const r = data?.conversionRates?.[impCurrency]
         if (typeof r !== "number" || !isFinite(r)) throw new Error(`No FX for ${impCurrency}`)
         if (!aborted) setFxRateToImp(r)
-      } catch (e: any) {
-        if (!aborted) setFxAutoError(e?.message || "FX fetch failed")
+     } catch (e) {
+        if (!aborted) setFxAutoError(e instanceof Error ? e.message : "FX fetch failed")
       } finally {
         if (!aborted) setFxAutoLoading(false)
       }
