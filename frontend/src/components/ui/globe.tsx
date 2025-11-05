@@ -397,9 +397,8 @@ export function Globe({ globeConfig, data }: WorldProps) {
       .arcStartLng((d) => (d as { startLng: number }).startLng * 1)
       .arcEndLat((d) => (d as { endLat: number }).endLat * 1)
       .arcEndLng((d) => (d as { endLng: number }).endLng * 1)
-      .arcColor((d: any) => [d.color, 'rgba(255,255,255,0)'])
-  // @ts-expect-error typings don't reflect gradient accessor by data; runtime supports [start,end]
-  .arcColor((d: Position) => [d.color, 'rgba(255,255,255,0)'])
+      // @ts-expect-error typings don't reflect gradient accessor by data; runtime supports [start,end]
+      .arcColor((d: Position) => [d.color, 'rgba(255,255,255,0)'])
       .arcAltitude((e) => (e as { arcAlt: number }).arcAlt * 1)
       .arcStroke(() => 1.0)
       // Animate dash to create motion along the arc when enabled
