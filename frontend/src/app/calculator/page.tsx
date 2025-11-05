@@ -444,10 +444,9 @@ export default function CalculatorSection() {
     })))
 
     try {
-      // Query tariffs for each product
-      const updatedProducts: ProductRow[] = []
-
-      for (const product of products) {
+      // Query tariffs for all products concurrently
+      console.log(`\n🚀 Processing ${products.length} products concurrently...`)
+      const productPromises = products.map(async (product) => {
         console.log(`\n🔍 Processing product ${product.productCode}...`)
 
         try {
@@ -456,34 +455,38 @@ export default function CalculatorSection() {
 
           if (result.rate !== null && !isNaN(productValue)) {
             const tariffAmount = (result.rate / 100) * productValue
-            updatedProducts.push({
+            console.log(`   ✅ Tariff calculated: ${result.rate}% = ${tariffAmount}`)
+            return {
               ...product,
               tariffRate: result.rate,
               tariffAmount: tariffAmount,
               dataSource: result.source,
-              status: 'success'
-            })
-            console.log(`   ✅ Tariff calculated: ${result.rate}% = ${tariffAmount}`)
+              status: 'success' as const
+            }
           } else {
-            updatedProducts.push({
+            console.log(`   ⚠️ No tariff data found`)
+            return {
               ...product,
               tariffRate: null,
               tariffAmount: null,
               dataSource: null,
-              status: 'error',
+              status: 'error' as const,
               errorMessage: 'No tariff data found (MFN may apply)'
-            })
-            console.log(`   ⚠️ No tariff data found`)
+            }
           }
         } catch (err) {
-          updatedProducts.push({
-            ...product,
-            status: 'error',
-            errorMessage: err instanceof Error ? err.message : 'Unknown error'
-          })
           console.error(`   ❌ Error processing product:`, err)
+          return {
+            ...product,
+            status: 'error' as const,
+            errorMessage: err instanceof Error ? err.message : 'Unknown error'
+          }
         }
-      }
+      })
+
+      // Wait for all product queries to complete concurrently
+      const updatedProducts = await Promise.all(productPromises)
+      console.log(`\n✅ All ${products.length} products processed concurrently`)
 
       setProducts(updatedProducts)
       setIsCalculatingTariff(false)
