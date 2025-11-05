@@ -105,7 +105,7 @@ public class GeminiAnalyzer {
      * Builds the JSON request body for the Gemini API.
      * Updated to use the new contents structure expected by Gemini API
      */
-    private String buildRequestBody(String prompt) throws IOException {
+    private String buildRequestBody(String prompt) {
         // Escape the prompt text properly for JSON
         String escapedPrompt = prompt.replace("\\", "\\\\")
                                    .replace("\"", "\\\"")
@@ -114,7 +114,7 @@ public class GeminiAnalyzer {
                                    .replace("\t", "\\t");
 
         // Updated request structure to match current Gemini API format
-        String requestJson = String.format("""
+        return String.format("""
             {
                 "contents": [
                     {
@@ -133,8 +133,6 @@ public class GeminiAnalyzer {
                 }
             }
             """, escapedPrompt);
-
-        return requestJson;
     }
 
     /**
