@@ -580,7 +580,7 @@ Return ONLY valid JSON (no markdown, no explanation):
 
     try {
       // Use proxied endpoint so middleware can inject Authorization header
-      const response = await fetch('/api/database/tariff-rates', {
+      const response = await fetch('/api/database/news/rates', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -831,13 +831,14 @@ Return ONLY valid JSON (no markdown, no explanation):
       let response;
 
       if (isAdmin) {
-        // Admin: Use News table hide endpoint (shared for all admins)
-        response = await fetch(`${API_BASE}/api/v1/news/hide?newsLink=${encodeURIComponent(article.url)}`, {
-          method: 'PATCH',
+        // Admin: Use News table visibility endpoint (RESTful - shared for all admins)
+        response = await fetch(`${API_BASE}/api/v1/news/visibility?newsLink=${encodeURIComponent(article.url)}`, {
+          method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
             ...getAuthHeaders()
           },
+          body: JSON.stringify({ hidden: true }),
           cache: 'no-store'
         });
       } else {
@@ -889,13 +890,14 @@ Return ONLY valid JSON (no markdown, no explanation):
       let response;
 
       if (isAdmin) {
-        // Admin: Use News table unhide endpoint
-        response = await fetch(`${API_BASE}/api/v1/news/unhide?newsLink=${encodeURIComponent(newsLink)}`, {
-          method: 'PATCH',
+        // Admin: Use News table visibility endpoint (RESTful)
+        response = await fetch(`${API_BASE}/api/v1/news/visibility?newsLink=${encodeURIComponent(newsLink)}`, {
+          method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
             ...getAuthHeaders()
           },
+          body: JSON.stringify({ hidden: false }),
           cache: 'no-store'
         });
       } else {
@@ -991,14 +993,15 @@ Return ONLY valid JSON (no markdown, no explanation):
 
     try {
       if (isAdmin) {
-        // Admin: Unhide all sources in parallel from News table
+        // Admin: Unhide all sources in parallel from News table (RESTful)
         const unhidePromises = hiddenSources.map(source =>
-          fetch(`${API_BASE}/api/v1/news/unhide?newsLink=${encodeURIComponent(source.newsLink)}`, {
-            method: 'PATCH',
+          fetch(`${API_BASE}/api/v1/news/visibility?newsLink=${encodeURIComponent(source.newsLink)}`, {
+            method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
               ...getAuthHeaders()
             },
+            body: JSON.stringify({ hidden: false }),
             cache: 'no-store'
           })
         );

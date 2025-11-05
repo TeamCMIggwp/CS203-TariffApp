@@ -21,8 +21,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/tariff-rates")
-@Tag(name = "News Tariff Rates", description = "API for managing tariff rates extracted from news articles")
+@RequestMapping("/api/v1/news/rates")
+@Tag(name = "News Tariff Rates", description = "RESTful API for managing tariff rates extracted from news articles")
 @Validated
 public class NewsTariffRateController {
 
@@ -32,13 +32,13 @@ public class NewsTariffRateController {
     private NewsTariffRateService service;
 
     @Operation(
-        summary = "Save tariff rate from news article",
+        summary = "Create tariff rate from news article",
         description = "Creates a tariff rate entry linked to a news article. Ensures one news source = one tariff rate (enforced by unique constraint on news_link)."
     )
     @ApiResponses(value = {
         @ApiResponse(
             responseCode = "201",
-            description = "Tariff rate saved successfully",
+            description = "Tariff rate created successfully",
             content = @Content(
                 mediaType = "application/json",
                 schema = @Schema(implementation = NewsTariffRateResponse.class)
@@ -58,7 +58,7 @@ public class NewsTariffRateController {
     @PostMapping
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<?> createTariffRate(@Valid @RequestBody CreateNewsTariffRateRequest request) {
-        logger.info("POST /api/v1/tariff-rates - Creating tariff rate for news: {}", request.getNewsLink());
+        logger.info("POST /api/v1/news/rates - Creating tariff rate for news: {}", request.getNewsLink());
 
         try {
             NewsTariffRateResponse response = service.createTariffRate(request);
@@ -96,7 +96,7 @@ public class NewsTariffRateController {
         @Parameter(description = "News article URL", required = true)
         @RequestParam String newsLink
     ) {
-        logger.info("GET /api/v1/tariff-rates - Fetching tariff rate for news: {}", newsLink);
+        logger.info("GET /api/v1/news/rates - Fetching tariff rate for news: {}", newsLink);
 
         try {
             NewsTariffRateResponse response = service.getTariffRateByNewsLink(newsLink);
@@ -107,22 +107,22 @@ public class NewsTariffRateController {
     }
 
     @Operation(
-        summary = "Check if tariff rate exists for news",
-        description = "Checks whether a tariff rate has already been saved for a specific news article"
+        summary = "Get tariff rate existence status",
+        description = "Returns existence status of a tariff rate for a specific news article"
     )
     @ApiResponses(value = {
         @ApiResponse(
             responseCode = "200",
-            description = "Check completed",
+            description = "Existence status retrieved",
             content = @Content(mediaType = "application/json")
         )
     })
-    @GetMapping("/exists")
-    public ResponseEntity<Boolean> checkTariffRateExists(
+    @GetMapping("/existence")
+    public ResponseEntity<Boolean> getTariffRateExistence(
         @Parameter(description = "News article URL", required = true)
         @RequestParam String newsLink
     ) {
-        logger.info("GET /api/v1/tariff-rates/exists - Checking existence for news: {}", newsLink);
+        logger.info("GET /api/v1/news/rates/existence - Checking existence for news: {}", newsLink);
         boolean exists = service.existsByNewsLink(newsLink);
         return ResponseEntity.ok(exists);
     }

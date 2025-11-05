@@ -58,9 +58,9 @@ public class SecurityConfig {
 				// News: GET and POST open; PUT/DELETE admin-only
 				.requestMatchers(HttpMethod.GET, "/api/v1/news/**").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/v1/news/**").permitAll()
-				.requestMatchers(HttpMethod.PUT, "/api/v1/news/**").hasRole("ADMIN")
+				.requestMatchers(HttpMethod.PUT, "/api/v1/news/visibility").authenticated() // Visibility update requires auth
+				.requestMatchers(HttpMethod.PUT, "/api/v1/news/**").hasRole("ADMIN") // Other PUT operations require admin
 				.requestMatchers(HttpMethod.DELETE, "/api/v1/news/**").hasRole("ADMIN")
-				.requestMatchers(HttpMethod.PATCH, "/api/v1/news/**").permitAll()
 
 				// WITS and WTO data open
 				.requestMatchers(HttpMethod.GET, "/api/v1/wits/**").permitAll()
@@ -82,8 +82,8 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.DELETE, "/api/v1/user/hidden-sources/**").permitAll()
 
 				// News Tariff Rates - POST requires admin authentication, GET is open
-				.requestMatchers(HttpMethod.POST, "/api/v1/tariff-rates").hasRole("ADMIN")
-				.requestMatchers(HttpMethod.GET, "/api/v1/tariff-rates/**").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/news/rates").hasRole("ADMIN")
+				.requestMatchers(HttpMethod.GET, "/api/v1/news/rates/**").permitAll()
 
 				// Everything else requires authentication
 				.anyRequest().authenticated()

@@ -203,13 +203,13 @@ public class NewsController {
     }
 
     @Operation(
-        summary = "Hide news source",
-        description = "Marks a news source as hidden. If the source doesn't exist in the database, it will be created as hidden. Hidden sources won't appear in search results."
+        summary = "Update news visibility",
+        description = "Updates the visibility status of a news source. Set hidden=true to hide, hidden=false to unhide. If the source doesn't exist and hidden=true, it will be created as hidden."
     )
     @ApiResponses(value = {
         @ApiResponse(
             responseCode = "200",
-            description = "News source hidden successfully",
+            description = "News visibility updated successfully",
             content = @Content(
                 mediaType = "application/json",
                 schema = @Schema(implementation = NewsResponse.class)
@@ -217,48 +217,44 @@ public class NewsController {
         ),
         @ApiResponse(
             responseCode = "400",
-            description = "Missing required parameter",
+            description = "Missing required parameter or invalid request body",
             content = @Content(mediaType = "application/json")
-        )
-    })
-    @PatchMapping("/hide")
-    public ResponseEntity<NewsResponse> hideSource(
-            @Parameter(description = "News article URL to hide", example = "https://www.usitc.gov/rice-report", required = true)
-            @RequestParam @NotBlank String newsLink) {
-
-        logger.info("PATCH /api/v1/news/hide - Hiding source: {}", newsLink);
-
-        NewsResponse response = newsService.hideSource(newsLink);
-        return ResponseEntity.ok(response);
-    }
-
-    @Operation(
-        summary = "Unhide news source",
-        description = "Marks a news source as visible again. Returns 404 if the source doesn't exist."
-    )
-    @ApiResponses(value = {
-        @ApiResponse(
-            responseCode = "200",
-            description = "News source unhidden successfully",
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = NewsResponse.class)
-            )
         ),
         @ApiResponse(
             responseCode = "404",
-            description = "News not found",
+            description = "News not found (when trying to unhide non-existent source)",
             content = @Content(mediaType = "application/json")
         )
     })
-    @PatchMapping("/unhide")
-    public ResponseEntity<NewsResponse> unhideSource(
-            @Parameter(description = "News article URL to unhide", example = "https://www.usitc.gov/rice-report", required = true)
-            @RequestParam @NotBlank String newsLink) {
+    @PutMapping("/visibility")
+    public ResponseEntity<NewsResponse> updateVisibility(
+            @Parameter(description = "News article URL", example = "https://www.usitc.gov/rice-report", required = true)
+            @RequestParam @NotBlank String newsLink,
+            @Parameter(description = "Visibility status request body", required = true)
+            @RequestBody @Valid VisibilityRequest request) {
 
-        logger.info("PATCH /api/v1/news/unhide - Unhiding source: {}", newsLink);
+        logger.info("PUT /api/v1/news/visibility - Updating visibility for: {} to hidden={}", newsLink, request.isHidden());
 
-        NewsResponse response = newsService.unhideSource(newsLink);
+        NewsResponse response;
+        if (request.isHidden()) {
+            response = newsService.hideSource(newsLink);
+        } else {
+            response = newsService.unhideSource(newsLink);
+        }
+
         return ResponseEntity.ok(response);
+    }
+
+    // Inner DTO class for visibility request
+    public static class VisibilityRequest {
+        private boolean hidden;
+
+        public boolean isHidden() {
+            return hidden;
+        }
+
+        public void setHidden(boolean hidden) {
+            this.hidden = hidden;
+        }
     }
 }
