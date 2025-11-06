@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -24,6 +25,7 @@ import org.springframework.test.context.ActiveProfiles;
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
 )
 @ActiveProfiles("test")
+@Import(TestSecurityConfig.class)
 public abstract class BaseIntegrationTest {
 
     @LocalServerPort
@@ -58,7 +60,7 @@ public abstract class BaseIntegrationTest {
         jdbcTemplate.execute("DELETE FROM UserHiddenSources");
         jdbcTemplate.execute("DELETE FROM NewsTariffRates");
         jdbcTemplate.execute("DELETE FROM refresh_tokens");
-        jdbcTemplate.execute("DELETE FROM TariffRates");
+        jdbcTemplate.execute("DELETE FROM wto_tariffs.TariffRates");
         jdbcTemplate.execute("DELETE FROM News");
         jdbcTemplate.execute("DELETE FROM accounts");
     }
