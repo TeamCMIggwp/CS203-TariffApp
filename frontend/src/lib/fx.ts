@@ -168,14 +168,18 @@ export const getCurrencyCode = (countryName?: string): string => {
 
 /** Universal currency name resolver (covers all ISO-4217) */
 let currencyDisplay: Intl.DisplayNames | undefined
+
 try {
-  // Client-side only; your converter runs with "use client"
-  if (typeof Intl !== "undefined" && (Intl as any).DisplayNames) {
+  if (
+    typeof Intl !== "undefined" &&
+    typeof (Intl as unknown as { DisplayNames?: typeof Intl.DisplayNames }).DisplayNames !== "undefined"
+  ) {
     currencyDisplay = new Intl.DisplayNames(["en"], { type: "currency" })
   }
 } catch {
-  // ignore; we'll fall back to the code below
+  // ignore; fallback below
 }
+
 
 export const getCurrencyName = (code?: string): string => {
   if (!code) return "US Dollar"
