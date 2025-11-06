@@ -55,7 +55,9 @@ public abstract class BaseIntegrationTest {
         // Clean up tables in correct order (respecting foreign keys)
         jdbcTemplate.execute("DELETE FROM UserHiddenSources");
         jdbcTemplate.execute("DELETE FROM NewsTariffRates");
+        jdbcTemplate.execute("DELETE FROM refresh_tokens");
         jdbcTemplate.execute("DELETE FROM TariffRates");
         jdbcTemplate.execute("DELETE FROM News");
+        jdbcTemplate.execute("DELETE FROM accounts");
     }
 }

@@ -34,3 +34,21 @@ CREATE TABLE IF NOT EXISTS NewsTariffRates (
   rate                 DECIMAL(6,3) NOT NULL,
   FOREIGN KEY (news_link) REFERENCES News(NewsLink) ON DELETE CASCADE
 );
+
+-- Auth tables (for authentication integration tests)
+CREATE TABLE IF NOT EXISTS accounts (
+  user_id      VARCHAR(255) PRIMARY KEY,
+  email        VARCHAR(255) UNIQUE NOT NULL,
+  password     VARCHAR(255),
+  provider     VARCHAR(50),
+  role         VARCHAR(50) DEFAULT 'user',
+  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  token_id     VARCHAR(255) PRIMARY KEY,
+  user_id      VARCHAR(255) NOT NULL,
+  expires_at   TIMESTAMP NOT NULL,
+  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES accounts(user_id) ON DELETE CASCADE
+);
