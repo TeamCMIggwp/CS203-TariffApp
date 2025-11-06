@@ -7,6 +7,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -59,6 +61,29 @@ public abstract class BaseIntegrationTest {
      */
     protected String createAuthHeader(String token) {
         return "Bearer " + token;
+    }
+
+    /**
+     * Helper method to create auth headers with test token
+     */
+    protected HttpHeaders createTestAuthHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", createAuthHeader("test-token"));
+        return headers;
+    }
+
+    /**
+     * Helper method to create authenticated request entity
+     */
+    protected <T> HttpEntity<T> createAuthenticatedEntity(T body) {
+        return new HttpEntity<>(body, createTestAuthHeaders());
+    }
+
+    /**
+     * Helper method to create authenticated request entity without body
+     */
+    protected HttpEntity<Void> createAuthenticatedEntity() {
+        return new HttpEntity<>(createTestAuthHeaders());
     }
 
     /**
