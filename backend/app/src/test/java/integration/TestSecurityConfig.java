@@ -20,7 +20,9 @@ public class TestSecurityConfig {
     public SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.disable())
             .authorizeHttpRequests(auth -> auth
+                // Allow all test endpoints
                 .anyRequest().permitAll()
             );
         return http.build();
