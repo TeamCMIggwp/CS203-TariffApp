@@ -7,7 +7,6 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import web.AppApplication;
 
 /**
  * Base class for integration tests.
@@ -20,7 +19,7 @@ import web.AppApplication;
  * - Cleans database before each test
  */
 @SpringBootTest(
-    classes = AppApplication.class,
+    classes = web.AppApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
 )
 @ActiveProfiles("test")
