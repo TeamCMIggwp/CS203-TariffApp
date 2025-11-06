@@ -26,10 +26,10 @@ public class TestSecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
                 // Test endpoints - allowing all for integration tests
-                .requestMatchers("/api/tariffs/**").permitAll()
-                .requestMatchers("/api/news/**").permitAll()
-                .requestMatchers("/api/users/**").permitAll()
-                .requestMatchers("/api/hidden-sources/**").permitAll()
+                .requestMatchers("/api/v1/tariffs/**").permitAll()
+                .requestMatchers("/api/v1/news/**").permitAll()
+                .requestMatchers("/api/v1/users/**").permitAll()
+                .requestMatchers("/api/v1/hidden-sources/**").permitAll()
                 // Secure admin endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // Default security

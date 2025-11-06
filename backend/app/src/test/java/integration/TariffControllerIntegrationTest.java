@@ -36,8 +36,9 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
         HttpEntity<CreateTariffRequest> entity = new HttpEntity<>(request, headers);
 
         // Act
-        ResponseEntity<TariffResponse> response = restTemplate.postForEntity(
+        ResponseEntity<TariffResponse> response = restTemplate.exchange(
                 baseUrl + "/api/v1/tariffs",
+                HttpMethod.POST,
                 entity,
                 TariffResponse.class
         );
@@ -237,8 +238,9 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
         HttpEntity<CreateTariffRequest> entity = new HttpEntity<>(request, headers);
 
         // Act
-        ResponseEntity<String> response = restTemplate.postForEntity(
+        ResponseEntity<String> response = restTemplate.exchange(
                 baseUrl + "/api/v1/tariffs",
+                HttpMethod.POST,
                 entity,
                 String.class
         );
@@ -263,8 +265,9 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
         HttpEntity<CreateTariffRequest> entity = new HttpEntity<>(request, headers);
 
         // Act
-        ResponseEntity<String> response = restTemplate.postForEntity(
+        ResponseEntity<String> response = restTemplate.exchange(
                 baseUrl + "/api/v1/tariffs",
+                HttpMethod.POST,
                 entity,
                 String.class
         );
