@@ -13,6 +13,7 @@ import {
   IconHome,
   IconHistory,
   IconCalculator,
+  IconReceiptDollar,
   IconUser,
   IconLogout,
 } from "@tabler/icons-react"
@@ -449,6 +450,11 @@ const links = [
     title: "Calculator",
     icon: <IconCalculator className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
     href: "/calculator",
+  },
+  {
+    title: "Currency Converter",
+    icon: <IconReceiptDollar className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+    href: "/currency",
   },
   {
     title: "History",
