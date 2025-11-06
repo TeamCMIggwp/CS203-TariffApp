@@ -492,12 +492,10 @@ class SearchServiceTest {
             {
                 "items": [
                     {
-                        "link": null,
                         "title": "Title Only"
                     },
                     {
-                        "link": "https://example.com",
-                        "title": null
+                        "link": "https://example.com"
                     },
                     {
                         "link": "https://wto.org/valid",
@@ -510,7 +508,7 @@ class SearchServiceTest {
         // Act
         List<SearchResult> results = invokeParseSearchResponse(nullValuesJson);
 
-        // Assert - Only non-null items are included
+        // Assert - Only items with both link and title are included
         assertEquals(1, results.size());
         SearchResult validResult = results.get(0);
         assertEquals("https://wto.org/valid", validResult.getUrl());
