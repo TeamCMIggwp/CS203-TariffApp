@@ -21,6 +21,16 @@ jobs:
         cd backend/app
         mvn clean package -DskipTests
         
+    - name: Debug - List Build Output
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Listing backend/app/target directory:"
+        ls -la backend/app/target/
+        echo "Looking for JAR files:"
+        find backend/app/target -name "*.jar"
+        echo "JAR file details:"
+        file backend/app/target/*.jar || echo "No JAR files found"
+        
     - name: Run Tests (Unit + Integration)
       run: |
         cd backend/app
@@ -68,6 +78,13 @@ jobs:
         cd backend/app
         echo "✅ All tests passed! Proceeding with deployment..."
         
+    - name: Debug - Verify JAR Before Deploy
+      run: |
+        echo "Verifying JAR file before deployment:"
+        ls -la backend/app/target/*.jar || echo "No JAR files found"
+        echo "Directory structure:"
+        tree backend/app/target || find backend/app/target -type d
+
     - name: Deploy JAR
       if: success()
       uses: appleboy/scp-action@v0.1.4
@@ -75,9 +92,10 @@ jobs:
         host: ${{ secrets.AWS_HOST }}
         username: ${{ secrets.AWS_USERNAME }}
         key: ${{ secrets.AWS_PRIVATE_KEY }}
-        source: "backend/app/target/api-server-1.0.jar"
+        source: "backend/app/target/*.jar"
         target: "backend/app/target/"
         strip_components: 3
+        debug: true
 
     - name: Deploy JaCoCo Reports
       if: success()
@@ -89,6 +107,19 @@ jobs:
         source: "backend/app/target/site/"
         target: "backend/app/target/"
         strip_components: 3
+        
+    - name: Debug - Verify Remote Directory
+      if: success()
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.AWS_HOST }}
+        username: ${{ secrets.AWS_USERNAME }}
+        key: ${{ secrets.AWS_PRIVATE_KEY }}
+        script: |
+          echo "Remote directory contents:"
+          ls -la backend/app/target/
+          echo "Looking for JAR files:"
+          find backend/app/target -name "*.jar"
         
     - name: Restart Application
       if: success()
