@@ -2,6 +2,7 @@ package integration;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -32,6 +33,7 @@ public abstract class BaseIntegrationTest {
     protected TestRestTemplate restTemplate;
 
     @Autowired
+    @Qualifier("appJdbcTemplate")
     protected JdbcTemplate jdbcTemplate;
 
     protected String baseUrl;
