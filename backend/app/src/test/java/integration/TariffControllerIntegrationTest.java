@@ -31,7 +31,7 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
         request.setRate(24.0);
         request.setUnit("percent");
 
-        HttpHeaders headers = new HttpHeaders();
+        HttpHeaders headers = createTestAuthHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<CreateTariffRequest> entity = new HttpEntity<>(request, headers);
 
@@ -70,8 +70,10 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
         );
 
         // Act
-        ResponseEntity<TariffResponse> response = restTemplate.getForEntity(
+        ResponseEntity<TariffResponse> response = restTemplate.exchange(
                 baseUrl + "/api/v1/tariffs?reporter=702&partner=156&product=271019&year=2020",
+                HttpMethod.GET,
+                createAuthenticatedEntity(),
                 TariffResponse.class
         );
 
@@ -103,8 +105,10 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
         );
 
         // Act
-        ResponseEntity<TariffResponse[]> response = restTemplate.getForEntity(
+        ResponseEntity<TariffResponse[]> response = restTemplate.exchange(
                 baseUrl + "/api/v1/tariffs/current",
+                HttpMethod.GET,
+                createAuthenticatedEntity(),
                 TariffResponse[].class
         );
 
@@ -130,7 +134,7 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
         updateRequest.setRate(30.0); // Updated rate
         updateRequest.setUnit("percent");
 
-        HttpHeaders headers = new HttpHeaders();
+        HttpHeaders headers = createTestAuthHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<UpdateTariffRequest> entity = new HttpEntity<>(updateRequest, headers);
 
@@ -168,7 +172,7 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
         ResponseEntity<Void> response = restTemplate.exchange(
                 baseUrl + "/api/v1/tariffs?reporter=840&partner=356&product=100630&year=2020",
                 HttpMethod.DELETE,
-                null,
+                createAuthenticatedEntity(),
                 Void.class
         );
 
@@ -187,8 +191,10 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     void getTariff_withMissingParameters_returnsBadRequest() {
         // Act - Missing 'year' parameter
-        ResponseEntity<String> response = restTemplate.getForEntity(
+        ResponseEntity<String> response = restTemplate.exchange(
                 baseUrl + "/api/v1/tariffs?reporter=840&partner=356&product=100630",
+                HttpMethod.GET,
+                createAuthenticatedEntity(),
                 String.class
         );
 
@@ -199,8 +205,10 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     void getTariff_withNonExistentTariff_returnsNotFound() {
         // Act
-        ResponseEntity<String> response = restTemplate.getForEntity(
+        ResponseEntity<String> response = restTemplate.exchange(
                 baseUrl + "/api/v1/tariffs?reporter=999&partner=999&product=999999&year=9999",
+                HttpMethod.GET,
+                createAuthenticatedEntity(),
                 String.class
         );
 
@@ -224,7 +232,7 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
         request.setRate(25.0);
         request.setUnit("percent");
 
-        HttpHeaders headers = new HttpHeaders();
+        HttpHeaders headers = createTestAuthHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<CreateTariffRequest> entity = new HttpEntity<>(request, headers);
 
@@ -250,7 +258,7 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
         request.setRate(24.0);
         request.setUnit("percent");
 
-        HttpHeaders headers = new HttpHeaders();
+        HttpHeaders headers = createTestAuthHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<CreateTariffRequest> entity = new HttpEntity<>(request, headers);
 
