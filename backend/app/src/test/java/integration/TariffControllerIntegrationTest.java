@@ -54,7 +54,7 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
 
         // Verify it was actually saved in database
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM wto_tariffs.TariffRates WHERE country_id = ? AND partner_country_id = ? AND product_id = ? AND year = ?",
+                "SELECT COUNT(*) FROM wto_tariffs.TariffRates WHERE country_id = ? AND partner_country_id = ? AND product_id = ? AND `year` = ?",
                 Integer.class,
                 "840", "356", 100630, 2020
         );
@@ -65,7 +65,7 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
     void getTariff_withExistingTariff_returnsTariffDetails() {
         // Arrange - Insert test data directly
         jdbcTemplate.update(
-                "INSERT INTO wto_tariffs.TariffRates (country_id, partner_country_id, product_id, year, rate, unit) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO wto_tariffs.TariffRates (country_id, partner_country_id, product_id, `year`, rate, unit) VALUES (?, ?, ?, ?, ?, ?)",
                 "702", "156", 271019, 2020, 5.0, "percent"
         );
 
@@ -90,15 +90,15 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
     void getAllTariffs_withMultipleTariffs_returnsAllTariffs() {
         // Arrange - Insert multiple tariffs
         jdbcTemplate.update(
-                "INSERT INTO wto_tariffs.TariffRates (country_id, partner_country_id, product_id, year, rate, unit) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO wto_tariffs.TariffRates (country_id, partner_country_id, product_id, `year`, rate, unit) VALUES (?, ?, ?, ?, ?, ?)",
                 "840", "356", 100630, 2020, 24.0, "percent"
         );
         jdbcTemplate.update(
-                "INSERT INTO wto_tariffs.TariffRates (country_id, partner_country_id, product_id, year, rate, unit) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO wto_tariffs.TariffRates (country_id, partner_country_id, product_id, `year`, rate, unit) VALUES (?, ?, ?, ?, ?, ?)",
                 "702", "156", 271019, 2021, 5.0, "percent"
         );
         jdbcTemplate.update(
-                "INSERT INTO wto_tariffs.TariffRates (country_id, partner_country_id, product_id, year, rate, unit) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO wto_tariffs.TariffRates (country_id, partner_country_id, product_id, `year`, rate, unit) VALUES (?, ?, ?, ?, ?, ?)",
                 "276", "392", 854590, 2019, 15.5, "percent"
         );
 
@@ -118,7 +118,7 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
     void updateTariff_withValidData_updatesTariffSuccessfully() {
         // Arrange - Insert initial tariff
         jdbcTemplate.update(
-                "INSERT INTO wto_tariffs.TariffRates (country_id, partner_country_id, product_id, year, rate, unit) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO wto_tariffs.TariffRates (country_id, partner_country_id, product_id, `year`, rate, unit) VALUES (?, ?, ?, ?, ?, ?)",
                 "840", "356", 100630, 2020, 24.0, "percent"
         );
 
@@ -149,7 +149,7 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
 
         // Verify database was updated
         Double rate = jdbcTemplate.queryForObject(
-                "SELECT rate FROM wto_tariffs.TariffRates WHERE country_id = ? AND partner_country_id = ? AND product_id = ? AND year = ?",
+                "SELECT rate FROM wto_tariffs.TariffRates WHERE country_id = ? AND partner_country_id = ? AND product_id = ? AND `year` = ?",
                 Double.class,
                 "840", "356", 100630, 2020
         );
@@ -160,7 +160,7 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
     void deleteTariff_withExistingTariff_deletesSuccessfully() {
         // Arrange - Insert tariff to delete
         jdbcTemplate.update(
-                "INSERT INTO wto_tariffs.TariffRates (country_id, partner_country_id, product_id, year, rate, unit) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO wto_tariffs.TariffRates (country_id, partner_country_id, product_id, `year`, rate, unit) VALUES (?, ?, ?, ?, ?, ?)",
                 "840", "356", 100630, 2020, 24.0, "percent"
         );
 
@@ -177,7 +177,7 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
 
         // Verify deletion in database
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM wto_tariffs.TariffRates WHERE country_id = ? AND partner_country_id = ? AND product_id = ? AND year = ?",
+                "SELECT COUNT(*) FROM wto_tariffs.TariffRates WHERE country_id = ? AND partner_country_id = ? AND product_id = ? AND `year` = ?",
                 Integer.class,
                 "840", "356", 100630, 2020
         );
@@ -212,7 +212,7 @@ class TariffControllerIntegrationTest extends BaseIntegrationTest {
     void createTariff_withDuplicateKey_returnsConflict() {
         // Arrange - Insert initial tariff
         jdbcTemplate.update(
-                "INSERT INTO wto_tariffs.TariffRates (country_id, partner_country_id, product_id, year, rate, unit) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO wto_tariffs.TariffRates (country_id, partner_country_id, product_id, `year`, rate, unit) VALUES (?, ?, ?, ?, ?, ?)",
                 "840", "356", 100630, 2020, 24.0, "percent"
         );
 
