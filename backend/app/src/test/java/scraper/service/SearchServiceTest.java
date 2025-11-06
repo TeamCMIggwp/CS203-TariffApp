@@ -221,11 +221,14 @@ class SearchServiceTest {
             """;
 
         // Act & Assert
-        SearchFailedException exception = assertThrows(SearchFailedException.class, () -> {
+        Exception exception = assertThrows(Exception.class, () -> {
             invokeParseSearchResponse(errorJson);
         });
 
-        assertTrue(exception.getMessage().contains("API key not valid"));
+        // Get the actual SearchFailedException from the cause chain
+        Throwable cause = exception.getCause();
+        assertTrue(cause instanceof SearchFailedException);
+        assertTrue(cause.getMessage().contains("Google API error: API key not valid"));
     }
 
     /**
@@ -246,11 +249,14 @@ class SearchServiceTest {
             """;
 
         // Act & Assert
-        SearchFailedException exception = assertThrows(SearchFailedException.class, () -> {
+        Exception exception = assertThrows(Exception.class, () -> {
             invokeParseSearchResponse(errorJson);
         });
 
-        assertTrue(exception.getMessage().contains("Unknown error"));
+        // Get the actual SearchFailedException from the cause chain
+        Throwable cause = exception.getCause();
+        assertTrue(cause instanceof SearchFailedException);
+        assertTrue(cause.getMessage().contains("Google API error: Unknown error"));
     }
 
     /**
@@ -327,11 +333,14 @@ class SearchServiceTest {
         String invalidJson = "{ this is not valid json }";
 
         // Act & Assert
-        SearchFailedException exception = assertThrows(SearchFailedException.class, () -> {
+        Exception exception = assertThrows(Exception.class, () -> {
             invokeParseSearchResponse(invalidJson);
         });
 
-        assertTrue(exception.getMessage().contains("Failed to parse search results"));
+        // Get the actual SearchFailedException from the cause chain
+        Throwable cause = exception.getCause();
+        assertTrue(cause instanceof SearchFailedException);
+        assertTrue(cause.getMessage().contains("Failed to parse search results"));
     }
 
     /**
@@ -501,8 +510,10 @@ class SearchServiceTest {
         // Act
         List<SearchResult> results = invokeParseSearchResponse(nullValuesJson);
 
-        // Assert - Only valid entry is included
+        // Assert - Only non-null items are included
         assertEquals(1, results.size());
-        assertEquals("https://wto.org/valid", results.get(0).getUrl());
+        SearchResult validResult = results.get(0);
+        assertEquals("https://wto.org/valid", validResult.getUrl());
+        assertEquals("Valid Entry", validResult.getTitle());
     }
 }
