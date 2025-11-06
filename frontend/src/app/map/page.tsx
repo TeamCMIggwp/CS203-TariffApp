@@ -2052,18 +2052,25 @@ export default function MapPage() {
 
                             {/* Tariff results */}
                             {tariffResultLines && (
-                                <div className="space-y-1">
+                                <div className="space-y-2 border border-gray-300 rounded-md p-4 bg-gray-50">
                                     {tariffResultLines.map((line, idx) => (
                                         <p
                                             key={idx}
-                                            className={`text-sm ${line.isNoData ? "text-gray-400" : line.isError ? "text-red-500" : "text-gray-800"
+                                            className={`text-sm font-medium ${line.isNoData
+                                                    ? "text-gray-400"
+                                                    : line.isError
+                                                        ? "text-red-500"
+                                                        : "text-gray-900"
                                                 }`}
                                         >
-                                            {line.text}
+                                            <span className="font-semibold text-black">{line.text.split(':')[0]}:</span>{" "}
+                                            <span className="font-bold text-blue-600">{line.text.split(':')[1]}</span>
                                         </p>
                                     ))}
                                 </div>
                             )}
+
+
                         </div>
                     </div>
                 </div>
