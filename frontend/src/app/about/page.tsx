@@ -48,39 +48,127 @@ const tariffFeatures = [
 
 function DynamicRates() {
   const countries = [
-    { name: "China", rates: [12.5, 11.8, 13.2, 12.1, 11.9, 12.7], trend: "up" },
-    { name: "Singapore", rates: [0.0, 0.0, 0.5, 0.2, 0.0, 0.3], trend: "stable" },
-    { name: "USA", rates: [5.3, 5.1, 5.5, 5.2, 5.4, 5.0], trend: "down" },
-    { name: "EU", rates: [8.7, 8.9, 8.5, 8.8, 8.6, 8.7], trend: "stable" },
-    { name: "India", rates: [33.5, 34.2, 33.8, 34.0, 33.6, 34.1], trend: "up" },
-    { name: "Brazil", rates: [10.2, 10.5, 10.1, 10.3, 10.4, 10.2], trend: "down" },
+    { name: "USA", code: "842" },
+    { name: "Singapore", code: "702" },
+    { name: "China", code: "156" },
+    { name: "India", code: "699" },
+    { name: "Germany", code: "276" },
+    { name: "England", code: "826" },
   ]
 
-  const [currentIndex, setCurrentIndex] = useState(0)
   const [currentCountry, setCurrentCountry] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
+  const [currentRate, setCurrentRate] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [currentTrend, setCurrentTrend] = useState<"up" | "down" | "stable">("stable")
 
+  // Fetch tariff data for a country
+  const fetchTariffData = async (countryCode: string) => {
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
+      const indicator = 'TP_A_0160' // Simple average MFN applied tariff
+      const currentYear = new Date().getFullYear().toString()
+
+      const url = new URL(`${API_BASE}/api/v1/indicators/${encodeURIComponent(indicator)}/observations`)
+      url.searchParams.set('r', countryCode)
+      url.searchParams.set('ps', currentYear)
+      url.searchParams.set('fmt', 'json')
+      url.searchParams.set('mode', 'full')
+      url.searchParams.set('echo', 'false')
+
+      const res = await fetch(url.toString(), { credentials: 'include' })
+      const text = await res.text()
+
+      if (!res.ok) return null
+
+      const json = JSON.parse(text)
+      const value = extractValueFromObj(json, currentYear)
+      return value
+    } catch (error) {
+      console.error('Error fetching tariff data:', error)
+      return null
+    }
+  }
+
+  // Extract numeric value from API response
+  const extractValueFromObj = (obj: unknown, preferYear?: string): number | null => {
+    if (obj == null) return null
+
+    if (Array.isArray(obj)) {
+      for (const el of obj) {
+        if (el && typeof el === "object" && "Value" in el && el.Value != null && !isNaN(Number(el.Value))) {
+          const yearVal = el.Year ?? null
+          if (preferYear && yearVal != null && String(yearVal) === String(preferYear)) return Number(el.Value)
+        }
+      }
+      for (const el of obj) {
+        const v = extractValueFromObj(el, preferYear)
+        if (v !== null) return v
+      }
+      return null
+    }
+
+    if (typeof obj === "object") {
+      const rec = obj as Record<string, unknown>
+      if ("Value" in rec && rec.Value != null && !isNaN(Number(rec.Value))) {
+        const hasYearField = Object.prototype.hasOwnProperty.call(rec, "Year")
+        const yearVal = rec["Year"] ?? null
+        if (hasYearField && yearVal != null && preferYear && String(yearVal) === String(preferYear)) {
+          return Number(rec.Value)
+        }
+        if (!hasYearField || yearVal == null) {
+          return Number(rec.Value)
+        }
+      }
+      for (const k of Object.keys(rec)) {
+        const v = extractValueFromObj(rec[k], preferYear)
+        if (v !== null) return v
+      }
+    }
+
+    return null
+  }
+
+  // Determine trend based on rate
+  const determineTrend = (rate: number): "up" | "down" | "stable" => {
+    if (rate > 15) return "up"
+    if (rate < 5) return "down"
+    return "stable"
+  }
+
+  // Initial load
+  useEffect(() => {
+    const loadInitialData = async () => {
+      const rate = await fetchTariffData(countries[0].code)
+      if (rate !== null) {
+        setCurrentRate(rate)
+        setCurrentTrend(determineTrend(rate))
+      }
+      setLoading(false)
+    }
+    loadInitialData()
+  }, [])
+
+  // Rotate countries
   useEffect(() => {
     const interval = setInterval(() => {
       setIsAnimating(true)
-      setTimeout(() => {
-        let nextCountry = currentCountry
-        do {
-          nextCountry = Math.floor(Math.random() * countries.length)
-        } while (nextCountry === currentCountry)
-
+      setTimeout(async () => {
+        const nextCountry = (currentCountry + 1) % countries.length
         setCurrentCountry(nextCountry)
-        setCurrentIndex(Math.floor(Math.random() * countries[nextCountry].rates.length))
+
+        const rate = await fetchTariffData(countries[nextCountry].code)
+        if (rate !== null) {
+          setCurrentRate(rate)
+          setCurrentTrend(determineTrend(rate))
+        }
 
         setTimeout(() => setIsAnimating(false), 50)
       }, 300)
-    }, 2000)
+    }, 3000)
 
     return () => clearInterval(interval)
   }, [currentCountry])
-
-  const currentRate = countries[currentCountry].rates[currentIndex]
-  const currentTrend = countries[currentCountry].trend
 
   const getTrendIcon = () => {
     if (currentTrend === "up") return <TrendingUp className="w-10 h-10 text-green-500" />
@@ -104,9 +192,8 @@ function DynamicRates() {
             <div className="text-center">
               <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">COUNTRY</p>
               <p
-                className={`text-3xl font-bold text-foreground transition-all duration-300 ${
-                  isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
-                }`}
+                className={`text-3xl font-bold text-foreground transition-all duration-300 ${isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
+                  }`}
               >
                 {countries[currentCountry].name}
               </p>
@@ -117,19 +204,26 @@ function DynamicRates() {
               <div className="text-center">
                 <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">CURRENT RATE</p>
                 <div
-                  className={`text-7xl font-bold tabular-nums text-black transition-all duration-300 ${
-                    isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
-                  }`}
+                  className={`text-7xl font-bold tabular-nums text-black transition-all duration-300 ${isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
+                    }`}
                 >
-                  {currentRate.toFixed(1)}
+                  {loading ? (
+                    <span className="text-4xl">Loading...</span>
+                  ) : currentRate !== null ? (
+                    <>
+                      {currentRate.toFixed(1)}
+                      <span className="text-4xl text-muted-foreground">%</span>
+                    </>
+                  ) : (
+                    <span className="text-3xl">N/A</span>
+                  )}
                   <span className="text-4xl text-muted-foreground">%</span>
                 </div>
               </div>
 
               <div
-                className={`transition-all duration-300 ${
-                  isAnimating ? "opacity-0 scale-50" : "opacity-100 scale-100"
-                }`}
+                className={`transition-all duration-300 ${isAnimating ? "opacity-0 scale-50" : "opacity-100 scale-100"
+                  }`}
               >
                 {getTrendIcon()}
               </div>
@@ -416,9 +510,8 @@ export default function AboutPage() {
                   onMouseLeave={() => setHoveredIndex(null)}
                 >
                   <div
-                    className={`absolute inset-0 p-4 flex flex-col items-center justify-center text-center transition-opacity duration-300 ${
-                      isHovered ? "opacity-0" : "opacity-100"
-                    }`}
+                    className={`absolute inset-0 p-4 flex flex-col items-center justify-center text-center transition-opacity duration-300 ${isHovered ? "opacity-0" : "opacity-100"
+                      }`}
                   >
                     <div
                       className={`w-12 h-12 rounded-lg ${indicator.color} text-white flex items-center justify-center mb-3`}
@@ -430,9 +523,8 @@ export default function AboutPage() {
                   </div>
 
                   <div
-                    className={`absolute inset-0 p-4 flex flex-col transition-opacity duration-300 ${
-                      isHovered ? "opacity-100" : "opacity-0"
-                    }`}
+                    className={`absolute inset-0 p-4 flex flex-col transition-opacity duration-300 ${isHovered ? "opacity-100" : "opacity-0"
+                      }`}
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <div
