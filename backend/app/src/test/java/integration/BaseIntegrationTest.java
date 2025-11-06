@@ -96,16 +96,22 @@ public abstract class BaseIntegrationTest {
             
             // Clean up tables in correct order
             jdbcTemplate.execute("TRUNCATE TABLE UserHiddenSources");
-            jdbcTemplate.execute("TRUNCATE TABLE NewsTariffRates");
-            jdbcTemplate.execute("TRUNCATE TABLE refresh_tokens");
+            jdbcTemplate.execute("TRUNCATE TABLE NewsTariffRates"); 
             jdbcTemplate.execute("TRUNCATE TABLE wto_tariffs.TariffRates");
             jdbcTemplate.execute("TRUNCATE TABLE News");
-            jdbcTemplate.execute("TRUNCATE TABLE accounts");
+
+            // Clean up auth tables in correct order
+            jdbcTemplate.execute("TRUNCATE TABLE accounts.password_reset_tokens");
+            jdbcTemplate.execute("TRUNCATE TABLE accounts.sessions");
+            jdbcTemplate.execute("TRUNCATE TABLE accounts.accounts");
+            jdbcTemplate.execute("TRUNCATE TABLE accounts.user_passwords");
+            jdbcTemplate.execute("TRUNCATE TABLE accounts.users");
             
             // Re-enable foreign key checks
             jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
         } catch (Exception e) {
             System.err.println("Error cleaning database: " + e.getMessage());
+            e.printStackTrace();  // Print full stack trace for debugging
         }
     }
 }

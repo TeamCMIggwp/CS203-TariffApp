@@ -1,5 +1,5 @@
+-- WTO Tariffs schema and tables
 CREATE SCHEMA IF NOT EXISTS wto_tariffs;
-
 CREATE TABLE IF NOT EXISTS wto_tariffs.TariffRates (
   country_id           VARCHAR(10)   NOT NULL,
   partner_country_id   VARCHAR(10)   NOT NULL,
@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS wto_tariffs.TariffRates (
   PRIMARY KEY (country_id, partner_country_id, product_id, `year`)
 );
 
+-- News and sources
 CREATE TABLE IF NOT EXISTS News (
   NewsLink  VARCHAR(512) PRIMARY KEY,
   remarks   VARCHAR(100),
@@ -35,20 +36,52 @@ CREATE TABLE IF NOT EXISTS NewsTariffRates (
   FOREIGN KEY (news_link) REFERENCES News(NewsLink) ON DELETE CASCADE
 );
 
--- Auth tables (for authentication integration tests)
-CREATE TABLE IF NOT EXISTS accounts (
-  user_id      VARCHAR(255) PRIMARY KEY,
-  email        VARCHAR(255) UNIQUE NOT NULL,
-  password     VARCHAR(255),
-  provider     VARCHAR(50),
-  role         VARCHAR(50) DEFAULT 'user',
-  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- Authentication schema and tables 
+CREATE SCHEMA IF NOT EXISTS accounts;
+
+-- Core users table
+CREATE TABLE IF NOT EXISTS accounts.users (
+  id         VARCHAR(64) NOT NULL PRIMARY KEY,
+  email      VARCHAR(191) NOT NULL UNIQUE,
+  name       VARCHAR(191),
+  country_code VARCHAR(3),
+  role       VARCHAR(32) NOT NULL DEFAULT 'user'
 );
 
-CREATE TABLE IF NOT EXISTS refresh_tokens (
-  token_id     VARCHAR(255) PRIMARY KEY,
-  user_id      VARCHAR(255) NOT NULL,
-  expires_at   TIMESTAMP NOT NULL,
-  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES accounts(user_id) ON DELETE CASCADE
+-- Credentials table for passwords and auth
+CREATE TABLE IF NOT EXISTS accounts.user_passwords (
+  user_id       VARCHAR(64) NOT NULL PRIMARY KEY,
+  password_hash TEXT NOT NULL,
+  algorithm     VARCHAR(32) NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES accounts.users(id) ON DELETE CASCADE
+);
+
+-- OAuth account mappings
+CREATE TABLE IF NOT EXISTS accounts.accounts (
+  provider VARCHAR(32) NOT NULL,
+  provider_account_id VARCHAR(191) NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
+  password_hash TEXT,
+  password_algorithm VARCHAR(32),
+  PRIMARY KEY (provider, provider_account_id),
+  FOREIGN KEY (user_id) REFERENCES accounts.users(id) ON DELETE CASCADE
+);
+
+-- Session management
+CREATE TABLE IF NOT EXISTS accounts.sessions (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES accounts.users(id) ON DELETE CASCADE
+);
+
+-- Password reset tokens
+CREATE TABLE IF NOT EXISTS accounts.password_reset_tokens (
+  token_hash VARCHAR(128) NOT NULL PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  used_at TIMESTAMP,
+  requested_ip VARCHAR(45),
+  FOREIGN KEY (user_id) REFERENCES accounts.users(id) ON DELETE CASCADE
 );
