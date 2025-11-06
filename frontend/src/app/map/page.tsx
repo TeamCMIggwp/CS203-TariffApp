@@ -2057,7 +2057,7 @@ export default function MapPage() {
                             {/* Error */}
                             {error && <p className="text-red-500">{error}</p>}
 
-                            {/* Tariff results - Card Grid (No Icons, With Indicator Code) */}
+                            {/* Tariff results - Card Grid (No Icons) */}
                             {tariffResultLines && tariffResultLines.length > 0 && (
                                 <div className="mt-6 space-y-4">
                                     <h3 className="text-lg font-bold text-slate-900 mb-4">Tariff Data Results</h3>
@@ -2079,21 +2079,15 @@ export default function MapPage() {
                                                         }`}
                                                 >
                                                     <div className="relative p-5">
-                                                        <div className="flex flex-col gap-1">
-                                                            {/* Label */}
+                                                        <div className="flex flex-col gap-2">
                                                             <p
                                                                 className={`text-sm font-medium ${line.isNoData ? "text-slate-500" : line.isError ? "text-red-600" : "text-slate-600"
                                                                     }`}
                                                             >
                                                                 {label}
                                                             </p>
-
-                                                            {/* Indicator Code as subheading */}
-                                                            <p className="text-xs text-slate-400 italic">{indicatorCode}</p>
-
-                                                            {/* Value */}
                                                             <p
-                                                                className={`text-2xl font-bold mt-1 ${line.isNoData ? "text-slate-400" : line.isError ? "text-red-500" : "text-slate-900"
+                                                                className={`text-2xl font-bold ${line.isNoData ? "text-slate-400" : line.isError ? "text-red-500" : "text-slate-900"
                                                                     }`}
                                                             >
                                                                 {value || "N/A"}
@@ -2106,6 +2100,7 @@ export default function MapPage() {
                                     </div>
                                 </div>
                             )}
+
 
 
                         </div>
