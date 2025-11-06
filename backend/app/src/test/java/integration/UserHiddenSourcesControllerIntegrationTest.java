@@ -17,8 +17,22 @@ class UserHiddenSourcesControllerIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUpUserHiddenSources() {
-        // Ensure tables exist
         try {
+            // Create schemas
+            jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS accounts");
+            
+            // Create accounts schema tables
+            jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS accounts.users (" +
+                "  id VARCHAR(64) NOT NULL PRIMARY KEY," +
+                "  email VARCHAR(191) NOT NULL UNIQUE," +
+                "  name VARCHAR(191)," +
+                "  country_code VARCHAR(3)," +
+                "  role VARCHAR(32) NOT NULL DEFAULT 'user'" +
+                ")"
+            );
+
+            // Create News and UserHiddenSources tables
             jdbcTemplate.execute(
                 "CREATE TABLE IF NOT EXISTS News (" +
                 "  NewsLink VARCHAR(512) PRIMARY KEY," +
@@ -36,8 +50,112 @@ class UserHiddenSourcesControllerIntegrationTest extends BaseIntegrationTest {
                 "  UNIQUE(user_id, news_link)" +
                 ")"
             );
+
+        // Create test users that match the @WithMockUser annotations
+        jdbcTemplate.update(
+            "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+            "user123", "user123@example.com", "Test User 123", "USA", "USER"
+        );
+        jdbcTemplate.update(
+            "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+            "user456", "user456@example.com", "Test User 456", "USA", "USER"
+        );
+        jdbcTemplate.update(
+            "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+            "user789", "user789@example.com", "Test User 789", "USA", "USER"
+        );
+        jdbcTemplate.update(
+            "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+            "user999", "user999@example.com", "Test User 999", "USA", "USER"
+        );
+        jdbcTemplate.update(
+            "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+            "otherUser", "other.user@example.com", "Other User", "USA", "USER"
+        );
+        jdbcTemplate.update(
+            "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+            "userABC", "userabc@example.com", "Test User ABC", "USA", "USER"
+        );
+        jdbcTemplate.update(
+            "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+            "userDEF", "userdef@example.com", "Test User DEF", "USA", "USER"
+        );
+        jdbcTemplate.update(
+            "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+            "userGHI", "userghi@example.com", "Test User GHI", "USA", "USER"
+        );
+        jdbcTemplate.update(
+            "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+            "userJKL", "userjkl@example.com", "Test User JKL", "USA", "USER"
+        );
+        jdbcTemplate.update(
+            "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+            "userMNO", "usermno@example.com", "Test User MNO", "USA", "USER"
+        );
+        jdbcTemplate.update(
+            "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+            "user1", "user1@example.com", "Test User 1", "USA", "USER"
+        );
+        jdbcTemplate.update(
+            "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+            "user2", "user2@example.com", "Test User 2", "USA", "USER"
+        );
         } catch (Exception e) {
-            // Tables might already exist
+            // Tables might already exist, ignore and continue
+        }
+
+        try {
+            // Create test users that match the @WithMockUser annotations
+            jdbcTemplate.update(
+                "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+                "user123", "user123@example.com", "Test User 123", "USA", "USER"
+            );
+            jdbcTemplate.update(
+                "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+                "user456", "user456@example.com", "Test User 456", "USA", "USER"
+            );
+            jdbcTemplate.update(
+                "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+                "user789", "user789@example.com", "Test User 789", "USA", "USER"
+            );
+            jdbcTemplate.update(
+                "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+                "user999", "user999@example.com", "Test User 999", "USA", "USER"
+            );
+            jdbcTemplate.update(
+                "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+                "otherUser", "other.user@example.com", "Other User", "USA", "USER"
+            );
+            jdbcTemplate.update(
+                "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+                "userABC", "userabc@example.com", "Test User ABC", "USA", "USER"
+            );
+            jdbcTemplate.update(
+                "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+                "userDEF", "userdef@example.com", "Test User DEF", "USA", "USER"
+            );
+            jdbcTemplate.update(
+                "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+                "userGHI", "userghi@example.com", "Test User GHI", "USA", "USER"
+            );
+            jdbcTemplate.update(
+                "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+                "userJKL", "userjkl@example.com", "Test User JKL", "USA", "USER"
+            );
+            jdbcTemplate.update(
+                "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+                "userMNO", "usermno@example.com", "Test User MNO", "USA", "USER"
+            );
+            jdbcTemplate.update(
+                "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+                "user1", "user1@example.com", "Test User 1", "USA", "USER"
+            );
+            jdbcTemplate.update(
+                "INSERT INTO accounts.users (id, email, name, country_code, role) VALUES (?, ?, ?, ?, ?)",
+                "user2", "user2@example.com", "Test User 2", "USA", "USER"
+            );
+        } catch (Exception e) {
+            // Users might already exist, ignore and continue
         }
 
         // Insert test news articles
@@ -58,8 +176,10 @@ class UserHiddenSourcesControllerIntegrationTest extends BaseIntegrationTest {
     @AfterEach
     void tearDownUserHiddenSources() {
         try {
+            // Clean up in reverse dependency order
             jdbcTemplate.execute("DELETE FROM UserHiddenSources");
             jdbcTemplate.execute("DELETE FROM News");
+            jdbcTemplate.execute("DELETE FROM accounts.users");
         } catch (Exception e) {
             // Ignore cleanup errors
         }

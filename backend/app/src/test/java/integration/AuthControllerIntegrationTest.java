@@ -22,26 +22,48 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
     void setUpAuth() {
         // Ensure accounts table exists for authentication tests
         try {
+            // Create accounts schema
+            jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS accounts");
+            
+            // Create tables in accounts schema
             jdbcTemplate.execute(
-                "CREATE TABLE IF NOT EXISTS accounts (" +
-                "  id VARCHAR(36) PRIMARY KEY," +
-                "  email VARCHAR(255) UNIQUE NOT NULL," +
-                "  name VARCHAR(255)," +
-                "  country VARCHAR(100)," +
-                "  password_hash VARCHAR(255)," +
-                "  role VARCHAR(50) DEFAULT 'USER'," +
-                "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
-                "  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" +
+                "CREATE TABLE IF NOT EXISTS accounts.users (" +
+                "  id VARCHAR(64) NOT NULL PRIMARY KEY," +
+                "  email VARCHAR(191) NOT NULL UNIQUE," +
+                "  name VARCHAR(191)," +
+                "  country_code VARCHAR(3)," +
+                "  role VARCHAR(32) NOT NULL DEFAULT 'user'" +
+                ")"
+            );
+
+            // Create other auth tables
+            jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS accounts.user_passwords (" +
+                "  user_id VARCHAR(64) NOT NULL PRIMARY KEY," +
+                "  password_hash TEXT NOT NULL," +
+                "  algorithm VARCHAR(32) NOT NULL," +
+                "  FOREIGN KEY (user_id) REFERENCES accounts.users(id) ON DELETE CASCADE" +
+                ")"
+            );
+            
+            jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS accounts.sessions (" +
+                "  id VARCHAR(64) NOT NULL PRIMARY KEY," +
+                "  user_id VARCHAR(64) NOT NULL," +
+                "  expires_at TIMESTAMP NOT NULL," +
+                "  FOREIGN KEY (user_id) REFERENCES accounts.users(id) ON DELETE CASCADE" +
                 ")"
             );
 
             jdbcTemplate.execute(
-                "CREATE TABLE IF NOT EXISTS refresh_tokens (" +
-                "  token VARCHAR(500) PRIMARY KEY," +
-                "  user_id VARCHAR(36) NOT NULL," +
+                "CREATE TABLE IF NOT EXISTS accounts.password_reset_tokens (" +
+                "  token_hash VARCHAR(128) NOT NULL PRIMARY KEY," +
+                "  user_id VARCHAR(64) NOT NULL," +
                 "  expires_at TIMESTAMP NOT NULL," +
-                "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
-                "  FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE" +
+                "  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP," +
+                "  used_at TIMESTAMP," +
+                "  requested_ip VARCHAR(45)," +
+                "  FOREIGN KEY (user_id) REFERENCES accounts.users(id) ON DELETE CASCADE" +
                 ")"
             );
         } catch (Exception e) {
@@ -52,8 +74,11 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
     @AfterEach
     void tearDownAuth() {
         try {
-            jdbcTemplate.execute("DELETE FROM refresh_tokens");
-            jdbcTemplate.execute("DELETE FROM accounts");
+            // Clean up auth tables in reverse dependency order
+            jdbcTemplate.execute("DELETE FROM accounts.password_reset_tokens");
+            jdbcTemplate.execute("DELETE FROM accounts.sessions");
+            jdbcTemplate.execute("DELETE FROM accounts.user_passwords");
+            jdbcTemplate.execute("DELETE FROM accounts.users");
         } catch (Exception e) {
             // Ignore cleanup errors
         }
@@ -66,7 +91,7 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
         SignupRequest request = new SignupRequest(
             "John Doe",
             "john.doe@example.com",
-            "USA",
+            "USA", // Using 3-letter country code
             "SecurePassword123!"
         );
 
@@ -90,7 +115,7 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
         // Verify user was created in database
         try {
             Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM accounts WHERE email = ?",
+                "SELECT COUNT(*) FROM accounts.users WHERE email = ?",
                 Integer.class,
                 "john.doe@example.com"
             );
@@ -107,7 +132,7 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
         SignupRequest signupRequest = new SignupRequest(
             "Jane Smith",
             "jane.smith@example.com",
-            "Canada",
+            "CAN", // Using 3-letter country code
             "Password123!"
         );
 
@@ -235,7 +260,7 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
         SignupRequest duplicateRequest = new SignupRequest(
             "Another User",
             "duplicate@example.com",
-            "Canada",
+            "CAN", // Canada
             "DifferentPassword123!"
         );
 
@@ -259,7 +284,7 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
         SignupRequest signupRequest = new SignupRequest(
             "Full Flow User",
             email,
-            "Germany",
+            "DEU", // Germany
             password
         );
 
