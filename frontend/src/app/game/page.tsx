@@ -59,6 +59,8 @@ export default function GamePage() {
   const [score, setScore] = useState(0)
   const [lives, setLives] = useState(3)
   const [showQuiz, setShowQuiz] = useState(false)
+
+  
   const [currentQuestion, setCurrentQuestion] = useState<any>(null)
 
   // Game state refs

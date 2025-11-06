@@ -15,6 +15,13 @@ import { ChevronDown } from "lucide-react"
 
 type MetricValue = string | number
 
+// Define the possible API response shape
+interface ExchangeApiResponse {
+  conversionRates?: Record<string, number>
+  rates?: Record<string, number>
+  rate?: number
+}
+
 type GeminiApiResponse = {
   summary?: string
   insights?: string[]
@@ -80,11 +87,11 @@ export default function CalculatorSection() {
     try {
       const url = `${API_BASE}/api/v1/exchange?base=${encodeURIComponent(fromCurrency)}`
       const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } })
-      
+
       if (!res.ok) throw new Error(`Currency API error: ${res.status}`)
 
-      const data: any = await res.json()
-      
+      const data: ExchangeApiResponse = await res.json()
+
       // Handle different response formats
       let rate = 1
       if (data.conversionRates && data.conversionRates[toCurrency]) {
@@ -104,8 +111,8 @@ export default function CalculatorSection() {
       setCurrencyLoading(false)
     }
   }
-const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
-  
+  const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
+
   // Update conversion rate when display currency changes
   useEffect(() => {
     fetchConversionRate(selectedCurrency, displayCurrency)
@@ -537,7 +544,7 @@ const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof curren
     }
   }
 
-  
+
   const getCountryName = (code: string) => {
     const country = countries.find(c => c.code === code)
     return country ? country.name : code
@@ -616,9 +623,9 @@ const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof curren
                   <span>Base Currency (from importer country)</span>
                 </Label>
                 <div className="flex items-center gap-2">
-                  <Input 
-                    value={selectedCurrency} 
-                    disabled 
+                  <Input
+                    value={selectedCurrency}
+                    disabled
                     className="bg-gray-100 dark:bg-gray-800 font-semibold"
                   />
                   <span className="text-sm text-muted-foreground">Auto-detected</span>
