@@ -1,4 +1,3 @@
-
 "use client"
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -49,19 +48,17 @@ const tariffFeatures = [
 
 function DynamicRates() {
   const countries = [
-    { name: "USA", code: "842" },
+    { name: "USA", code: "840" },
     { name: "Singapore", code: "702" },
     { name: "China", code: "156" },
     { name: "India", code: "356" },
-    { name: "Germany", code: "276" },
-    { name: "England", code: "826" },
+    { name: "Australia", code: "036" },
   ]
 
   const [currentCountry, setCurrentCountry] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
   const [currentRate, setCurrentRate] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
-  const [currentTrend, setCurrentTrend] = useState<"up" | "down" | "stable">("stable")
   const [cachedRates, setCachedRates] = useState<Map<string, number>>(new Map())
 
   // Fetch tariff data for a country
@@ -69,8 +66,8 @@ function DynamicRates() {
     try {
       const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
       const indicator = 'TP_A_0160' // Simple average MFN applied tariff
-      const currentYear = new Date().getFullYear().toString()
-      const previousYear = (new Date().getFullYear() - 1).toString()
+      const currentYear = (new Date().getFullYear() - 1).toString() // Current year - 1
+      const previousYear = (new Date().getFullYear() - 2).toString() // Fallback to current year - 2
 
       const url = new URL(`${API_BASE}/api/v1/indicators/${encodeURIComponent(indicator)}/observations`)
       url.searchParams.set('r', countryCode)
@@ -196,13 +193,6 @@ function DynamicRates() {
     return null
   }
 
-  // Determine trend based on rate
-  const determineTrend = (rate: number): "up" | "down" | "stable" => {
-    if (rate > 15) return "up"
-    if (rate < 5) return "down"
-    return "stable"
-  }
-
   // Initial load - fetch all countries once when component mounts
   useEffect(() => {
     let isMounted = true
@@ -232,7 +222,6 @@ function DynamicRates() {
         if (firstCountryWithData) {
           const rate = ratesMap.get(firstCountryWithData.code)!
           setCurrentRate(rate)
-          setCurrentTrend(determineTrend(rate))
           setCurrentCountry(countries.indexOf(firstCountryWithData))
           console.log('Initial data loaded successfully')
         } else {
@@ -248,7 +237,7 @@ function DynamicRates() {
     return () => {
       isMounted = false
     }
-  }, []) // Empty dependency array - only runs once on mount
+  }, [])
 
   // Rotate countries - only starts after initial load, uses cached data
   useEffect(() => {
@@ -277,7 +266,6 @@ function DynamicRates() {
           console.log(`Rotating to country ${nextIndex + 1}/${countries.length}: ${country.name} - ${rate}%`)
           setCurrentCountry(nextIndex)
           setCurrentRate(rate)
-          setCurrentTrend(determineTrend(rate))
         }
 
         setTimeout(() => setIsAnimating(false), 50)
@@ -288,13 +276,7 @@ function DynamicRates() {
       console.log('Cleaning up country rotation timer')
       clearInterval(interval)
     }
-  }, [currentCountry, loading, cachedRates]) // Added cachedRates dependency
-
-  const getTrendIcon = () => {
-    if (currentTrend === "up") return <TrendingUp className="w-10 h-10 text-green-500" />
-    if (currentTrend === "down") return <TrendingDown className="w-10 h-10 text-red-500" />
-    return <Scale className="w-10 h-10 text-gray-500" />
-  }
+  }, [currentCountry, loading, cachedRates])
 
   return (
     <div className="relative">
@@ -309,62 +291,42 @@ function DynamicRates() {
 
           <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16">
             {/* Country */}
-            <div className="text-center">
+            <div className="text-center min-w-[200px]">
               <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">COUNTRY</p>
               <p
-                className={`text-3xl font-bold text-foreground transition-all duration-300 ${isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
-                  }`}
+                className={`text-3xl font-bold text-foreground transition-all duration-300 ${
+                  isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
+                }`}
               >
                 {countries[currentCountry].name}
               </p>
             </div>
 
             {/* Current Rate */}
-            <div className="flex items-center gap-6">
-              <div className="text-center">
-                <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">CURRENT RATE</p>
-                <div
-                  className={`text-7xl font-bold tabular-nums text-black transition-all duration-300 ${isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
-                    }`}
-                >
-                  {loading ? (
-                    <span className="text-4xl">Loading...</span>
-                  ) : currentRate !== null ? (
-                    <>
-                      {currentRate.toFixed(1)}
-                      <span className="text-4xl text-muted-foreground">%</span>
-                    </>
-                  ) : (
-                    <span className="text-3xl">N/A</span>
-                  )}
-                </div>
-              </div>
-
+            <div className="text-center min-w-[250px]">
+              <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">CURRENT RATE</p>
               <div
-                className={`transition-all duration-300 ${isAnimating ? "opacity-0 scale-50" : "opacity-100 scale-100"
-                  }`}
+                className={`text-7xl font-bold tabular-nums text-black transition-all duration-300 ${
+                  isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
+                }`}
               >
-                {getTrendIcon()}
-              </div>
-            </div>
-
-            {/* Trend */}
-            <div className="text-center">
-              <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">TREND</p>
-              <div
-                className={`transition-all duration-300 ${isAnimating ? "opacity-0 scale-50" : "opacity-100 scale-100"
-                  }`}
-              >
-                <p className="text-2xl font-semibold capitalize text-foreground">
-                  {loading ? "..." : currentTrend}
-                </p>
+                {loading ? (
+                  <span className="text-4xl">Loading...</span>
+                ) : currentRate !== null ? (
+                  <>
+                    {currentRate.toFixed(1)}
+                    <span className="text-4xl text-muted-foreground">%</span>
+                  </>
+                ) : (
+                  <span className="text-3xl">N/A</span>
+                )}
               </div>
             </div>
           </div>
 
           <div className="mt-8 text-center">
             <p className="text-sm text-gray-700">
-              Agricultural tariff rates from WTO Database (TP_A_0160 - Simple Average MFN Applied Tariff) • Rotates every 3 seconds
+              Agricultural tariff rates from WTO Database (TP_A_0160 - Simple Average MFN Applied Tariff)
             </p>
             {cachedRates.size > 0 && (
               <p className="text-xs text-gray-500 mt-2">
@@ -642,8 +604,9 @@ export default function AboutPage() {
                   onMouseLeave={() => setHoveredIndex(null)}
                 >
                   <div
-                    className={`absolute inset-0 p-4 flex flex-col items-center justify-center text-center transition-opacity duration-300 ${isHovered ? "opacity-0" : "opacity-100"
-                      }`}
+                    className={`absolute inset-0 p-4 flex flex-col items-center justify-center text-center transition-opacity duration-300 ${
+                      isHovered ? "opacity-0" : "opacity-100"
+                    }`}
                   >
                     <div
                       className={`w-12 h-12 rounded-lg ${indicator.color} text-white flex items-center justify-center mb-3`}
@@ -655,8 +618,9 @@ export default function AboutPage() {
                   </div>
 
                   <div
-                    className={`absolute inset-0 p-4 flex flex-col transition-opacity duration-300 ${isHovered ? "opacity-100" : "opacity-0"
-                      }`}
+                    className={`absolute inset-0 p-4 flex flex-col transition-opacity duration-300 ${
+                      isHovered ? "opacity-100" : "opacity-0"
+                    }`}
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <div
