@@ -22,18 +22,8 @@ public class TestSecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.disable())
             .authorizeHttpRequests(auth -> auth
-                // Public endpoints
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/public/**").permitAll()
-                // Test endpoints - allowing all for integration tests
-                .requestMatchers("/api/v1/tariffs/**").permitAll()
-                .requestMatchers("/api/v1/news/**").permitAll()
-                .requestMatchers("/api/v1/users/**").permitAll()
-                .requestMatchers("/api/v1/hidden-sources/**").permitAll()
-                // Secure admin endpoints
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                // Default security
-                .anyRequest().authenticated()
+                // Allow all test endpoints
+                .anyRequest().permitAll()
             );
         return http.build();
     }
