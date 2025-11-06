@@ -64,7 +64,7 @@ const globeConfig = {
   // Start centered over Singapore (lat ~1.35N, lng ~103.82E)
   initialPosition: { lat: 350.35, lng: 103.82, altitude: 2.2 },
   autoRotate: true,
-  autoRotateSpeed: 0.06,  // a hair slower
+  autoRotateSpeed: 0.1,  // a hair slower
   useSkybox: !isDev,
   starsBackgroundUrl: "/stars_milky.jpg",
   starfieldCount: isDev ? 1200 : 2000,
