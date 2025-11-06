@@ -2165,61 +2165,88 @@ export default function MapPage() {
 
         {showPopup && selectedToCountry && (
         <div
-          className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50"
-          onClick={() => setShowPopup(false)}
+            className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50"
+            onClick={() => setShowPopup(false)}
         >
-          <div className="bg-white p-6 rounded shadow-lg max-w-md w-full relative" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setShowPopup(false)} className="absolute top-2 right-2 text-gray-500 hover:text-black text-xl">
-              &times;
+            <div
+            className="bg-white p-8 rounded-xl shadow-xl max-w-lg w-full relative border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+            >
+            {/* Close Button */}
+            <button
+                onClick={() => setShowPopup(false)}
+                className="absolute top-3 right-4 text-gray-400 hover:text-gray-700 text-2xl"
+            >
+                &times;
             </button>
 
-            <h3 className="text-lg font-semibold mb-2">
-              Selected Country: {countries.find(c => c.code === selectedToCountry)?.name}
+            {/* Title */}
+            <h3 className="text-2xl font-bold text-center mb-6 text-black">
+                Selected Country
             </h3>
-
-            <div className="mb-4">
-              <label className="block mb-1 font-medium">Year:</label>
-              <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="w-full border px-2 py-1 rounded">
-                {[2025, 2024, 2023, 2022, 2021, 2020].map(yr => (
-                  <option key={yr} value={String(yr)}>{yr}</option>
-                ))}
-              </select>
+            <div className="text-center text-lg font-medium mb-6 text-gray-700">
+                {countries.find(c => c.code === selectedToCountry)?.name}
             </div>
 
-            <button onClick={handleShowTariff} disabled={loading} className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 w-full">
-              {loading ? 'Loading...' : 'Show Tariff'}
+            {/* Year Select */}
+            <div className="mb-6">
+                <label className="block mb-2 text-black font-medium">Year:</label>
+                <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="w-full bg-gray-100 border border-gray-300 text-black rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                >
+                {[2025, 2024, 2023, 2022, 2021, 2020].map(yr => (
+                    <option key={yr} value={String(yr)}>
+                    {yr}
+                    </option>
+                ))}
+                </select>
+            </div>
+
+            {/* Button */}
+            <button
+                onClick={handleShowTariff}
+                disabled={loading}
+                className={`w-full bg-black hover:bg-neutral-800 text-white font-medium rounded-lg px-6 py-3 shadow-md transition-all duration-150 ${
+                loading ? 'opacity-60 cursor-not-allowed' : ''
+                }`}
+            >
+                {loading ? 'Loading...' : 'Show Tariff'}
             </button>
 
+            {/* Results */}
             {tariffResultLines && (
-              <div className="mt-4 p-3 bg-gray-100 rounded">
-                <div className="font-medium mb-2 text-center">WTO TP Indicators</div>
-                <ul className="space-y-1 text-center">
-                  {tariffResultLines.map((line, idx) => (
+                <div className="mt-6 p-5 bg-gradient-to-r from-green-900/50 to-blue-900/50 rounded-lg border border-green-700 text-white text-center">
+                <div className="font-semibold mb-3 text-lg">WTO TP Indicators</div>
+                <ul className="space-y-1">
+                    {tariffResultLines.map((line, idx) => (
                     <li
-                      key={idx}
-                      className={
+                        key={idx}
+                        className={
                         line.isNoData
-                          ? 'font-semibold text-red-600'
-                          : line.isError
-                          ? 'font-semibold text-red-800'
-                          : 'font-semibold text-black'
-                      }
+                            ? 'font-semibold text-red-400'
+                            : line.isError
+                            ? 'font-semibold text-red-600'
+                            : 'font-semibold text-white'
+                        }
                     >
-                      {line.text}
+                        {line.text}
                     </li>
-                  ))}
+                    ))}
                 </ul>
-              </div>
+                </div>
             )}
 
+            {/* Error */}
             {error && (
-               <div className="mt-4 p-3 bg-red-100 text-red-800 rounded text-center">
-                 Error: {error}
-               </div>
-             )}
-          </div>
+                <div className="mt-4 p-4 bg-red-100 text-red-800 rounded-lg text-center border border-red-300">
+                Error: {error}
+                </div>
+            )}
+            </div>
         </div>
-      )}
+        )}
     </div>
   );
 }
