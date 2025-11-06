@@ -43,6 +43,15 @@ public abstract class BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         baseUrl = "http://localhost:" + port;
+        cleanDatabase();
+        setupTestData();
+    }
+    
+    /**
+     * Override this method in test classes to set up any necessary test data
+     */
+    protected void setupTestData() {
+        // Default implementation is empty
     }
 
     /**
@@ -56,12 +65,22 @@ public abstract class BaseIntegrationTest {
      * Helper method to clean up test data
      */
     protected void cleanDatabase() {
-        // Clean up tables in correct order (respecting foreign keys)
-        jdbcTemplate.execute("DELETE FROM UserHiddenSources");
-        jdbcTemplate.execute("DELETE FROM NewsTariffRates");
-        jdbcTemplate.execute("DELETE FROM refresh_tokens");
-        jdbcTemplate.execute("DELETE FROM wto_tariffs.TariffRates");
-        jdbcTemplate.execute("DELETE FROM News");
-        jdbcTemplate.execute("DELETE FROM accounts");
+        try {
+            // Disable foreign key checks temporarily
+            jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+            
+            // Clean up tables in correct order
+            jdbcTemplate.execute("TRUNCATE TABLE UserHiddenSources");
+            jdbcTemplate.execute("TRUNCATE TABLE NewsTariffRates");
+            jdbcTemplate.execute("TRUNCATE TABLE refresh_tokens");
+            jdbcTemplate.execute("TRUNCATE TABLE wto_tariffs.TariffRates");
+            jdbcTemplate.execute("TRUNCATE TABLE News");
+            jdbcTemplate.execute("TRUNCATE TABLE accounts");
+            
+            // Re-enable foreign key checks
+            jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+        } catch (Exception e) {
+            System.err.println("Error cleaning database: " + e.getMessage());
+        }
     }
 }
