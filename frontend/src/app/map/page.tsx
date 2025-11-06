@@ -18,6 +18,13 @@ export default function MapPage() {
 
     const hoveredCountryName = countries.find(c => c.code === hoveredCountry)?.name || '';
 
+    const indicatorLabels: Record<string, string> = {
+        "TP_A_0160": "Simple average MFN applied tariff – agricultural products",
+        "TP_A_0170": "Trade-weighted MFN applied tariff",
+        "TP_B_0180": "Simple average bound tariff - agricultural products",
+        "TP_B_0190": "Percentage of bound tariff lines",
+    };
+
     useEffect(() => {
         if (tooltipRef.current) {
             setTooltipWidth(tooltipRef.current.offsetWidth);
@@ -2044,31 +2051,56 @@ export default function MapPage() {
                                 disabled={loading}
                                 className="w-full bg-black text-white py-2 px-4 rounded-lg hover:bg-gray-900 transition-colors disabled:opacity-50"
                             >
-                                {loading ? "Loading..." : "Show Tariff"}
+                                {loading ? "Loading..." : "Show Tariff Data"}
                             </button>
 
                             {/* Error */}
                             {error && <p className="text-red-500">{error}</p>}
 
-                            {/* Tariff results */}
-                            {tariffResultLines && (
-                                <div className="space-y-2 border border-gray-300 rounded-md p-4 bg-gray-50">
-                                    {tariffResultLines.map((line, idx) => (
-                                        <p
-                                            key={idx}
-                                            className={`text-sm font-medium ${line.isNoData
-                                                    ? "text-gray-400"
-                                                    : line.isError
-                                                        ? "text-red-500"
-                                                        : "text-gray-900"
-                                                }`}
-                                        >
-                                            <span className="font-semibold text-black">{line.text.split(':')[0]}:</span>{" "}
-                                            <span className="font-bold text-blue-600">{line.text.split(':')[1]}</span>
-                                        </p>
-                                    ))}
+                            {/* Tariff results - Card Grid (No Icons) */}
+                            {tariffResultLines && tariffResultLines.length > 0 && (
+                                <div className="mt-6 space-y-4">
+                                    <h3 className="text-lg font-bold text-slate-900 mb-4">Tariff Data Results</h3>
+                                    <div className="grid gap-4">
+                                        {tariffResultLines.map((line, idx) => {
+                                            const parts = line.text.split(":")
+                                            const indicatorCode = parts[0]?.trim()
+                                            const value = parts[1]?.trim()
+                                            const label = indicatorLabels[indicatorCode] || indicatorCode
+
+                                            return (
+                                                <div
+                                                    key={idx}
+                                                    className={`relative overflow-hidden rounded-xl border-2 transition-all duration-200 ${line.isNoData
+                                                            ? "bg-slate-50 border-slate-200"
+                                                            : line.isError
+                                                                ? "bg-red-50 border-red-200"
+                                                                : "bg-gradient-to-br from-white to-slate-50 border-slate-200 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-500/10"
+                                                        }`}
+                                                >
+                                                    <div className="relative p-5">
+                                                        <div className="flex flex-col gap-2">
+                                                            <p
+                                                                className={`text-sm font-medium ${line.isNoData ? "text-slate-500" : line.isError ? "text-red-600" : "text-slate-600"
+                                                                    }`}
+                                                            >
+                                                                {label}
+                                                            </p>
+                                                            <p
+                                                                className={`text-2xl font-bold ${line.isNoData ? "text-slate-400" : line.isError ? "text-red-500" : "text-slate-900"
+                                                                    }`}
+                                                            >
+                                                                {value || "N/A"}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
                                 </div>
                             )}
+
 
 
                         </div>
