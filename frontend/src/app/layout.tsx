@@ -13,6 +13,7 @@ import {
   IconHome,
   IconHistory,
   IconCalculator,
+  IconDeviceGamepad2,
   IconReceiptDollar,
   IconUser,
   IconLogout,
@@ -471,6 +472,11 @@ const links = [
     title: "News",
     icon: <Newspaper className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
     href: "/news",
+  },
+  {
+    title: "Game",
+    icon: <IconDeviceGamepad2 className="h-full w-full text-neutral-500 dark:text-neutral-300" />,
+    href: "/game",
   },
   {
     title: "About",
