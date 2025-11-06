@@ -7,18 +7,17 @@ import static org.mockito.Mockito.*;
 
 import java.util.Map;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
-import org.mockito.ArgumentCaptor;
 
 /**
  * Pure unit tests for WtoController — no Spring context, no MockMvc.
- * Mirrors ScraperControllerTest style: direct method invocation.
+ * Localized stubbing only in tests that hit the service to avoid UnnecessaryStubbing.
  */
 @ExtendWith(MockitoExtension.class)
 class WtoControllerTest {
@@ -29,20 +28,15 @@ class WtoControllerTest {
     @InjectMocks
     private WtoController controller;
 
-    private ResponseEntity<String> ok(String body) {
+    private static ResponseEntity<String> ok(String body) {
         return ResponseEntity.ok(body);
     }
 
-    @BeforeEach
-    void setup() {
-        when(svc.callWtoApi(anyMap())).thenReturn(ok("{\"ok\":true}"));
-    }
-
-    // ---------- Echo bypass path ----------
+    // ---------- Echo bypass path: no service call, so no stubbing ----------
     @Test
     void echo_true_returnsEchoOfInputs() {
         ResponseEntity<?> res = controller.getObservations(
-                "hs_p_0070", // indicator (lower -> upper in controller)
+                "hs_p_0070", // indicator
                 "840",       // r
                 "156",       // p
                 "100630",    // pc
@@ -73,11 +67,11 @@ class WtoControllerTest {
         ResponseEntity<?> res = controller.getObservations(
                 "tp_a_0160",
                 null,      // r missing
-                null,      // p not used
-                null,      // pc not used
+                null,
+                null,
                 null,      // ps missing
                 "json",
-                null,      // mode not used
+                null,
                 false
         );
         assertEquals(422, res.getStatusCodeValue());
@@ -87,9 +81,11 @@ class WtoControllerTest {
 
     @Test
     void tpa_success_callsServiceWithQuery() {
+        when(svc.callWtoApi(anyMap())).thenReturn(ok("{\"ok\":true}"));
+
         ResponseEntity<?> res = controller.getObservations(
                 "tp_a_0170",
-                "702",     // r
+                "702",       // r
                 null,
                 null,
                 "2015-2024", // ps
@@ -97,6 +93,7 @@ class WtoControllerTest {
                 null,
                 false
         );
+
         assertEquals(200, res.getStatusCodeValue());
         ArgumentCaptor<Map<String, String>> cap = ArgumentCaptor.forClass(Map.class);
         verify(svc).callWtoApi(cap.capture());
@@ -105,6 +102,7 @@ class WtoControllerTest {
         assertEquals("702", q.get("r"));
         assertEquals("2015-2024", q.get("ps"));
         assertEquals("json", q.get("fmt"));
+        verifyNoMoreInteractions(svc);
     }
 
     // ---------- TPB group (TP_B_0180 / TP_B_0190) ----------
@@ -127,6 +125,8 @@ class WtoControllerTest {
 
     @Test
     void tpb_success_defaultsModeToFull_whenNull() {
+        when(svc.callWtoApi(anyMap())).thenReturn(ok("{\"ok\":true}"));
+
         ResponseEntity<?> res = controller.getObservations(
                 "tp_b_0190",
                 "840",
@@ -137,6 +137,7 @@ class WtoControllerTest {
                 null,     // mode null -> controller should default to "full"
                 false
         );
+
         assertEquals(200, res.getStatusCodeValue());
         ArgumentCaptor<Map<String, String>> cap = ArgumentCaptor.forClass(Map.class);
         verify(svc).callWtoApi(cap.capture());
@@ -145,6 +146,7 @@ class WtoControllerTest {
         assertEquals("840", q.get("r"));
         assertEquals("json", q.get("fmt"));
         assertEquals("full", q.get("mode")); // default applied
+        verifyNoMoreInteractions(svc);
     }
 
     // ---------- HSP default group (e.g., HS_P_0070) ----------
@@ -162,11 +164,13 @@ class WtoControllerTest {
         );
         assertEquals(422, res.getStatusCodeValue());
         assertTrue(res.getBody().toString().contains("Required params for HS_P_0070 (HSP): r, pc, ps"));
-        verifyNoMoreInteractions(svc);
+        verifyNoInteractions(svc);
     }
 
     @Test
     void hsp_success_includesOptionalPartner_andOptionalModeWhenProvided() {
+        when(svc.callWtoApi(anyMap())).thenReturn(ok("{\"ok\":true}"));
+
         ResponseEntity<?> res = controller.getObservations(
                 "HS_P_0070",
                 "702",        // r
@@ -177,6 +181,7 @@ class WtoControllerTest {
                 "compact",    // mode present (optional)
                 false
         );
+
         assertEquals(200, res.getStatusCodeValue());
         ArgumentCaptor<Map<String, String>> cap = ArgumentCaptor.forClass(Map.class);
         verify(svc).callWtoApi(cap.capture());
@@ -188,5 +193,6 @@ class WtoControllerTest {
         assertEquals("2018-2020", q.get("ps"));
         assertEquals("json", q.get("fmt"));
         assertEquals("compact", q.get("mode")); // only set when provided
+        verifyNoMoreInteractions(svc);
     }
 }
