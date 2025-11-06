@@ -384,12 +384,21 @@ const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
   }
 
   const pauseGameForQuiz = () => {
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current)
-    }
-    setCurrentQuestion(getRandomQuestion())
-    setShowQuiz(true)
+  if (animationRef.current) {
+    cancelAnimationFrame(animationRef.current)
   }
+
+  const rawQuestion = getRandomQuestion()
+  const formattedQuestion: Question = {
+    id: crypto.randomUUID(),          // unique ID
+    questionText: rawQuestion.question,
+    options: rawQuestion.options,
+    answer: rawQuestion.correctAnswer,
+  }
+
+  setCurrentQuestion(formattedQuestion)
+  setShowQuiz(true)
+}
 
   const handleQuizAnswer = (correct: boolean) => {
     setShowQuiz(false)
