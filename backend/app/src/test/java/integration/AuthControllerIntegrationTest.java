@@ -5,8 +5,6 @@ import auth.SignupRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 
 import java.util.List;
@@ -18,7 +16,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Integration tests for AuthController.
  * Tests the full authentication flow: signup, login, refresh token, and JWT validation
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AuthControllerIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach

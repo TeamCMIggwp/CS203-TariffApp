@@ -4,10 +4,8 @@ import database.userhiddensources.dto.HiddenSourceResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.*;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.TestPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,10 +13,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Integration tests for UserHiddenSourcesController.
  * Tests user-specific hidden sources management with authentication
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@TestPropertySource(properties = {
-    "spring.security.enabled=true"
-})
 class UserHiddenSourcesControllerIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach

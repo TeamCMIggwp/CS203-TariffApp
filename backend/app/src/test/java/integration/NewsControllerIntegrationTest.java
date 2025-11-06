@@ -5,7 +5,6 @@ import database.news.dto.UpdateNewsRequest;
 import database.news.dto.NewsResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -14,7 +13,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Integration tests for NewsController.
  * Tests the full stack: Controller -> Service -> Repository -> Database
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class NewsControllerIntegrationTest extends BaseIntegrationTest {
 
     @AfterEach
