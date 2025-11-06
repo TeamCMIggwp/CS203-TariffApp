@@ -48,26 +48,26 @@ const tariffFeatures = [
 
 function DynamicRates() {
   const countries = [
-    { name: "USA", code: "842" },
+    { name: "USA", code: "840" },
     { name: "Singapore", code: "702" },
     { name: "China", code: "156" },
-    { name: "India", code: "699" },
-    { name: "Germany", code: "276" },
-    { name: "England", code: "826" },
+    { name: "India", code: "356" },
+    { name: "Australia", code: "036" },
   ]
 
   const [currentCountry, setCurrentCountry] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
   const [currentRate, setCurrentRate] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
-  const [currentTrend, setCurrentTrend] = useState<"up" | "down" | "stable">("stable")
+  const [cachedRates, setCachedRates] = useState<Map<string, number>>(new Map())
 
   // Fetch tariff data for a country
-  const fetchTariffData = async (countryCode: string) => {
+  const fetchTariffData = async (countryCode: string): Promise<number | null> => {
     try {
       const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
       const indicator = 'TP_A_0160' // Simple average MFN applied tariff
-      const currentYear = new Date().getFullYear().toString()
+      const currentYear = (new Date().getFullYear() - 1).toString() // Current year - 1
+      const previousYear = (new Date().getFullYear() - 2).toString() // Fallback to current year - 2
 
       const url = new URL(`${API_BASE}/api/v1/indicators/${encodeURIComponent(indicator)}/observations`)
       url.searchParams.set('r', countryCode)
@@ -76,14 +76,78 @@ function DynamicRates() {
       url.searchParams.set('mode', 'full')
       url.searchParams.set('echo', 'false')
 
+      console.log('Fetching tariff data:', {
+        country: countries.find(c => c.code === countryCode)?.name,
+        countryCode,
+        url: url.toString()
+      })
+
       const res = await fetch(url.toString(), { credentials: 'include' })
       const text = await res.text()
 
-      if (!res.ok) return null
+      console.log('API Response:', {
+        status: res.status,
+        ok: res.ok,
+        textLength: text.length,
+        preview: text.substring(0, 200)
+      })
 
-      const json = JSON.parse(text)
-      const value = extractValueFromObj(json, currentYear)
-      return value
+      if (!res.ok) {
+        console.warn(`API returned ${res.status} for ${countryCode}, trying previous year...`)
+
+        // Try previous year if current year fails
+        url.searchParams.set('ps', previousYear)
+        const retryRes = await fetch(url.toString(), { credentials: 'include' })
+        const retryText = await retryRes.text()
+
+        if (!retryRes.ok || !retryText || retryText.trim() === '') {
+          console.warn(`No data available for country ${countryCode}`)
+          return null
+        }
+
+        try {
+          const json = JSON.parse(retryText)
+          const value = extractValueFromObj(json, previousYear)
+          console.log('Extracted tariff value (previous year):', {
+            country: countries.find(c => c.code === countryCode)?.name,
+            value,
+            year: previousYear
+          })
+          return value
+        } catch (parseError) {
+          console.error('Failed to parse retry response:', parseError)
+          return null
+        }
+      }
+
+      // Check if response is empty or not valid JSON
+      if (!text || text.trim() === '') {
+        console.warn('Empty response from API for country:', countryCode)
+        return null
+      }
+
+      try {
+        const json = JSON.parse(text)
+        console.log('Parsed JSON structure:', {
+          hasData: !!json,
+          keys: Object.keys(json || {}).slice(0, 5)
+        })
+
+        const value = extractValueFromObj(json, currentYear)
+        console.log('Extracted tariff value:', {
+          country: countries.find(c => c.code === countryCode)?.name,
+          value,
+          year: currentYear
+        })
+
+        return value
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', {
+          error: parseError,
+          responsePreview: text.substring(0, 100)
+        })
+        return null
+      }
     } catch (error) {
       console.error('Error fetching tariff data:', error)
       return null
@@ -129,52 +193,90 @@ function DynamicRates() {
     return null
   }
 
-  // Determine trend based on rate
-  const determineTrend = (rate: number): "up" | "down" | "stable" => {
-    if (rate > 15) return "up"
-    if (rate < 5) return "down"
-    return "stable"
-  }
-
-  // Initial load
+  // Initial load - fetch all countries once when component mounts
   useEffect(() => {
-    const loadInitialData = async () => {
-      const rate = await fetchTariffData(countries[0].code)
-      if (rate !== null) {
-        setCurrentRate(rate)
-        setCurrentTrend(determineTrend(rate))
+    let isMounted = true
+
+    const loadAllData = async () => {
+      console.log('=== Starting initial tariff data load for all countries ===')
+      const ratesMap = new Map<string, number>()
+
+      // Fetch data for all countries
+      for (const country of countries) {
+        console.log(`Fetching data for ${country.name} (${country.code})`)
+        const rate = await fetchTariffData(country.code)
+
+        if (rate !== null) {
+          ratesMap.set(country.code, rate)
+          console.log(`✓ ${country.name}: ${rate}%`)
+        } else {
+          console.warn(`✗ Failed to load data for ${country.name}`)
+        }
       }
-      setLoading(false)
+
+      if (isMounted) {
+        setCachedRates(ratesMap)
+
+        // Set initial display with first country that has data
+        const firstCountryWithData = countries.find(c => ratesMap.has(c.code))
+        if (firstCountryWithData) {
+          const rate = ratesMap.get(firstCountryWithData.code)!
+          setCurrentRate(rate)
+          setCurrentCountry(countries.indexOf(firstCountryWithData))
+          console.log('Initial data loaded successfully')
+        } else {
+          console.warn('No data available for any country')
+        }
+
+        setLoading(false)
+      }
     }
-    loadInitialData()
+
+    loadAllData()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
-  // Rotate countries
+  // Rotate countries - only starts after initial load, uses cached data
   useEffect(() => {
+    // Don't start rotation if still loading or no cached data
+    if (loading || cachedRates.size === 0) return
+
+    console.log('Starting country rotation timer')
     const interval = setInterval(() => {
       setIsAnimating(true)
-      setTimeout(async () => {
-        const nextCountry = (currentCountry + 1) % countries.length
-        setCurrentCountry(nextCountry)
+      setTimeout(() => {
+        // Find next country with cached data
+        let nextIndex = (currentCountry + 1) % countries.length
+        let attempts = 0
 
-        const rate = await fetchTariffData(countries[nextCountry].code)
-        if (rate !== null) {
+        // Skip countries without data
+        while (!cachedRates.has(countries[nextIndex].code) && attempts < countries.length) {
+          nextIndex = (nextIndex + 1) % countries.length
+          attempts++
+        }
+
+        // If we found a country with data
+        if (cachedRates.has(countries[nextIndex].code)) {
+          const country = countries[nextIndex]
+          const rate = cachedRates.get(country.code)!
+
+          console.log(`Rotating to country ${nextIndex + 1}/${countries.length}: ${country.name} - ${rate}%`)
+          setCurrentCountry(nextIndex)
           setCurrentRate(rate)
-          setCurrentTrend(determineTrend(rate))
         }
 
         setTimeout(() => setIsAnimating(false), 50)
       }, 300)
     }, 3000)
 
-    return () => clearInterval(interval)
-  }, [currentCountry])
-
-  const getTrendIcon = () => {
-    if (currentTrend === "up") return <TrendingUp className="w-10 h-10 text-green-500" />
-    if (currentTrend === "down") return <TrendingDown className="w-10 h-10 text-red-500" />
-    return <Scale className="w-10 h-10 text-gray-500" />
-  }
+    return () => {
+      console.log('Cleaning up country rotation timer')
+      clearInterval(interval)
+    }
+  }, [currentCountry, loading, cachedRates])
 
   return (
     <div className="relative">
@@ -189,63 +291,55 @@ function DynamicRates() {
 
           <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16">
             {/* Country */}
-            <div className="text-center">
+            <div className="text-center min-w-[200px]">
               <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">COUNTRY</p>
               <p
-                className={`text-3xl font-bold text-foreground transition-all duration-300 ${isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
-                  }`}
+                className={`text-3xl font-bold text-foreground transition-all duration-300 ${
+                  isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
+                }`}
               >
                 {countries[currentCountry].name}
               </p>
             </div>
 
             {/* Current Rate */}
-            <div className="flex items-center gap-6">
-              <div className="text-center">
-                <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">CURRENT RATE</p>
-                <div
-                  className={`text-7xl font-bold tabular-nums text-black transition-all duration-300 ${isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
-                    }`}
-                >
-                  {loading ? (
-                    <span className="text-4xl">Loading...</span>
-                  ) : currentRate !== null ? (
-                    <>
-                      {currentRate.toFixed(1)}
-                      <span className="text-4xl text-muted-foreground">%</span>
-                    </>
-                  ) : (
-                    <span className="text-3xl">N/A</span>
-                  )}
-                  <span className="text-4xl text-muted-foreground">%</span>
-                </div>
-              </div>
-
+            <div className="text-center min-w-[250px]">
+              <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">CURRENT RATE</p>
               <div
-                className={`transition-all duration-300 ${isAnimating ? "opacity-0 scale-50" : "opacity-100 scale-100"
-                  }`}
+                className={`text-7xl font-bold tabular-nums text-black transition-all duration-300 ${
+                  isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
+                }`}
               >
-                {getTrendIcon()}
+                {loading ? (
+                  <span className="text-4xl">Loading...</span>
+                ) : currentRate !== null ? (
+                  <>
+                    {currentRate.toFixed(1)}
+                    <span className="text-4xl text-muted-foreground">%</span>
+                  </>
+                ) : (
+                  <span className="text-3xl">N/A</span>
+                )}
               </div>
-            </div>
-
-            {/* Trend */}
-            <div className="text-center">
-              <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">TREND</p>
-              <p className="text-2xl font-semibold capitalize text-foreground">{currentTrend}</p>
             </div>
           </div>
 
           <div className="mt-8 text-center">
             <p className="text-sm text-gray-700">
-              Agricultural tariff rates updating every 2 seconds • Data from WTO Database
+              Agricultural tariff rates from WTO Database (TP_A_0160 - Simple Average MFN Applied Tariff)
             </p>
+            {cachedRates.size > 0 && (
+              <p className="text-xs text-gray-500 mt-2">
+                Displaying {cachedRates.size} of {countries.length} countries with available data
+              </p>
+            )}
           </div>
         </div>
       </div>
     </div>
   )
 }
+
 export default function AboutPage() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
@@ -510,8 +604,9 @@ export default function AboutPage() {
                   onMouseLeave={() => setHoveredIndex(null)}
                 >
                   <div
-                    className={`absolute inset-0 p-4 flex flex-col items-center justify-center text-center transition-opacity duration-300 ${isHovered ? "opacity-0" : "opacity-100"
-                      }`}
+                    className={`absolute inset-0 p-4 flex flex-col items-center justify-center text-center transition-opacity duration-300 ${
+                      isHovered ? "opacity-0" : "opacity-100"
+                    }`}
                   >
                     <div
                       className={`w-12 h-12 rounded-lg ${indicator.color} text-white flex items-center justify-center mb-3`}
@@ -523,8 +618,9 @@ export default function AboutPage() {
                   </div>
 
                   <div
-                    className={`absolute inset-0 p-4 flex flex-col transition-opacity duration-300 ${isHovered ? "opacity-100" : "opacity-0"
-                      }`}
+                    className={`absolute inset-0 p-4 flex flex-col transition-opacity duration-300 ${
+                      isHovered ? "opacity-100" : "opacity-0"
+                    }`}
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <div
