@@ -60,8 +60,15 @@ export default function GamePage() {
   const [lives, setLives] = useState(3)
   const [showQuiz, setShowQuiz] = useState(false)
 
-  
-  const [currentQuestion, setCurrentQuestion] = useState<any>(null)
+  type Question = {
+  id: string
+  questionText: string
+  options: string[]
+  answer: string
+}
+
+const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
+
 
   // Game state refs
   const playerRef = useRef<Position>({ x: 14, y: 23 })
