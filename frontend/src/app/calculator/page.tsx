@@ -66,52 +66,6 @@ export default function CalculatorSection() {
   const [fxAutoLoading, setFxAutoLoading] = useState<boolean>(false)
   const [fxAutoError, setFxAutoError] = useState<string | null>(null)
 
-  // Helper to get importer name by numeric code then resolve currency via fx.ts
-  const getImporterCurrency = (code?: string) => {
-    const importerName = code ? countries.find(c => c.code === code)?.name : undefined
-    return getCurrencyCode(importerName) || "USD"
-  }
-
-  // When importer (toCountry) changes, resolve its currency via fx.ts
-  useEffect(() => {
-    setImpCurrency(getImporterCurrency(toCountry))
-  }, [toCountry])
-
-  // Fetch USD -> importer currency rate immediately whenever currency changes
-  useEffect(() => {
-    let aborted = false
-    const fetchRate = async () => {
-      setFxAutoError(null)
-      if (!impCurrency) return
-
-      if (impCurrency === "USD") {
-        setFxRateToImp(1)
-        return
-      }
-
-      setFxAutoLoading(true)
-      try {
-        const res = await fetch(`${API_BASE}/api/v1/exchange?base=USD`, {
-          headers: { Accept: "application/json" }
-        })
-        if (!res.ok) throw new Error(`FX API ${res.status}`)
-        const data: ExchangeApiResponse = await res.json()
-        const r = data?.conversionRates?.[impCurrency]
-        if (typeof r !== "number" || !isFinite(r)) throw new Error(`No FX for ${impCurrency}`)
-        if (!aborted) setFxRateToImp(r)
-     } catch (e) {
-        if (!aborted) setFxAutoError(e instanceof Error ? e.message : "FX fetch failed")
-      } finally {
-        if (!aborted) setFxAutoLoading(false)
-      }
-    }
-    fetchRate()
-    return () => { aborted = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [impCurrency])
-
-  const [showConvertedBox, setShowConvertedBox] = useState<boolean>(false)
-
   // Backend API base URL, configurable via environment for Amplify and local dev
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
 
@@ -543,15 +497,6 @@ export default function CalculatorSection() {
   const totalTariff = products.reduce((sum, p) => sum + (p.tariffAmount || 0), 0)
   const totalCost = totalValue + totalTariff
 
-  const convertedTotals = useMemo(() => {
-    if (fxRateToImp == null) return null
-    return {
-      value: totalValue * fxRateToImp,
-      tariff: totalTariff * fxRateToImp,
-      cost: totalCost * fxRateToImp
-    }
-  }, [fxRateToImp, totalValue, totalTariff, totalCost])
-
 
   const dummyChartData = [
     { product: "Wheat", tariff: 5.2 },
@@ -787,86 +732,6 @@ export default function CalculatorSection() {
                   <p className="text-2xl font-bold text-green-300">{selectedCurrency} {totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
                 </div>
               </div>
-            </div>
-
-            {/* 🔽 Collapsible: Auto-Converted Totals (Importer Currency) */}
-            <div className="bg-white/20 backdrop-blur-sm rounded-lg border-2 border-white/30 mt-6 overflow-hidden">
-              {/* Header — acts like a button */}
-              <button
-                type="button"
-                onClick={() => setShowConvertedBox(v => !v)}
-                className="w-full flex items-center justify-between px-6 py-4 text-left focus:outline-none focus:ring-2 focus:ring-white/60"
-                aria-expanded={showConvertedBox}
-                aria-controls="converted-totals-panel"
-              >
-                <div className="flex items-center gap-3">
-                  <h4 className="text-xl font-bold text-white">
-                    USD → {impCurrency}
-                  </h4>
-                </div>
-                <ChevronDown
-                  className={`h-5 w-5 text-white transition-transform ${showConvertedBox ? "rotate-180" : ""}`}
-                  aria-hidden="true"
-                />
-              </button>
-
-              {/* Collapsible content */}
-              <AnimatePresence initial={false}>
-                {showConvertedBox && (
-                  <motion.div
-                    id="converted-totals-panel"
-                    key="converted-totals-panel"
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <div className="px-6 pb-6 pt-2">
-                      {/* Loading / Error states */}
-                      {fxAutoLoading && (
-                        <div className="text-white text-sm flex items-center">
-                          <span className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
-                          Fetching FX rate...
-                        </div>
-                      )}
-
-                      {fxAutoError && (
-                        <div className="bg-red-600 text-white p-3 rounded-lg">{fxAutoError}</div>
-                      )}
-
-                      {/* Values */}
-                      {!fxAutoLoading && !fxAutoError && fxRateToImp !== null && convertedTotals && (
-                        <>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-white">
-                            <div>
-                              <p className="text-gray-300">Total Import Value:</p>
-                              <p className="text-2xl font-bold">
-                                {impCurrency} {convertedTotals.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-gray-300">Total Tariff:</p>
-                              <p className="text-2xl font-bold text-red-300">
-                                {impCurrency} {convertedTotals.tariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-gray-300">Total Cost:</p>
-                              <p className="text-2xl font-bold text-green-300">
-                                {impCurrency} {convertedTotals.cost.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="mt-4 text-sm text-gray-200">
-                            Using FX: 1 USD = {fxRateToImp.toLocaleString(undefined, { maximumFractionDigits: 6 })} {impCurrency}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 mt-6">
