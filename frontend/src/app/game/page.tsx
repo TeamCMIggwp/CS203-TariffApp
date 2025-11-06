@@ -640,7 +640,17 @@ const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
         </div>
       </div>
 
-      {showQuiz && currentQuestion && <QuizModal question={currentQuestion} onAnswer={handleQuizAnswer} />}
+      {showQuiz && currentQuestion && (
+  <QuizModal
+    question={{
+      question: currentQuestion.questionText,
+      type: "multiple-choice",          // or whatever type is appropriate
+      correctAnswer: currentQuestion.answer,
+      options: currentQuestion.options,
+    }}
+    onAnswer={handleQuizAnswer}
+  />
+)}
 
       {gameOver && <GameOverModal score={score} won={lives > 0} onRestart={startGame} />}
     </div>
