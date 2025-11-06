@@ -55,19 +55,70 @@ export default function CalculatorSection() {
   const [showAIAnalysis, setShowAIAnalysis] = useState(false)
   const [showCharts, setShowCharts] = useState(false)
 
-  // === Auto FX (standalone; does NOT use selectedCurrency) ===
-  type ExchangeApiResponse = {
-    baseCurrency: string
-    conversionRates: Record<string, number>
-  }
+  // === Currency Conversion ===
+  const [displayCurrency, setDisplayCurrency] = useState<string>("USD")
+  const [conversionRate, setConversionRate] = useState<number>(1)
+  const [currencyLoading, setCurrencyLoading] = useState(false)
+  const [currencyError, setCurrencyError] = useState<string | null>(null)
 
-  const [impCurrency, setImpCurrency] = useState<string>("USD")
-  const [fxRateToImp, setFxRateToImp] = useState<number | null>(null)
-  const [fxAutoLoading, setFxAutoLoading] = useState<boolean>(false)
-  const [fxAutoError, setFxAutoError] = useState<string | null>(null)
+  // Available currencies for the dropdown
+  const availableCurrencies = ["USD", "EUR", "GBP", "JPY", "CNY", "SGD", "AUD", "CAD", "CHF", "INR"]
 
   // Backend API base URL, configurable via environment for Amplify and local dev
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
+
+  // Fetch currency conversion rate
+  const fetchConversionRate = async (fromCurrency: string, toCurrency: string) => {
+    if (fromCurrency === toCurrency) {
+      setConversionRate(1)
+      return
+    }
+
+    setCurrencyLoading(true)
+    setCurrencyError(null)
+
+    try {
+      const url = `${API_BASE}/api/v1/exchange?base=${encodeURIComponent(fromCurrency)}`
+      const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } })
+      
+      if (!res.ok) throw new Error(`Currency API error: ${res.status}`)
+
+      const data: any = await res.json()
+      
+      // Handle different response formats
+      let rate = 1
+      if (data.conversionRates && data.conversionRates[toCurrency]) {
+        rate = data.conversionRates[toCurrency]
+      } else if (data.rates && data.rates[toCurrency]) {
+        rate = data.rates[toCurrency]
+      } else if (data.rate) {
+        rate = data.rate
+      }
+
+      setConversionRate(rate)
+    } catch (err) {
+      console.error('Currency conversion error:', err)
+      setCurrencyError('Failed to fetch exchange rate')
+      setConversionRate(1)
+    } finally {
+      setCurrencyLoading(false)
+    }
+  }
+const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
+  
+  // Update conversion rate when display currency changes
+  useEffect(() => {
+    fetchConversionRate(selectedCurrency, displayCurrency)
+  }, [displayCurrency, selectedCurrency])
+
+  // Helper function to convert and format amounts
+  const convertAmount = (amount: number) => {
+    return amount * conversionRate
+  }
+
+  const formatCurrency = (amount: number) => {
+    return convertAmount(amount).toLocaleString(undefined, { maximumFractionDigits: 2 })
+  }
 
   const addProduct = () => {
     const newId = String(Date.now())
@@ -486,7 +537,7 @@ export default function CalculatorSection() {
     }
   }
 
-  const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
+  
   const getCountryName = (code: string) => {
     const country = countries.find(c => c.code === code)
     return country ? country.name : code
@@ -496,7 +547,6 @@ export default function CalculatorSection() {
   const totalValue = products.reduce((sum, p) => sum + (parseFloat(p.value) || 0), 0)
   const totalTariff = products.reduce((sum, p) => sum + (p.tariffAmount || 0), 0)
   const totalCost = totalValue + totalTariff
-
 
   const dummyChartData = [
     { product: "Wheat", tariff: 5.2 },
@@ -558,6 +608,51 @@ export default function CalculatorSection() {
                 </Select>
               </div>
             </div>
+
+            {/* Currency Selection Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="space-y-2">
+                <Label htmlFor="base-currency" className="flex items-center gap-2">
+                  <span>Base Currency (from importer country)</span>
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    value={selectedCurrency} 
+                    disabled 
+                    className="bg-gray-100 dark:bg-gray-800 font-semibold"
+                  />
+                  <span className="text-sm text-muted-foreground">Auto-detected</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="display-currency" className="flex items-center gap-2">
+                  <span>Display Currency</span>
+                  {currencyLoading && <span className="text-xs text-blue-600">(updating...)</span>}
+                </Label>
+                <Select value={displayCurrency} onValueChange={setDisplayCurrency}>
+                  <SelectTrigger className="bg-white dark:bg-gray-900">
+                    <SelectValue>{displayCurrency}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableCurrencies.map(curr => (
+                      <SelectItem key={curr} value={curr}>
+                        {curr}
+                        {curr === selectedCurrency && " (Base)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {displayCurrency !== selectedCurrency && conversionRate !== 1 && (
+                  <p className="text-xs text-muted-foreground">
+                    1 {selectedCurrency} = {conversionRate.toFixed(4)} {displayCurrency}
+                  </p>
+                )}
+                {currencyError && (
+                  <p className="text-xs text-red-600">{currencyError}</p>
+                )}
+              </div>
+            </div>
             {/* Products Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -606,7 +701,7 @@ export default function CalculatorSection() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor={`value-${product.id}`}>Value of Goods ({selectedCurrency})</Label>
+                    <Label htmlFor={`value-${product.id}`}>Value of Goods ({displayCurrency})</Label>
                     <Input
                       type="number"
                       value={product.value}
@@ -686,7 +781,7 @@ export default function CalculatorSection() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white">
                         <div>
                           <p className="text-gray-300 text-sm">Goods Value:</p>
-                          <p className="font-semibold">{selectedCurrency} {Number.parseFloat(product.value).toLocaleString()}</p>
+                          <p className="font-semibold">{displayCurrency} {formatCurrency(Number.parseFloat(product.value))}</p>
                         </div>
                         <div>
                           <p className="text-gray-300 text-sm">Tariff Rate:</p>
@@ -695,13 +790,13 @@ export default function CalculatorSection() {
                         <div>
                           <p className="text-gray-300 text-sm">Tariff Amount:</p>
                           <p className="font-semibold text-red-300">
-                            {selectedCurrency} {product.tariffAmount?.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                            {displayCurrency} {formatCurrency(product.tariffAmount || 0)}
                           </p>
                         </div>
                         <div>
                           <p className="text-gray-300 text-sm">Total Cost:</p>
                           <p className="font-semibold text-green-300">
-                            {selectedCurrency} {((parseFloat(product.value) + (product.tariffAmount || 0))).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                            {displayCurrency} {formatCurrency(parseFloat(product.value) + (product.tariffAmount || 0))}
                           </p>
                         </div>
                       </div>
@@ -721,15 +816,15 @@ export default function CalculatorSection() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-white">
                 <div>
                   <p className="text-gray-300">Total Import Value:</p>
-                  <p className="text-2xl font-bold">{selectedCurrency} {totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                  <p className="text-2xl font-bold">{displayCurrency} {formatCurrency(totalValue)}</p>
                 </div>
                 <div>
                   <p className="text-gray-300">Total Tariff:</p>
-                  <p className="text-2xl font-bold text-red-300">{selectedCurrency} {totalTariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                  <p className="text-2xl font-bold text-red-300">{displayCurrency} {formatCurrency(totalTariff)}</p>
                 </div>
                 <div>
                   <p className="text-gray-300">Total Cost:</p>
-                  <p className="text-2xl font-bold text-green-300">{selectedCurrency} {totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                  <p className="text-2xl font-bold text-green-300">{displayCurrency} {formatCurrency(totalCost)}</p>
                 </div>
               </div>
             </div>
