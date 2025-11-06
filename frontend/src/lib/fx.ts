@@ -1,5 +1,4 @@
-// fx.ts — static country-to-currency code mapping
-// Used to translate importer country name → currency code
+// fx.ts — static country-to-currency mapping + display names
 
 export const countryToCurrency: Record<string, string> = {
   "Afghanistan": "AFN",
@@ -165,4 +164,21 @@ export const countryToCurrency: Record<string, string> = {
 export const getCurrencyCode = (countryName?: string): string => {
   if (!countryName) return "USD"
   return countryToCurrency[countryName] || "USD"
+}
+
+/** Universal currency name resolver (covers all ISO-4217) */
+let currencyDisplay: Intl.DisplayNames | undefined
+try {
+  // Client-side only; your converter runs with "use client"
+  if (typeof Intl !== "undefined" && (Intl as any).DisplayNames) {
+    currencyDisplay = new Intl.DisplayNames(["en"], { type: "currency" })
+  }
+} catch {
+  // ignore; we'll fall back to the code below
+}
+
+export const getCurrencyName = (code?: string): string => {
+  if (!code) return "US Dollar"
+  const c = code.toUpperCase()
+  return currencyDisplay?.of(c) || c  // fallback to code if the environment lacks support
 }
