@@ -103,7 +103,7 @@ class GlobalExceptionHandlerTest {
     void handleNewsNotFound_returns404WithErrorResponse() {
         WebRequest request = mock(WebRequest.class);
         NewsNotFoundException ex =
-                new NewsNotFoundException(123L);
+                new NewsNotFoundException("123");
 
         when(request.getDescription(false)).thenReturn("uri=/news/123");
 
