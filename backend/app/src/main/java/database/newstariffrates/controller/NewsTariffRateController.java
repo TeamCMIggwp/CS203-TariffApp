@@ -21,8 +21,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/news/rates")
-@Tag(name = "News Tariff Rates", description = "RESTful API for managing tariff rates extracted from news articles")
+@RequestMapping("/api/v1/admin/news/rates")
+@Tag(name = "Admin News Tariff Rates", description = "RESTful API for admins to manage tariff rates extracted from news articles")
 @Validated
 public class NewsTariffRateController {
 

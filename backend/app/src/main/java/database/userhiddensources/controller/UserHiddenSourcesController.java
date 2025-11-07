@@ -21,8 +21,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/user/news")
-@Tag(name = "User Hidden Sources", description = "API for regular users to manage their personal hidden news sources")
+@RequestMapping("/api/v1/user/hidden-news")
+@Tag(name = "User Hidden News", description = "API for regular users to manage their personal hidden news sources")
 @Validated
 public class UserHiddenSourcesController {
     private static final Logger logger = LoggerFactory.getLogger(UserHiddenSourcesController.class);
@@ -65,7 +65,7 @@ public class UserHiddenSourcesController {
             @RequestParam @NotBlank String newsLink) {
 
         String userId = getUserIdentifier();
-        logger.info("POST /api/v1/user/news - User: {}, newsLink: {}", userId, newsLink);
+        logger.info("POST /api/v1/user/hidden-news - User: {}, newsLink: {}", userId, newsLink);
 
         HiddenSourceResponse response = service.hideSourceForUser(userId, newsLink);
         return ResponseEntity.ok(response);
@@ -101,14 +101,14 @@ public class UserHiddenSourcesController {
         String userId = getUserIdentifier();
 
         if (all) {
-            logger.info("DELETE /api/v1/user/news?all=true - User: {}", userId);
+            logger.info("DELETE /api/v1/user/hidden-news?all=true - User: {}", userId);
             int count = service.unhideAllSourcesForUser(userId);
             return ResponseEntity.ok(String.format("Unhidden %d sources", count));
         } else {
             if (newsLink == null || newsLink.isBlank()) {
                 return ResponseEntity.badRequest().body("newsLink parameter required when all=false");
             }
-            logger.info("DELETE /api/v1/user/news?newsLink={} - User: {}", newsLink, userId);
+            logger.info("DELETE /api/v1/user/hidden-news?newsLink={} - User: {}", newsLink, userId);
             service.unhideSourceForUser(userId, newsLink);
             return ResponseEntity.noContent().build();
         }
@@ -134,7 +134,7 @@ public class UserHiddenSourcesController {
     public ResponseEntity<List<HiddenSourceResponse>> getHiddenSources() {
 
         String userId = getUserIdentifier();
-        logger.info("GET /api/v1/user/news - User: {}", userId);
+        logger.info("GET /api/v1/user/hidden-news - User: {}", userId);
 
         List<HiddenSourceResponse> response = service.getHiddenSourcesForUser(userId);
         return ResponseEntity.ok(response);

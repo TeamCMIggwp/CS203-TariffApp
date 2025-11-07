@@ -26,8 +26,8 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/news")
-@Tag(name = "News Management", description = "RESTful API for managing news articles")
+@RequestMapping("/api/v1/admin/news")
+@Tag(name = "Admin News Management", description = "RESTful API for admins to manage shared news database")
 @Validated
 public class NewsController {
     private static final Logger logger = LoggerFactory.getLogger(NewsController.class);

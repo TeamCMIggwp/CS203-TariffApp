@@ -55,12 +55,13 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.PUT, "/api/v1/tariffs/**").hasRole("ADMIN")
 				.requestMatchers(HttpMethod.DELETE, "/api/v1/tariffs/**").hasRole("ADMIN")
 
-				// News: GET and POST open; PUT/DELETE admin-only
-				.requestMatchers(HttpMethod.GET, "/api/v1/news/**").permitAll()
-				.requestMatchers(HttpMethod.POST, "/api/v1/news/**").permitAll()
-				.requestMatchers(HttpMethod.PUT, "/api/v1/news/visibility").authenticated() // Visibility update requires auth
-				.requestMatchers(HttpMethod.PUT, "/api/v1/news/**").hasRole("ADMIN") // Other PUT operations require admin
-				.requestMatchers(HttpMethod.DELETE, "/api/v1/news/**").hasRole("ADMIN")
+				// Admin News Management (Shared database operations for all admins)
+				.requestMatchers(HttpMethod.GET, "/api/v1/admin/news/all").permitAll() // Anyone can see all news in DB
+				.requestMatchers(HttpMethod.GET, "/api/v1/admin/news").permitAll() // Anyone can check if specific news exists
+				.requestMatchers(HttpMethod.POST, "/api/v1/admin/news").hasRole("ADMIN") // Only admin can add to DB
+				.requestMatchers(HttpMethod.PUT, "/api/v1/admin/news/visibility").hasRole("ADMIN") // Only admin can hide globally (for all admins)
+				.requestMatchers(HttpMethod.PUT, "/api/v1/admin/news").hasRole("ADMIN") // Only admin can update remarks
+				.requestMatchers(HttpMethod.DELETE, "/api/v1/admin/news").hasRole("ADMIN") // Only admin can delete from DB
 
 				// WITS and WTO data open
 				.requestMatchers(HttpMethod.GET, "/api/v1/wits/**").permitAll()
@@ -76,14 +77,14 @@ public class SecurityConfig {
 				// Scraping Jobs
 				.requestMatchers(HttpMethod.GET, "/api/v1/scrape").permitAll()
 
-				// User Hidden Sources - requires authentication (proxied through Next.js middleware)
-				.requestMatchers(HttpMethod.POST, "/api/v1/user/news").authenticated()
-				.requestMatchers(HttpMethod.GET, "/api/v1/user/news").authenticated()
-				.requestMatchers(HttpMethod.DELETE, "/api/v1/user/news").authenticated()
+				// User Hidden News (Personal hidden list - each user has their own)
+				.requestMatchers(HttpMethod.POST, "/api/v1/user/hidden-news").authenticated()
+				.requestMatchers(HttpMethod.GET, "/api/v1/user/hidden-news").authenticated()
+				.requestMatchers(HttpMethod.DELETE, "/api/v1/user/hidden-news").authenticated()
 
-				// News Tariff Rates - POST requires admin authentication, GET is open
-				.requestMatchers(HttpMethod.POST, "/api/v1/news/rates").hasRole("ADMIN")
-				.requestMatchers(HttpMethod.GET, "/api/v1/news/rates/**").permitAll()
+				// Admin News Tariff Rates - POST requires admin authentication, GET is open
+				.requestMatchers(HttpMethod.POST, "/api/v1/admin/news/rates").hasRole("ADMIN")
+				.requestMatchers(HttpMethod.GET, "/api/v1/admin/news/rates/**").permitAll()
 
 				// Everything else requires authentication
 				.anyRequest().authenticated()
