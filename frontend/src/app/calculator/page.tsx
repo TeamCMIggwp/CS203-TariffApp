@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts"
 import { BarChart3, Sparkles, Database, Globe, Plus, Trash2 } from "lucide-react"
-import { getCurrencyCode } from "@/lib/fx"
+import { getCurrencyCode, getCurrencyName, countryToCurrency } from "@/lib/fx"
 import { ChevronDown } from "lucide-react"
 
 type MetricValue = string | number
@@ -41,6 +41,9 @@ type ProductRow = {
   errorMessage?: string
 }
 
+// Derive country list as string[] from currency converter
+const countryNames = Object.keys(countryToCurrency as Record<string, unknown>) as string[]
+
 export default function CalculatorSection() {
   const calculatorY = useMotionValue(0)
   const [fromCountry, setFromCountry] = useState("004")
@@ -63,13 +66,11 @@ export default function CalculatorSection() {
   const [showCharts, setShowCharts] = useState(false)
 
   // === Currency Conversion ===
-  const [displayCurrency, setDisplayCurrency] = useState<string>("USD")
+  const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
+  const [displayCurrency, setDisplayCurrency] = useState<string>(selectedCurrency)
   const [conversionRate, setConversionRate] = useState<number>(1)
   const [currencyLoading, setCurrencyLoading] = useState(false)
   const [currencyError, setCurrencyError] = useState<string | null>(null)
-
-  // Available currencies for the dropdown
-  const availableCurrencies = ["USD", "EUR", "GBP", "JPY", "CNY", "SGD", "AUD", "CAD", "CHF", "INR"]
 
   // Backend API base URL, configurable via environment for Amplify and local dev
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
@@ -111,7 +112,12 @@ export default function CalculatorSection() {
       setCurrencyLoading(false)
     }
   }
-  const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
+  
+  // Update display currency when importer country changes
+  useEffect(() => {
+    const newCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
+    setDisplayCurrency(newCurrency)
+  }, [toCountry])
 
   // Update conversion rate when display currency changes
   useEffect(() => {
@@ -571,7 +577,7 @@ export default function CalculatorSection() {
             <CardTitle className="calculator-title">Agricultural Tariff Calculator</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-                        {/* Top row: From, To, Year, Display Currency all in one line */}
+            {/* Top row: From, To, Year, Display Currency all in one line */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="from-country">From Country (Exporter)</Label>
@@ -645,6 +651,7 @@ export default function CalculatorSection() {
                 )}
               </div>
             </div>
+            
             {/* Products Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -655,7 +662,7 @@ export default function CalculatorSection() {
                   disabled={isCalculatingTariff}
                   className="flex items-center bg-black hover:bg-neutral-800 text-white font-medium rounded-lg px-4 py-2 shadow-md transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <Plus className="w-4 h-4 mr-1" /> {/* tighter spacing */}
+                  <Plus className="w-4 h-4 mr-1" />
                   <span>Add Product</span>
                 </Button>
               </div>
@@ -964,6 +971,6 @@ export default function CalculatorSection() {
           </motion.div>
         )}
       </div>
-    </motion.section >
+    </motion.section>
   )
 }
