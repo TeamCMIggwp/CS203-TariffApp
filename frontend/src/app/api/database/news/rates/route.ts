@@ -5,7 +5,7 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
 
 /**
  * Proxy for News Tariff Rates API
- * POST /api/database/news/rates -> POST /api/v1/news/rates (backend)
+ * POST /api/database/news/rates -> POST /api/v1/admin/news/rates (backend)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Forward to backend
-    const backendResponse = await fetch(`${BACKEND_URL}/api/v1/news/rates`, {
+    const backendResponse = await fetch(`${BACKEND_URL}/api/v1/admin/news/rates`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
 /**
  * Proxy for News Tariff Rates API
- * GET /api/database/news/rates?newsLink=... -> GET /api/v1/news/rates?newsLink=... (backend)
+ * GET /api/database/news/rates?newsLink=... -> GET /api/v1/admin/news/rates?newsLink=... (backend)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build backend URL
-    let backendUrl = `${BACKEND_URL}/api/v1/news/rates`;
+    let backendUrl = `${BACKEND_URL}/api/v1/admin/news/rates`;
     if (checkExistence === 'true') {
       backendUrl += `/existence?newsLink=${encodeURIComponent(newsLink)}`;
     } else {

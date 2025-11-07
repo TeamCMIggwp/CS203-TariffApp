@@ -94,9 +94,10 @@ export default function NewsPage() {
 
   // Backend API base URL for non-auth endpoints
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
-  // Proxied path that goes through Next.js so middleware can inject Authorization from access_token cookie
-  const NEWS_API = '/api/v1/news'
-  const USER_HIDDEN_API = '/api/user/news' // Proxied through Next.js to access HttpOnly cookie
+  // Admin News API - for checking if news exists and admin operations
+  const ADMIN_NEWS_API = '/api/database/admin/news' // Proxied through Next.js to /api/v1/admin/news
+  // User Hidden News API - for regular users to hide sources personally
+  const USER_HIDDEN_API = '/api/database/user/hidden-news' // Proxied through Next.js to /api/v1/user/hidden-news
   const GEMINI_API = `${API_BASE}/api/v1/gemini/analyses`
 
   /**
@@ -366,10 +367,10 @@ Return ONLY valid JSON (no markdown, no explanation):
             const encodedUrl = encodeURIComponent(article.url);
             console.log(`[DB Check] Checking if article exists: ${article.url}`);
             console.log(`[DB Check] Encoded URL: ${encodedUrl}`);
-            console.log(`[DB Check] API endpoint: ${NEWS_API}?newsLink=${encodedUrl}`);
+            console.log(`[DB Check] API endpoint: ${ADMIN_NEWS_API}?newsLink=${encodedUrl}`);
 
             const checkResponse = await fetch(
-              `${NEWS_API}?newsLink=${encodedUrl}`,
+              `${ADMIN_NEWS_API}?newsLink=${encodedUrl}`,
               {
                 method: 'GET',
                 cache: 'no-store'
@@ -638,7 +639,7 @@ Return ONLY valid JSON (no markdown, no explanation):
     setUpdatingRemarks(prev => ({ ...prev, [index]: true }));
 
     try {
-      const response = await fetch(`${NEWS_API}`, {
+      const response = await fetch(`${ADMIN_NEWS_API}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -689,7 +690,7 @@ Return ONLY valid JSON (no markdown, no explanation):
     setAddingToDatabase(prev => ({ ...prev, [index]: true }));
 
     try {
-      const response = await fetch(`${NEWS_API}`, {
+      const response = await fetch(`${ADMIN_NEWS_API}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -739,7 +740,7 @@ Return ONLY valid JSON (no markdown, no explanation):
     setDeletingFromDatabase(prev => ({ ...prev, [index]: true }));
 
     try {
-      const response = await fetch(`${NEWS_API}?newsLink=${encodeURIComponent(article.url)}`, {
+      const response = await fetch(`${ADMIN_NEWS_API}?newsLink=${encodeURIComponent(article.url)}`, {
         method: 'DELETE',
         cache: 'no-store'
       });
@@ -939,7 +940,7 @@ Return ONLY valid JSON (no markdown, no explanation):
               try {
                 const encodedUrl = encodeURIComponent(newsLink);
                 const checkResponse = await fetch(
-                  `${NEWS_API}?newsLink=${encodedUrl}`,
+                  `${ADMIN_NEWS_API}?newsLink=${encodedUrl}`,
                   {
                     method: 'GET',
                     cache: 'no-store'
@@ -1088,7 +1089,7 @@ Return ONLY valid JSON (no markdown, no explanation):
               if (isAdmin) {
                 const encodedUrl = encodeURIComponent(article.url);
                 const checkResponse = await fetch(
-                  `${NEWS_API}?newsLink=${encodedUrl}`,
+                  `${ADMIN_NEWS_API}?newsLink=${encodedUrl}`,
                   {
                     method: 'GET',
                     cache: 'no-store'
