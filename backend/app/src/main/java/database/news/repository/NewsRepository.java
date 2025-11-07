@@ -53,7 +53,7 @@ public class NewsRepository {
                 NewsEntity news = new NewsEntity();
                 news.setNewsLink(rs.getString("NewsLink"));
                 news.setRemarks(rs.getString("remarks"));
-                news.setHidden(rs.getBoolean("is_hidden"));
+                news.setHidden(rs.getBoolean("isHidden"));
                 return news;
             }, normalizedUrl);
 
