@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import database.news.entity.NewsEntity;
+import database.news.util.UrlNormalizer;
 
 @Repository
 public class NewsRepository {
@@ -23,10 +24,13 @@ public class NewsRepository {
      */
     public boolean exists(String newsLink) {
         try {
+            // Normalize URL for consistent lookup
+            String normalizedUrl = UrlNormalizer.normalize(newsLink);
+
             String sql = "SELECT COUNT(*) FROM `News` WHERE `NewsLink` = ?";
-            
-            Integer count = jdbcTemplate.queryForObject(sql, Integer.class, newsLink);
-            
+
+            Integer count = jdbcTemplate.queryForObject(sql, Integer.class, normalizedUrl);
+
             return count != null && count > 0;
         } catch (DataAccessException e) {
             logger.error("Error checking news existence: {}", e.getMessage(), e);
@@ -39,7 +43,9 @@ public class NewsRepository {
      */
     public NewsEntity getNews(String newsLink) {
         try {
-            logger.debug("Querying news for: newsLink={}", newsLink);
+            // Normalize URL for consistent lookup
+            String normalizedUrl = UrlNormalizer.normalize(newsLink);
+            logger.debug("Querying news for: newsLink={} (normalized: {})", newsLink, normalizedUrl);
 
             String sql = "SELECT `NewsLink`, `remarks`, `is_hidden` FROM `News` WHERE `NewsLink` = ?";
 
@@ -49,7 +55,7 @@ public class NewsRepository {
                 news.setRemarks(rs.getString("remarks"));
                 news.setHidden(rs.getBoolean("is_hidden"));
                 return news;
-            }, newsLink);
+            }, normalizedUrl);
 
         } catch (EmptyResultDataAccessException e) {
             logger.info("No news found for link: {}", newsLink);
@@ -111,10 +117,12 @@ public class NewsRepository {
      */
     public void create(String newsLink, String remarks) {
         try {
-            logger.info("Creating new news: newsLink={}, remarks={}", newsLink, remarks);
+            // Normalize URL before storing
+            String normalizedUrl = UrlNormalizer.normalize(newsLink);
+            logger.info("Creating new news: newsLink={} (normalized: {}), remarks={}", newsLink, normalizedUrl, remarks);
 
             // Truncate if exceeds limits
-            String newsLinkValue = newsLink;
+            String newsLinkValue = normalizedUrl;
             if (newsLinkValue.length() > 200) {
                 newsLinkValue = newsLinkValue.substring(0, 200);
                 logger.warn("NewsLink truncated to 200 characters");
@@ -143,11 +151,13 @@ public class NewsRepository {
      */
     public int hideSource(String newsLink) {
         try {
-            logger.info("Hiding news source: newsLink={}", newsLink);
+            // Normalize URL for consistent lookup
+            String normalizedUrl = UrlNormalizer.normalize(newsLink);
+            logger.info("Hiding news source: newsLink={} (normalized: {})", newsLink, normalizedUrl);
 
             String sql = "UPDATE `News` SET `is_hidden` = TRUE WHERE `NewsLink` = ?";
 
-            int rowsUpdated = jdbcTemplate.update(sql, newsLink);
+            int rowsUpdated = jdbcTemplate.update(sql, normalizedUrl);
 
             logger.info("Hidden {} rows", rowsUpdated);
             return rowsUpdated;
@@ -163,11 +173,13 @@ public class NewsRepository {
      */
     public int unhideSource(String newsLink) {
         try {
-            logger.info("Unhiding news source: newsLink={}", newsLink);
+            // Normalize URL for consistent lookup
+            String normalizedUrl = UrlNormalizer.normalize(newsLink);
+            logger.info("Unhiding news source: newsLink={} (normalized: {})", newsLink, normalizedUrl);
 
             String sql = "UPDATE `News` SET `is_hidden` = FALSE WHERE `NewsLink` = ?";
 
-            int rowsUpdated = jdbcTemplate.update(sql, newsLink);
+            int rowsUpdated = jdbcTemplate.update(sql, normalizedUrl);
 
             logger.info("Unhidden {} rows", rowsUpdated);
             return rowsUpdated;
@@ -183,22 +195,24 @@ public class NewsRepository {
      */
     public int updateRemarks(String newsLink, String remarks) {
         try {
-            logger.info("Updating news: newsLink={}, remarks={}", newsLink, remarks);
-            
+            // Normalize URL for consistent lookup
+            String normalizedUrl = UrlNormalizer.normalize(newsLink);
+            logger.info("Updating news: newsLink={} (normalized: {}), remarks={}", newsLink, normalizedUrl, remarks);
+
             // Truncate if exceeds limits
             String remarksValue = remarks;
             if (remarksValue != null && remarksValue.length() > 100) {
                 remarksValue = remarksValue.substring(0, 100);
                 logger.warn("Remarks truncated to 100 characters");
             }
-            
+
             String sql = "UPDATE `News` SET `remarks` = ? WHERE `NewsLink` = ?";
-            
-            int rowsUpdated = jdbcTemplate.update(sql, remarksValue, newsLink);
-            
+
+            int rowsUpdated = jdbcTemplate.update(sql, remarksValue, normalizedUrl);
+
             logger.info("Updated {} rows", rowsUpdated);
             return rowsUpdated;
-            
+
         } catch (DataAccessException e) {
             logger.error("Error updating news: {}", e.getMessage(), e);
             throw e;
@@ -210,15 +224,17 @@ public class NewsRepository {
      */
     public int delete(String newsLink) {
         try {
-            logger.info("Deleting news: newsLink={}", newsLink);
-            
+            // Normalize URL for consistent lookup
+            String normalizedUrl = UrlNormalizer.normalize(newsLink);
+            logger.info("Deleting news: newsLink={} (normalized: {})", newsLink, normalizedUrl);
+
             String sql = "DELETE FROM `News` WHERE `NewsLink` = ?";
-            
-            int rowsDeleted = jdbcTemplate.update(sql, newsLink);
-            
+
+            int rowsDeleted = jdbcTemplate.update(sql, normalizedUrl);
+
             logger.info("Deleted {} rows", rowsDeleted);
             return rowsDeleted;
-            
+
         } catch (DataAccessException e) {
             logger.error("Error deleting news: {}", e.getMessage(), e);
             throw e;
