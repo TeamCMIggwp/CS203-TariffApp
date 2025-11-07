@@ -100,35 +100,8 @@ export default function NewsPage() {
   const USER_HIDDEN_API = '/api/database/user/hidden-news' // Proxied through Next.js to /api/v1/user/hidden-news
   const GEMINI_API = `${API_BASE}/api/v1/gemini/analyses`
 
-  /**
-   * Get access token from cookie
-   */
-  const getAccessToken = (): string | null => {
-    try {
-      const cookies = document.cookie.split(';');
-      const accessTokenCookie = cookies.find(c => c.trim().startsWith('access_token='));
-      if (!accessTokenCookie) return null;
-      return accessTokenCookie.split('=')[1];
-    } catch (error) {
-      console.error('Error getting access token:', error);
-      return null;
-    }
-  };
-
-  /**
-   * Get authorization headers for API requests
-   */
-  const getAuthHeaders = (): HeadersInit => {
-    const token = getAccessToken();
-    console.log('getAuthHeaders - token:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN');
-    if (!token) {
-      console.warn('No access token found in cookies!');
-      return {};
-    }
-    return {
-      'Authorization': `Bearer ${token}`
-    };
-  };
+  // Note: Authorization headers are now automatically injected by Next.js middleware
+  // for all /api/database/* requests, so we don't need getAuthHeaders anymore
 
   /**
    * Check user role by calling server-side API (can read HttpOnly cookie)
@@ -784,7 +757,7 @@ Return ONLY valid JSON (no markdown, no explanation):
     try {
       if (isAdmin) {
         // Admin: Fetch from News table (shared hidden sources)
-        const response = await fetch(`${API_BASE}/api/v1/news/all`, {
+        const response = await fetch(`${ADMIN_NEWS_API}/all`, {
           method: 'GET',
           cache: 'no-store'
         });
@@ -846,11 +819,10 @@ Return ONLY valid JSON (no markdown, no explanation):
 
       if (isAdmin) {
         // Admin: Use News table visibility endpoint (RESTful - shared for all admins)
-        response = await fetch(`${API_BASE}/api/v1/news/visibility?newsLink=${encodeURIComponent(article.url)}`, {
+        response = await fetch(`${ADMIN_NEWS_API}/visibility?newsLink=${encodeURIComponent(article.url)}`, {
           method: 'PUT',
           headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeaders()
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({ hidden: true }),
           cache: 'no-store'
@@ -905,11 +877,10 @@ Return ONLY valid JSON (no markdown, no explanation):
 
       if (isAdmin) {
         // Admin: Use News table visibility endpoint (RESTful)
-        response = await fetch(`${API_BASE}/api/v1/news/visibility?newsLink=${encodeURIComponent(newsLink)}`, {
+        response = await fetch(`${ADMIN_NEWS_API}/visibility?newsLink=${encodeURIComponent(newsLink)}`, {
           method: 'PUT',
           headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeaders()
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({ hidden: false }),
           cache: 'no-store'
@@ -1009,11 +980,10 @@ Return ONLY valid JSON (no markdown, no explanation):
       if (isAdmin) {
         // Admin: Unhide all sources in parallel from News table (RESTful)
         const unhidePromises = hiddenSources.map(source =>
-          fetch(`${API_BASE}/api/v1/news/visibility?newsLink=${encodeURIComponent(source.newsLink)}`, {
+          fetch(`${ADMIN_NEWS_API}/visibility?newsLink=${encodeURIComponent(source.newsLink)}`, {
             method: 'PUT',
             headers: {
-              'Content-Type': 'application/json',
-              ...getAuthHeaders()
+              'Content-Type': 'application/json'
             },
             body: JSON.stringify({ hidden: false }),
             cache: 'no-store'
