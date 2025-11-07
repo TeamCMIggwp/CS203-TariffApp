@@ -76,10 +76,10 @@ public class SecurityConfig {
 				// Scraping Jobs
 				.requestMatchers(HttpMethod.GET, "/api/v1/scrape").permitAll()
 
-				// User Hidden Sources - hide requires authentication, unhide is open
-				.requestMatchers(HttpMethod.POST, "/api/v1/user/hidden-sources/hide").authenticated()
-				.requestMatchers(HttpMethod.GET, "/api/v1/user/hidden-sources").authenticated()
-				.requestMatchers(HttpMethod.DELETE, "/api/v1/user/hidden-sources/**").permitAll()
+				// User Hidden Sources - requires authentication (proxied through Next.js middleware)
+				.requestMatchers(HttpMethod.POST, "/api/v1/user/news").authenticated()
+				.requestMatchers(HttpMethod.GET, "/api/v1/user/news").authenticated()
+				.requestMatchers(HttpMethod.DELETE, "/api/v1/user/news").authenticated()
 
 				// News Tariff Rates - POST requires admin authentication, GET is open
 				.requestMatchers(HttpMethod.POST, "/api/v1/news/rates").hasRole("ADMIN")
