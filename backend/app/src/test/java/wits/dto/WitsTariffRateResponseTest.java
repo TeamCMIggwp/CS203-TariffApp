@@ -1,12 +1,10 @@
-package wits;
+package wits.dto;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.Test;
-
-import wits.dto.WitsTariffRateResponse;
 
 class WitsTariffRateResponseTest {
 
