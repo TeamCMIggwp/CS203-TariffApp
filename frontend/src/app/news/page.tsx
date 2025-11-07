@@ -503,23 +503,22 @@ Return ONLY valid JSON (no markdown, no explanation):
   /**
    * Open tariff rate modal and pre-fill form if Gemini analysis exists
    */
-  const openTariffModal = (article: EnrichedArticle) => {
+  const openTariffModal = (article: EnrichedArticle, prefillWithGemini: boolean = true) => {
     setSelectedArticleForTariff(article);
 
-    // Note: Gemini returns country/product names, but DB needs ISO codes and HS codes
-    // We'll show Gemini data as hints, but admin must enter correct codes
-    if (article.geminiAnalysis) {
+    // Pre-fill form with Gemini AI extracted data (editable)
+    if (prefillWithGemini && article.geminiAnalysis) {
       setTariffFormData({
-        countryId: '', // Admin must enter 3-char ISO code
-        partnerCountryId: '',
-        productId: '', // Admin must enter HS code
+        countryId: article.geminiAnalysis.exporterCountry || '', // Pre-filled but editable
+        partnerCountryId: article.geminiAnalysis.importerCountry || '',
+        productId: article.geminiAnalysis.product || '', // Pre-filled but editable
         tariffTypeId: '',
         year: article.geminiAnalysis.year || '',
-        rate: article.geminiAnalysis.tariffRate?.replace('%', '') || '',
+        rate: article.geminiAnalysis.tariffRate?.replace('%', '').trim() || '',
         unit: article.geminiAnalysis.tariffRate?.includes('%') ? '%' : ''
       });
     } else {
-      // Reset form for manual entry
+      // Empty form for manual entry
       setTariffFormData({
         countryId: '',
         partnerCountryId: '',
@@ -1411,23 +1410,32 @@ Return ONLY valid JSON (no markdown, no explanation):
                             </span>
                           )}
                           {isAdmin && article.isInDatabase && !article.geminiAnalysis && !article.analyzingWithGemini && (
-                            <button
-                              onClick={() => runGeminiAnalysisForArticle(index, article)}
-                              disabled={runningGeminiAnalysis[index]}
-                              className="bg-gradient-to-r from-purple-500/30 to-pink-500/30 hover:from-purple-500/40 hover:to-pink-500/40 disabled:from-gray-500/30 disabled:to-gray-500/30 text-purple-200 hover:text-purple-100 disabled:text-gray-400 font-bold px-4 py-2 rounded-lg border border-purple-400/40 hover:border-purple-300 disabled:border-gray-400/40 transition-all duration-200 disabled:cursor-not-allowed text-sm flex items-center gap-2"
-                            >
-                              {runningGeminiAnalysis[index] ? (
-                                <>
-                                  <div className="w-4 h-4 border-2 border-purple-300/30 border-t-purple-300 rounded-full animate-spin"></div>
-                                  Running...
-                                </>
-                              ) : (
-                                <>
-                                  <IconDatabase className="w-4 h-4" />
-                                  Run Gemini Analysis
-                                </>
-                              )}
-                            </button>
+                            <>
+                              <button
+                                onClick={() => runGeminiAnalysisForArticle(index, article)}
+                                disabled={runningGeminiAnalysis[index]}
+                                className="bg-gradient-to-r from-purple-500/30 to-pink-500/30 hover:from-purple-500/40 hover:to-pink-500/40 disabled:from-gray-500/30 disabled:to-gray-500/30 text-purple-200 hover:text-purple-100 disabled:text-gray-400 font-bold px-4 py-2 rounded-lg border border-purple-400/40 hover:border-purple-300 disabled:border-gray-400/40 transition-all duration-200 disabled:cursor-not-allowed text-sm flex items-center gap-2"
+                              >
+                                {runningGeminiAnalysis[index] ? (
+                                  <>
+                                    <div className="w-4 h-4 border-2 border-purple-300/30 border-t-purple-300 rounded-full animate-spin"></div>
+                                    Running...
+                                  </>
+                                ) : (
+                                  <>
+                                    <IconDatabase className="w-4 h-4" />
+                                    Run Gemini Analysis
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => openTariffModal(article, false)}
+                                className="bg-gradient-to-r from-green-500/30 to-emerald-500/30 hover:from-green-500/40 hover:to-emerald-500/40 text-green-200 hover:text-green-100 font-bold px-4 py-2 rounded-lg border border-green-400/40 hover:border-green-300 transition-all duration-200 text-sm flex items-center gap-2"
+                              >
+                                <IconDatabase className="w-4 h-4" />
+                                Save Tariff to Database
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -1727,7 +1735,7 @@ Return ONLY valid JSON (no markdown, no explanation):
                 {/* Show Gemini extracted data as reference */}
                 {selectedArticleForTariff.geminiAnalysis && (
                   <div className="bg-blue-500/20 border border-blue-400/40 rounded-lg p-4 mb-4">
-                    <p className="text-blue-200 text-sm font-semibold mb-2">📋 Gemini AI Extracted Data (for reference):</p>
+                    <p className="text-blue-200 text-sm font-semibold mb-2">✨ AI-Extracted Data (Pre-filled below - editable):</p>
                     <div className="text-blue-100 text-xs space-y-1">
                       <p>• Country: {selectedArticleForTariff.geminiAnalysis.exporterCountry}</p>
                       <p>• Partner: {selectedArticleForTariff.geminiAnalysis.importerCountry}</p>
@@ -1735,7 +1743,7 @@ Return ONLY valid JSON (no markdown, no explanation):
                       <p>• Year: {selectedArticleForTariff.geminiAnalysis.year}</p>
                       <p>• Rate: {selectedArticleForTariff.geminiAnalysis.tariffRate}</p>
                     </div>
-                    <p className="text-blue-200 text-xs mt-2 italic">⚠️ You must convert these to ISO codes and HS codes below</p>
+                    <p className="text-yellow-200 text-xs mt-2 italic font-semibold">⚠️ The form below has been pre-filled with AI data. Please verify and convert country/product names to ISO/HS codes as needed.</p>
                   </div>
                 )}
 
