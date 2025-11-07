@@ -571,8 +571,8 @@ export default function CalculatorSection() {
             <CardTitle className="calculator-title">Agricultural Tariff Calculator</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Top row: From, To, Year all in one line */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* Top row: From, To, Year, Display Currency all in one line */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="from-country">From Country (Exporter)</Label>
                 <Select value={fromCountry} onValueChange={setFromCountry}>
@@ -614,23 +614,6 @@ export default function CalculatorSection() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            {/* Currency Selection Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-              <div className="space-y-2">
-                <Label htmlFor="base-currency" className="flex items-center gap-2">
-                  <span>Base Currency (from importer country)</span>
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={selectedCurrency}
-                    disabled
-                    className="bg-gray-100 dark:bg-gray-800 font-semibold"
-                  />
-                  <span className="text-sm text-muted-foreground">Auto-detected</span>
-                </div>
-              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="display-currency" className="flex items-center gap-2">
@@ -638,16 +621,18 @@ export default function CalculatorSection() {
                   {currencyLoading && <span className="text-xs text-blue-600">(updating...)</span>}
                 </Label>
                 <Select value={displayCurrency} onValueChange={setDisplayCurrency}>
-                  <SelectTrigger className="bg-white dark:bg-gray-900">
+                  <SelectTrigger>
                     <SelectValue>{displayCurrency}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {availableCurrencies.map(curr => (
-                      <SelectItem key={curr} value={curr}>
-                        {curr}
-                        {curr === selectedCurrency && " (Base)"}
-                      </SelectItem>
-                    ))}
+                    {countryNames.map(name => {
+                      const code = getCurrencyCode(name)
+                      return (
+                        <SelectItem key={name} value={code}>
+                          {name} — {getCurrencyName(code)} ({code})
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
                 {displayCurrency !== selectedCurrency && conversionRate !== 1 && (
