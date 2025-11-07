@@ -122,38 +122,45 @@ class GlobalExceptionHandlerTest {
     // ---------- MethodArgumentNotValidException (Validation) ----------
 
     @Test
-    void handleValidationExceptions_returns400WithValidationErrorResponse() throws Exception {
-        WebRequest request = mock(WebRequest.class);
-        when(request.getDescription(false)).thenReturn("uri=/tariffs/create");
+void handleValidationExceptions_returns400WithValidationErrorResponse() throws Exception {
+    WebRequest request = mock(WebRequest.class);
+    when(request.getDescription(false)).thenReturn("uri=/tariffs/create");
 
-        // Build a BindingResult with field errors
-        Object target = new Object();
-        BeanPropertyBindingResult bindingResult =
-                new BeanPropertyBindingResult(target, "tariffRequest");
-        bindingResult.addError(new FieldError("tariffRequest", "reporter", "must not be blank"));
-        bindingResult.addError(new FieldError("tariffRequest", "year", "must be a valid year"));
+    // Build a BindingResult with field errors
+    Object target = new Object();
+    BeanPropertyBindingResult bindingResult =
+            new BeanPropertyBindingResult(target, "tariffRequest");
+    bindingResult.addError(new FieldError("tariffRequest", "reporter", "must not be blank"));
+    bindingResult.addError(new FieldError("tariffRequest", "year", "must be a valid year"));
 
-        MethodArgumentNotValidException ex =
-                new MethodArgumentNotValidException(null, bindingResult);
+    // Create a real MethodParameter so MethodArgumentNotValidException is well-formed
+    java.lang.reflect.Method method =
+            DummyController.class.getDeclaredMethod("create", Object.class);
+    org.springframework.core.MethodParameter methodParameter =
+            new org.springframework.core.MethodParameter(method, 0);
 
-        ResponseEntity<ValidationErrorResponse> response =
-                handler.handleValidationExceptions(ex, request);
+    MethodArgumentNotValidException ex =
+            new MethodArgumentNotValidException(methodParameter, bindingResult);
 
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        ValidationErrorResponse body = response.getBody();
-        assertNotNull(body);
-        assertEquals(HttpStatus.BAD_REQUEST.value(), body.getStatus());
-        assertEquals("Validation Failed", body.getError());
-        assertEquals("Validation failed for one or more fields", body.getMessage());
-        assertEquals("/tariffs/create", body.getPath());
-        assertNotNull(body.getTimestamp());
+    ResponseEntity<ValidationErrorResponse> response =
+            handler.handleValidationExceptions(ex, request);
 
-        Map<String, String> errors = body.getValidationErrors();
-        assertNotNull(errors);
-        assertEquals(2, errors.size());
-        assertEquals("must not be blank", errors.get("reporter"));
-        assertEquals("must be a valid year", errors.get("year"));
-    }
+    assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    ValidationErrorResponse body = response.getBody();
+    assertNotNull(body);
+    assertEquals(HttpStatus.BAD_REQUEST.value(), body.getStatus());
+    assertEquals("Validation Failed", body.getError());
+    assertEquals("Validation failed for one or more fields", body.getMessage());
+    assertEquals("/tariffs/create", body.getPath());
+    assertNotNull(body.getTimestamp());
+
+    Map<String, String> errors = body.getValidationErrors();
+    assertNotNull(errors);
+    assertEquals(2, errors.size());
+    assertEquals("must not be blank", errors.get("reporter"));
+    assertEquals("must be a valid year", errors.get("year"));
+}
+
 
     // ---------- Generic Exception ----------
 
@@ -226,4 +233,12 @@ class GlobalExceptionHandlerTest {
         assertEquals("error1", ver.getValidationErrors().get("field1"));
         assertEquals("error2", ver.getValidationErrors().get("field2"));
     }
+
+    // Helper dummy target used to construct a valid MethodParameter for validation tests
+static class DummyController {
+    @SuppressWarnings("unused")
+    public void create(Object request) {
+        // no-op
+    }
+}
 }
