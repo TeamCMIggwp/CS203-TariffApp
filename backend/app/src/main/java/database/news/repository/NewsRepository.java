@@ -47,7 +47,7 @@ public class NewsRepository {
             String normalizedUrl = UrlNormalizer.normalize(newsLink);
             logger.debug("Querying news for: newsLink={} (normalized: {})", newsLink, normalizedUrl);
 
-            String sql = "SELECT `NewsLink`, `remarks`, `is_hidden` FROM `News` WHERE `NewsLink` = ?";
+            String sql = "SELECT NewsLink, remarks, isHidden FROM News WHERE NewsLink = ?";
 
             return jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
                 NewsEntity news = new NewsEntity();
@@ -73,13 +73,13 @@ public class NewsRepository {
         try {
             logger.debug("Querying all news");
 
-            String sql = "SELECT `NewsLink`, `remarks`, `is_hidden` FROM `News`";
+            String sql = "SELECT NewsLink, remarks, isHidden FROM News";
 
             return jdbcTemplate.query(sql, (rs, rowNum) -> {
                 NewsEntity news = new NewsEntity();
                 news.setNewsLink(rs.getString("NewsLink"));
                 news.setRemarks(rs.getString("remarks"));
-                news.setHidden(rs.getBoolean("is_hidden"));
+                news.setHidden(rs.getBoolean("isHidden"));
                 return news;
             });
 
@@ -96,13 +96,13 @@ public class NewsRepository {
         try {
             logger.debug("Querying all visible news");
 
-            String sql = "SELECT `NewsLink`, `remarks`, `is_hidden` FROM `News` WHERE `is_hidden` = FALSE";
+            String sql = "SELECT NewsLink, remarks, isHidden FROM News WHERE isHidden = FALSE";
 
             return jdbcTemplate.query(sql, (rs, rowNum) -> {
                 NewsEntity news = new NewsEntity();
                 news.setNewsLink(rs.getString("NewsLink"));
                 news.setRemarks(rs.getString("remarks"));
-                news.setHidden(rs.getBoolean("is_hidden"));
+                news.setHidden(rs.getBoolean("isHidden"));
                 return news;
             });
 
@@ -134,7 +134,7 @@ public class NewsRepository {
                 logger.warn("Remarks truncated to 100 characters");
             }
 
-            String sql = "INSERT INTO `News` (`NewsLink`, `remarks`, `is_hidden`) VALUES (?, ?, FALSE)";
+            String sql = "INSERT INTO News (NewsLink, remarks, isHidden) VALUES (?, ?, FALSE)";
 
             int rowsInserted = jdbcTemplate.update(sql, newsLinkValue, remarksValue);
 
@@ -155,7 +155,7 @@ public class NewsRepository {
             String normalizedUrl = UrlNormalizer.normalize(newsLink);
             logger.info("Hiding news source: newsLink={} (normalized: {})", newsLink, normalizedUrl);
 
-            String sql = "UPDATE `News` SET `is_hidden` = TRUE WHERE `NewsLink` = ?";
+            String sql = "UPDATE News SET isHidden = TRUE WHERE NewsLink = ?";
 
             int rowsUpdated = jdbcTemplate.update(sql, normalizedUrl);
 
@@ -177,7 +177,7 @@ public class NewsRepository {
             String normalizedUrl = UrlNormalizer.normalize(newsLink);
             logger.info("Unhiding news source: newsLink={} (normalized: {})", newsLink, normalizedUrl);
 
-            String sql = "UPDATE `News` SET `is_hidden` = FALSE WHERE `NewsLink` = ?";
+            String sql = "UPDATE News SET isHidden = FALSE WHERE NewsLink = ?";
 
             int rowsUpdated = jdbcTemplate.update(sql, normalizedUrl);
 

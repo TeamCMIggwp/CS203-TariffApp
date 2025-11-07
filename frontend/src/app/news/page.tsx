@@ -364,6 +364,10 @@ Return ONLY valid JSON (no markdown, no explanation):
         scrapedData.articles.map(async (article) => {
           try {
             const encodedUrl = encodeURIComponent(article.url);
+            console.log(`[DB Check] Checking if article exists: ${article.url}`);
+            console.log(`[DB Check] Encoded URL: ${encodedUrl}`);
+            console.log(`[DB Check] API endpoint: ${NEWS_API}?newsLink=${encodedUrl}`);
+
             const checkResponse = await fetch(
               `${NEWS_API}?newsLink=${encodedUrl}`,
               {
@@ -372,8 +376,11 @@ Return ONLY valid JSON (no markdown, no explanation):
               }
             );
 
+            console.log(`[DB Check] Response status for ${article.url}: ${checkResponse.status}`);
+
             if (checkResponse.ok) {
               const dbEntry: NewsFromDB = await checkResponse.json();
+              console.log(`[DB Check] ✅ Found in database:`, dbEntry);
               return {
                 ...article,
                 isInDatabase: true,
@@ -383,6 +390,7 @@ Return ONLY valid JSON (no markdown, no explanation):
                 analyzingWithGemini: false
               };
             } else if (checkResponse.status === 404) {
+              console.log(`[DB Check] ❌ Not found in database (404): ${article.url}`);
               return {
                 ...article,
                 isInDatabase: false,
@@ -391,9 +399,14 @@ Return ONLY valid JSON (no markdown, no explanation):
                 geminiAnalysis: null,
                 analyzingWithGemini: false
               };
+            } else {
+              // Other error status codes
+              console.warn(`[DB Check] ⚠️ Unexpected status ${checkResponse.status} for ${article.url}`);
+              const errorText = await checkResponse.text();
+              console.warn(`[DB Check] Error response:`, errorText);
             }
           } catch (dbError) {
-            console.error('Error checking database for:', article.url, dbError);
+            console.error(`[DB Check] 💥 Exception checking database for ${article.url}:`, dbError);
           }
 
           return {
