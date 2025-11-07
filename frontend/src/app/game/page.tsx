@@ -611,7 +611,7 @@ const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
         <Card className="p-6 space-y-4">
           <div className="flex justify-between items-center">
             <div className="text-lg font-semibold">Score: {score}</div>
-            <div className="text-lg font-semibold">Lives: {"❤️".repeat(lives)}</div>
+            <div className="text-lg font-semibold">Lives: {"❤️".repeat(Math.max(0, lives || 0))}</div>
           </div>
 
           <div className="flex justify-center">
@@ -652,7 +652,14 @@ const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
   />
 )}
 
-      {gameOver && <GameOverModal score={score} won={lives > 0} onRestart={startGame} />}
+      {gameOver && (
+      <GameOverModal
+        score={score}
+        won={lives > 0}
+        onRestart={startGame}
+        onClose={() => setGameOver(false)}
+      />
+    )}
     </div>
   )
 }
