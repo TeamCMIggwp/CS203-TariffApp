@@ -562,38 +562,77 @@ Return ONLY valid JSON (no markdown, no explanation):
       return;
     }
 
+    // Validate productId is a valid integer
+    const productIdNum = parseInt(tariffFormData.productId);
+    if (isNaN(productIdNum)) {
+      alert('Product HS Code must be a valid integer (e.g., 100630 for rice)');
+      return;
+    }
+
+    // Validate year is a valid integer
+    const yearNum = parseInt(tariffFormData.year);
+    if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100) {
+      alert('Year must be a valid year between 1900 and 2100');
+      return;
+    }
+
+    // Validate rate is a valid number
+    const rateNum = parseFloat(tariffFormData.rate);
+    if (isNaN(rateNum) || rateNum < 0) {
+      alert('Tariff Rate must be a valid non-negative number');
+      return;
+    }
+
     setSavingTariffRate(true);
 
     try {
+      // Prepare request body matching CreateNewsTariffRateRequest
+      const requestBody = {
+        newsLink: selectedArticleForTariff.url,
+        countryId: tariffFormData.countryId.toUpperCase().trim(),
+        partnerCountryId: tariffFormData.partnerCountryId ? tariffFormData.partnerCountryId.toUpperCase().trim() : null,
+        productId: productIdNum,
+        tariffTypeId: tariffFormData.tariffTypeId ? parseInt(tariffFormData.tariffTypeId) : null,
+        year: yearNum,
+        rate: rateNum,
+        unit: tariffFormData.unit.trim() || '%'
+      };
+
+      console.log('Saving tariff rate:', requestBody);
+
       // Use proxied endpoint so middleware can inject Authorization header
       const response = await fetch('/api/database/news/rates', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          newsLink: selectedArticleForTariff.url,
-          countryId: tariffFormData.countryId.toUpperCase(),
-          partnerCountryId: tariffFormData.partnerCountryId ? tariffFormData.partnerCountryId.toUpperCase() : null,
-          productId: parseInt(tariffFormData.productId),
-          tariffTypeId: tariffFormData.tariffTypeId ? parseInt(tariffFormData.tariffTypeId) : null,
-          year: parseInt(tariffFormData.year),
-          rate: parseFloat(tariffFormData.rate),
-          unit: tariffFormData.unit || '%'
-        }),
+        body: JSON.stringify(requestBody),
         cache: 'no-store'
       });
 
       if (response.ok) {
+        const result = await response.json();
+        console.log('Tariff rate saved:', result);
         alert('✅ Tariff rate saved to database successfully!');
         closeTariffModal();
       } else {
-        const errorText = await response.text();
-        alert(`Failed to save tariff rate: ${errorText}`);
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await response.json();
+            errorMessage = errorData.message || JSON.stringify(errorData);
+          } else {
+            errorMessage = await response.text();
+          }
+        } catch (e) {
+          console.error('Error parsing error response:', e);
+        }
+        alert(`Failed to save tariff rate: ${errorMessage}`);
       }
     } catch (error) {
       console.error('Error saving tariff rate:', error);
-      alert('Failed to save tariff rate. Please try again.');
+      alert(`Failed to save tariff rate: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSavingTariffRate(false);
     }
