@@ -6,6 +6,7 @@ import database.news.dto.NewsResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.*;
+import org.springframework.security.test.context.support.WithMockUser;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,7 +21,7 @@ class NewsControllerIntegrationTest extends BaseIntegrationTest {
         cleanDatabase();
     }
 
-    // @Test - Temporarily disabled due to setup issues
+    @Test
     void createNews_withValidData_returnsCreatedNews() {
         // Arrange
         CreateNewsRequest request = new CreateNewsRequest();
@@ -80,7 +81,7 @@ class NewsControllerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // @Test - Temporarily disabled due to setup issues
+    @Test
     void getAllNews_withMultipleNews_returnsAllNews() {
         // Arrange
         jdbcTemplate.update(
@@ -174,7 +175,8 @@ class NewsControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(count).isEqualTo(0);
     }
 
-    // @Test - Temporarily disabled due to setup issues
+    @Test
+    @WithMockUser(username = "testuser", roles = {"USER"})
     void updateVisibility_togglesHiddenStatus() {
         // Arrange
         jdbcTemplate.update(
