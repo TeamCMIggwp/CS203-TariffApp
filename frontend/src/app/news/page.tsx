@@ -3,9 +3,15 @@
 import { IconNews, IconDatabase, IconAlertCircle, IconSearch, IconCalendar, IconListNumbers, IconTrash, IconGlobe, IconPackage, IconCalendarEvent, IconPercentage } from "@tabler/icons-react";
 import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { countries, agriculturalProducts } from "@/lib/tariff-data";
+import { agriculturalProducts } from "@/lib/tariff-data";
 
 // TypeScript interfaces matching the new API response structure
+interface Country {
+  code: string;
+  name: string;
+  region: string;
+}
+
 interface ScrapedArticle {
   url: string;
   title: string;
@@ -79,6 +85,8 @@ export default function NewsPage() {
   const [loadingHiddenSources, setLoadingHiddenSources] = useState(false);
   const [unhidingSource, setUnhidingSource] = useState<{ [key: string]: boolean }>({});
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [loadingCountries, setLoadingCountries] = useState(false);
 
   // Tariff Rate Modal State
   const [showTariffModal, setShowTariffModal] = useState(false);
@@ -128,9 +136,35 @@ export default function NewsPage() {
     }
   };
 
-  // Check user role on component mount
+  /**
+   * Fetch countries from database
+   */
+  const fetchCountries = async () => {
+    try {
+      setLoadingCountries(true);
+      const response = await fetch('/api/database/countries', {
+        method: 'GET',
+        cache: 'no-store'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCountries(data);
+        console.log('Loaded countries from database:', data.length);
+      } else {
+        console.error('Failed to fetch countries:', response.status);
+      }
+    } catch (error) {
+      console.error('Error fetching countries:', error);
+    } finally {
+      setLoadingCountries(false);
+    }
+  };
+
+  // Check user role and fetch countries on component mount
   useEffect(() => {
     checkUserRole();
+    fetchCountries();
   }, []);
 
   // Fetch hidden sources count when isAdmin is determined
