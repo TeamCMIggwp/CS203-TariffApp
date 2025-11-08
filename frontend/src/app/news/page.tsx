@@ -1870,9 +1870,11 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <Select value={tariffFormData.partnerCountryId} onValueChange={(value) => handleTariffFormChange('partnerCountryId', value)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select importing country">
-                          {tariffFormData.partnerCountryId
-                            ? countries.find((c) => c.code === tariffFormData.partnerCountryId)?.name
-                            : "Select importing country"}
+                          <span style={{ color: 'black', fontWeight: 'bold' }}>
+                            {tariffFormData.partnerCountryId
+                              ? countries.find((c) => c.code === tariffFormData.partnerCountryId)?.name
+                              : "Select importing country"}
+                          </span>
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="max-h-[300px]">
@@ -1896,9 +1898,11 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <Select value={tariffFormData.productId} onValueChange={(value) => handleTariffFormChange('productId', value)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select product type">
-                          {tariffFormData.productId
-                            ? agriculturalProducts.find((p) => p.hs_code === tariffFormData.productId)?.name
-                            : "Select product type"}
+                          <span style={{ color: 'black', fontWeight: 'bold' }}>
+                            {tariffFormData.productId
+                              ? agriculturalProducts.find((p) => p.hs_code === tariffFormData.productId)?.name
+                              : "Select product type"}
+                          </span>
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -1922,7 +1926,9 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <Select value={tariffFormData.year} onValueChange={(value) => handleTariffFormChange('year', value)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select year">
-                          {tariffFormData.year || "Select year"}
+                          <span style={{ color: 'black', fontWeight: 'bold' }}>
+                            {tariffFormData.year || "Select year"}
+                          </span>
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
