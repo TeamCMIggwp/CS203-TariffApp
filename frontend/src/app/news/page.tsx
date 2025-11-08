@@ -1743,190 +1743,163 @@ Return ONLY valid JSON (no markdown, no explanation):
           {/* Modal Content */}
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
             <div
-              className="bg-gradient-to-br from-gray-900 to-black border-2 border-cyan-400/50 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-b-2 border-cyan-400/50 p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-cyan-400/30 p-2 rounded-lg">
-                      <IconDatabase className="w-6 h-6 text-cyan-200" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-white">Save Tariff Rate to Database</h2>
-                  </div>
+              <div className="pt-8 pb-4 px-6 border-b border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-center text-2xl font-semibold text-gray-900 flex-1">Save Tariff Rate to Database</h2>
                   <button
                     onClick={closeTariffModal}
-                    className="text-white/70 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
+                    className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-lg"
                   >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
-                <p className="text-white/70 text-sm mt-2">
-                  Article: {selectedArticleForTariff.title.substring(0, 80)}...
+                <p className="text-center text-sm text-gray-500 mt-2">
+                  {selectedArticleForTariff.title.length > 100
+                    ? selectedArticleForTariff.title.substring(0, 100) + '...'
+                    : selectedArticleForTariff.title}
                 </p>
               </div>
 
               {/* Modal Body */}
-              <div className="p-6 space-y-4">
+              <div className="px-6 py-6 space-y-6">
+                {/* Instruction Text */}
+                <p className="text-center text-sm text-gray-600">
+                  Fill the fields and click Save to add this tariff rate to the database.
+                </p>
+
                 {/* Show Gemini extracted data as reference */}
                 {selectedArticleForTariff.geminiAnalysis && (
-                  <div className="bg-blue-500/20 border border-blue-400/40 rounded-lg p-4 mb-4">
-                    <p className="text-blue-200 text-sm font-semibold mb-2">✨ AI-Extracted Data (Pre-filled below - editable):</p>
-                    <div className="text-blue-100 text-xs space-y-1">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-blue-900 text-sm font-semibold mb-2">✨ AI-Extracted Data (Pre-filled below):</p>
+                    <div className="text-blue-800 text-xs space-y-1">
                       <p>• Country: {selectedArticleForTariff.geminiAnalysis.exporterCountry}</p>
                       <p>• Partner: {selectedArticleForTariff.geminiAnalysis.importerCountry}</p>
                       <p>• Product: {selectedArticleForTariff.geminiAnalysis.product}</p>
                       <p>• Year: {selectedArticleForTariff.geminiAnalysis.year}</p>
                       <p>• Rate: {selectedArticleForTariff.geminiAnalysis.tariffRate}</p>
                     </div>
-                    <p className="text-yellow-200 text-xs mt-2 italic font-semibold">⚠️ The form below has been pre-filled with AI data. Please verify and convert country/product names to ISO/HS codes as needed.</p>
+                    <p className="text-amber-700 text-xs mt-2 italic font-semibold">⚠️ Please verify and convert to ISO/HS codes as needed.</p>
                   </div>
                 )}
 
-                {/* Country ID */}
-                <div>
-                  <label className="block text-cyan-300 font-semibold mb-2 text-sm">
-                    Country ISO Code (3 chars) <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={3}
-                    value={tariffFormData.countryId}
-                    onChange={(e) => handleTariffFormChange('countryId', e.target.value.toUpperCase())}
-                    placeholder="e.g., JPN, USA, CHN"
-                    className="w-full px-4 py-3 bg-black/50 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-cyan-400/60 transition-all uppercase"
-                  />
-                </div>
+                {/* Form Fields in Grid Layout (matching admin dashboard) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* From Country (Exporter) */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      From Country (Exporter) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={3}
+                      value={tariffFormData.countryId}
+                      onChange={(e) => handleTariffFormChange('countryId', e.target.value.toUpperCase())}
+                      placeholder="E.G., JPN, USA, CHN"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase text-gray-900 placeholder-gray-400"
+                    />
+                    <p className="text-xs text-gray-500">Enter 3-character ISO code</p>
+                  </div>
 
-                {/* Partner Country ID */}
-                <div>
-                  <label className="block text-green-300 font-semibold mb-2 text-sm">
-                    Partner Country ISO Code (3 chars, optional)
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={3}
-                    value={tariffFormData.partnerCountryId}
-                    onChange={(e) => handleTariffFormChange('partnerCountryId', e.target.value.toUpperCase())}
-                    placeholder="e.g., USA, CHN (optional)"
-                    className="w-full px-4 py-3 bg-black/50 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-green-400/60 transition-all uppercase"
-                  />
-                </div>
+                  {/* To Country (Importer) */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      To Country (Importer)
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={3}
+                      value={tariffFormData.partnerCountryId}
+                      onChange={(e) => handleTariffFormChange('partnerCountryId', e.target.value.toUpperCase())}
+                      placeholder="E.G., USA, CHN (OPTIONAL)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase text-gray-900 placeholder-gray-400"
+                    />
+                    <p className="text-xs text-gray-500">Optional - Leave blank if not applicable</p>
+                  </div>
 
-                {/* Product ID */}
-                <div>
-                  <label className="block text-yellow-300 font-semibold mb-2 text-sm">
-                    Product HS Code (integer) <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={tariffFormData.productId}
-                    onChange={(e) => handleTariffFormChange('productId', e.target.value)}
-                    placeholder="e.g., 100630 for rice"
-                    className="w-full px-4 py-3 bg-black/50 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-yellow-400/60 transition-all"
-                  />
-                </div>
+                  {/* Agricultural Product */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Agricultural Product <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={tariffFormData.productId}
+                      onChange={(e) => handleTariffFormChange('productId', e.target.value)}
+                      placeholder="e.g., 100630 for rice"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-400"
+                    />
+                    <p className="text-xs text-gray-500">Enter HS code (e.g., 100630 for semi-milled rice)</p>
+                  </div>
 
-                {/* Tariff Type ID */}
-                <div>
-                  <label className="block text-purple-300 font-semibold mb-2 text-sm">
-                    Tariff Type ID (integer, optional)
-                  </label>
-                  <input
-                    type="number"
-                    value={tariffFormData.tariffTypeId}
-                    onChange={(e) => handleTariffFormChange('tariffTypeId', e.target.value)}
-                    placeholder="e.g., 1 for MFN (optional)"
-                    className="w-full px-4 py-3 bg-black/50 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-purple-400/60 transition-all"
-                  />
-                </div>
+                  {/* Year */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Year <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={tariffFormData.year}
+                      onChange={(e) => handleTariffFormChange('year', e.target.value)}
+                      placeholder="e.g., 2024"
+                      min="1900"
+                      max="2100"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-400"
+                    />
+                  </div>
 
-                {/* Year */}
-                <div>
-                  <label className="block text-pink-300 font-semibold mb-2 text-sm">
-                    Year <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={tariffFormData.year}
-                    onChange={(e) => handleTariffFormChange('year', e.target.value)}
-                    placeholder="e.g., 2024"
-                    min="1900"
-                    max="2100"
-                    className="w-full px-4 py-3 bg-black/50 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-pink-400/60 transition-all"
-                  />
-                </div>
-
-                {/* Rate and Unit */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-orange-300 font-semibold mb-2 text-sm">
-                      Tariff Rate <span className="text-red-400">*</span>
+                  {/* Tariff Rate */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Tariff Rate (%) <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="number"
                       step="0.01"
                       value={tariffFormData.rate}
                       onChange={(e) => handleTariffFormChange('rate', e.target.value)}
-                      placeholder="e.g., 50"
-                      className="w-full px-4 py-3 bg-black/50 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-orange-400/60 transition-all"
+                      placeholder="e.g., 11.12345"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-400"
                     />
                   </div>
-                  <div>
-                    <label className="block text-orange-300 font-semibold mb-2 text-sm">
-                      Unit
+
+                  {/* Tariff Type ID (Optional) */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Tariff Type ID
                     </label>
                     <input
-                      type="text"
-                      value={tariffFormData.unit}
-                      onChange={(e) => handleTariffFormChange('unit', e.target.value)}
-                      placeholder="e.g., %"
-                      className="w-full px-4 py-3 bg-black/50 border-2 border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-orange-400/60 transition-all"
+                      type="number"
+                      value={tariffFormData.tariffTypeId}
+                      onChange={(e) => handleTariffFormChange('tariffTypeId', e.target.value)}
+                      placeholder="e.g., 1 for MFN (optional)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-400"
                     />
+                    <p className="text-xs text-gray-500">Optional - Database reference ID</p>
                   </div>
-                </div>
-
-                {/* Info Message */}
-                <div className="bg-orange-500/20 border border-orange-400/40 rounded-lg p-4">
-                  <p className="text-orange-200 text-sm font-semibold mb-1">
-                    ⚠️ Important: Database Requirements
-                  </p>
-                  <ul className="text-orange-100 text-xs space-y-1 ml-4 list-disc">
-                    <li>Country codes must be 3-character ISO codes (e.g., JPN for Japan, USA for United States)</li>
-                    <li>Product codes must be HS (Harmonized System) codes (e.g., 100630 for semi-milled rice)</li>
-                    <li>Tariff type IDs are database reference IDs (optional)</li>
-                  </ul>
                 </div>
               </div>
 
               {/* Modal Footer */}
-              <div className="bg-gradient-to-r from-gray-800/50 to-black/50 border-t-2 border-white/20 p-6 flex gap-4 justify-end">
+              <div className="border-t border-gray-200 px-6 py-6 flex gap-4 justify-center">
                 <button
                   onClick={closeTariffModal}
                   disabled={savingTariffRate}
-                  className="bg-gray-500/20 hover:bg-gray-500/30 disabled:bg-gray-500/10 text-gray-300 hover:text-white disabled:text-gray-500 font-bold px-6 py-3 rounded-lg border border-gray-400/40 hover:border-gray-300 disabled:border-gray-400/20 transition-all disabled:cursor-not-allowed"
+                  className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={saveTariffRateToDatabase}
                   disabled={savingTariffRate}
-                  className="bg-gradient-to-r from-green-500/30 to-emerald-500/30 hover:from-green-500/40 hover:to-emerald-500/40 disabled:from-gray-500/20 disabled:to-gray-500/20 text-green-200 hover:text-green-100 disabled:text-gray-400 font-bold px-6 py-3 rounded-lg border border-green-400/40 hover:border-green-300 disabled:border-gray-400/40 transition-all disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-6 py-2 border border-transparent rounded-md shadow-sm text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
-                  {savingTariffRate ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-green-300/30 border-t-green-300 rounded-full animate-spin"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <IconDatabase className="w-5 h-5" />
-                      Save to Database
-                    </>
-                  )}
+                  {savingTariffRate ? 'Saving...' : 'Save to Database'}
                 </button>
               </div>
             </div>
