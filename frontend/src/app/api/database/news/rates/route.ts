@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
     const accessToken = cookieStore.get('access_token')?.value;
 
     if (!accessToken) {
+      console.error('No access token found in cookies');
       return NextResponse.json(
         { error: 'Unauthorized - No access token found' },
         { status: 401 }
@@ -21,6 +22,8 @@ export async function POST(request: NextRequest) {
 
     // Get request body
     const body = await request.json();
+    console.log('Forwarding request to backend:', `${BACKEND_URL}/api/v1/admin/news/rates`);
+    console.log('Request body:', body);
 
     // Forward to backend
     const backendResponse = await fetch(`${BACKEND_URL}/api/v1/admin/news/rates`, {
