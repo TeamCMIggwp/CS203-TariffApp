@@ -1842,12 +1842,11 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <Select value={tariffFormData.countryId} onValueChange={(value) => handleTariffFormChange('countryId', value)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select exporting country">
-                          {(() => {
-                            console.log('From Country - countryId:', tariffFormData.countryId);
-                            const country = countries.find((c) => c.code === tariffFormData.countryId);
-                            console.log('From Country - found country:', country);
-                            return tariffFormData.countryId ? country?.name : "Select exporting country";
-                          })()}
+                          <span style={{ color: 'black', fontWeight: 'bold' }}>
+                            {tariffFormData.countryId
+                              ? countries.find((c) => c.code === tariffFormData.countryId)?.name
+                              : "Select exporting country"}
+                          </span>
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="max-h-[300px]">
