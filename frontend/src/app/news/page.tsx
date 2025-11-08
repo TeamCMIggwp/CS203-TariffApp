@@ -3,14 +3,9 @@
 import { IconNews, IconDatabase, IconAlertCircle, IconSearch, IconCalendar, IconListNumbers, IconTrash, IconGlobe, IconPackage, IconCalendarEvent, IconPercentage } from "@tabler/icons-react";
 import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { agriculturalProducts } from "@/lib/tariff-data";
+import { countries, agriculturalProducts } from "@/lib/tariff-data";
 
 // TypeScript interfaces matching the new API response structure
-interface Country {
-  code: string;
-  name: string;
-  region: string;
-}
 
 interface ScrapedArticle {
   url: string;
@@ -85,8 +80,6 @@ export default function NewsPage() {
   const [loadingHiddenSources, setLoadingHiddenSources] = useState(false);
   const [unhidingSource, setUnhidingSource] = useState<{ [key: string]: boolean }>({});
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const [countries, setCountries] = useState<Country[]>([]);
-  const [loadingCountries, setLoadingCountries] = useState(false);
 
   // Tariff Rate Modal State
   const [showTariffModal, setShowTariffModal] = useState(false);
@@ -136,35 +129,9 @@ export default function NewsPage() {
     }
   };
 
-  /**
-   * Fetch countries from database
-   */
-  const fetchCountries = async () => {
-    try {
-      setLoadingCountries(true);
-      const response = await fetch('/api/database/countries', {
-        method: 'GET',
-        cache: 'no-store'
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setCountries(data);
-        console.log('Loaded countries from database:', data.length);
-      } else {
-        console.error('Failed to fetch countries:', response.status);
-      }
-    } catch (error) {
-      console.error('Error fetching countries:', error);
-    } finally {
-      setLoadingCountries(false);
-    }
-  };
-
-  // Check user role and fetch countries on component mount
+  // Check user role on component mount
   useEffect(() => {
     checkUserRole();
-    fetchCountries();
   }, []);
 
   // Fetch hidden sources count when isAdmin is determined
@@ -545,24 +512,53 @@ Return ONLY valid JSON (no markdown, no explanation):
 
     // Pre-fill form with Gemini AI extracted data (try to match dropdown options)
     if (prefillWithGemini && article.geminiAnalysis) {
-      // Try to match country name to country code
+      // Try to match country name to country code - handles various formats
       const matchCountry = (countryName: string | null) => {
         if (!countryName) return '';
-        const country = countries.find(c =>
-          c.name.toLowerCase() === countryName.toLowerCase() ||
+        const normalized = countryName.trim().toLowerCase();
+
+        // Try exact match first
+        let country = countries.find(c =>
+          c.name.toLowerCase() === normalized ||
           c.code === countryName.toUpperCase()
         );
-        return country?.code || '';
+
+        // Try partial match if exact match fails
+        if (!country) {
+          country = countries.find(c =>
+            c.name.toLowerCase().includes(normalized) ||
+            normalized.includes(c.name.toLowerCase())
+          );
+        }
+
+        const result = country?.code || '';
+        if (result && country) {
+          console.log(`Matched "${countryName}" to "${country.name}" (code: ${result})`);
+        } else {
+          console.warn(`Could not match country: "${countryName}"`);
+        }
+        return result;
       };
 
       // Try to match product name to HS code
       const matchProduct = (productName: string | null) => {
         if (!productName) return '';
+        const normalized = productName.trim().toLowerCase();
+
+        // Try to find product that contains the search term or vice versa
         const product = agriculturalProducts.find(p =>
-          p.name.toLowerCase().includes(productName.toLowerCase()) ||
+          p.name.toLowerCase().includes(normalized) ||
+          normalized.includes(p.name.toLowerCase()) ||
           p.hs_code === productName
         );
-        return product?.hs_code || '';
+
+        const result = product?.hs_code || '';
+        if (result && product) {
+          console.log(`Matched "${productName}" to "${product.name}" (HS code: ${result})`);
+        } else {
+          console.warn(`Could not match product: "${productName}"`);
+        }
+        return result;
       };
 
       setTariffFormData({
