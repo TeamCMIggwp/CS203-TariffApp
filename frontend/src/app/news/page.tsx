@@ -1839,14 +1839,21 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <label className="text-sm font-medium text-gray-700">
                       From Country (Exporter) <span className="text-red-500">*</span>
                     </label>
-                    <Select key={`country-${tariffFormData.countryId}`} value={tariffFormData.countryId} onValueChange={(value) => handleTariffFormChange('countryId', value)}>
+                    <Select value={tariffFormData.countryId} onValueChange={(value) => handleTariffFormChange('countryId', value)}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select exporting country" />
+                        <SelectValue placeholder="Select exporting country">
+                          {tariffFormData.countryId
+                            ? countries.find((c) => c.code === tariffFormData.countryId)?.name
+                            : "Select exporting country"}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="max-h-[300px]">
                         {countries.map((country) => (
                           <SelectItem key={country.code} value={country.code}>
-                            {country.name}
+                            <div className="flex flex-col">
+                              <span className="font-medium">{country.name}</span>
+                              <span className="text-xs text-gray-600 mt-0.5">code: {country.code}</span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1858,14 +1865,21 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <label className="text-sm font-medium text-gray-700">
                       To Country (Importer)
                     </label>
-                    <Select key={`partner-${tariffFormData.partnerCountryId}`} value={tariffFormData.partnerCountryId} onValueChange={(value) => handleTariffFormChange('partnerCountryId', value)}>
+                    <Select value={tariffFormData.partnerCountryId} onValueChange={(value) => handleTariffFormChange('partnerCountryId', value)}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select importing country" />
+                        <SelectValue placeholder="Select importing country">
+                          {tariffFormData.partnerCountryId
+                            ? countries.find((c) => c.code === tariffFormData.partnerCountryId)?.name
+                            : "Select importing country"}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="max-h-[300px]">
                         {countries.map((country) => (
                           <SelectItem key={country.code} value={country.code}>
-                            {country.name}
+                            <div className="flex flex-col">
+                              <span className="font-medium">{country.name}</span>
+                              <span className="text-xs text-gray-600 mt-0.5">code: {country.code}</span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1877,14 +1891,21 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <label className="text-sm font-medium text-gray-700">
                       Agricultural Product <span className="text-red-500">*</span>
                     </label>
-                    <Select key={`product-${tariffFormData.productId}`} value={tariffFormData.productId} onValueChange={(value) => handleTariffFormChange('productId', value)}>
+                    <Select value={tariffFormData.productId} onValueChange={(value) => handleTariffFormChange('productId', value)}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select product type" />
+                        <SelectValue placeholder="Select product type">
+                          {tariffFormData.productId
+                            ? agriculturalProducts.find((p) => p.hs_code === tariffFormData.productId)?.name
+                            : "Select product type"}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {agriculturalProducts.map((product) => (
                           <SelectItem key={product.hs_code} value={product.hs_code}>
-                            {product.name}
+                            <div className="flex flex-col">
+                              <span className="font-medium">{product.name}</span>
+                              <span className="text-xs text-gray-600 mt-0.5">code: {product.hs_code}</span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1896,9 +1917,11 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <label className="text-sm font-medium text-gray-700">
                       Year <span className="text-red-500">*</span>
                     </label>
-                    <Select key={`year-${tariffFormData.year}`} value={tariffFormData.year} onValueChange={(value) => handleTariffFormChange('year', value)}>
+                    <Select value={tariffFormData.year} onValueChange={(value) => handleTariffFormChange('year', value)}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select year" />
+                        <SelectValue placeholder="Select year">
+                          {tariffFormData.year || "Select year"}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {[2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015, 2010, 2005, 2000, 1998, 1995, 1990].map((yr) => (
