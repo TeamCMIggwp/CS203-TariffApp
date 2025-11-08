@@ -39,9 +39,6 @@ const globeConfig = {
   // specularImageUrl: "/earth_specular.jpg", // add to public/ to enable
   cloudsImageUrl: "/8k_earth_clouds.ktx2",
   cloudsSpeed: 0.0006, // even slower cloud rotation
-  showAtmosphere: true,
-  atmosphereColor: "#FFFFFF",
-  atmosphereAltitude: 0.1,
   // Keep emissive low so the day texture retains contrast
   emissive: "#102b4d",
   emissiveIntensity: 0.32,
@@ -69,7 +66,8 @@ const globeConfig = {
   useSkybox: !isDev,
   starsBackgroundUrl: "/stars_milky.jpg",
   starfieldCount: isDev ? 1200 : 2000,
-  enableBloom: !isDev,
+  // Disable bloom to remove the large halo/ring in production
+  enableBloom: false,
   flipPoles: true,
   flipTextureVertically: false,
   flipTextureHorizontally: true,
