@@ -529,8 +529,8 @@ export function World(props: WorldProps) {
       ) : (
         <Starfield count={globeConfig.starfieldCount ?? 2000} />
       )}
-      {/* Atmosphere glow around Earth */}
-      {globeConfig.showAtmosphere !== false && (
+      {/* Atmosphere glow around Earth (opt-in only) */}
+      {globeConfig.showAtmosphere === true && (
         <Atmosphere color="#66a6ff" intensity={0.25} radius={102} />
       )}
       {/* Night-side city lights (requires a night lights texture) */}
