@@ -2,6 +2,8 @@
 
 import { IconNews, IconDatabase, IconAlertCircle, IconSearch, IconCalendar, IconListNumbers, IconTrash, IconGlobe, IconPackage, IconCalendarEvent, IconPercentage } from "@tabler/icons-react";
 import { useState, useEffect } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { countries, agriculturalProducts } from "@/lib/tariff-data";
 
 // TypeScript interfaces matching the new API response structure
 interface ScrapedArticle {
@@ -502,16 +504,37 @@ Return ONLY valid JSON (no markdown, no explanation):
 
   /**
    * Open tariff rate modal and pre-fill form if Gemini analysis exists
+   * Try to match Gemini data to dropdown options
    */
   const openTariffModal = (article: EnrichedArticle, prefillWithGemini: boolean = true) => {
     setSelectedArticleForTariff(article);
 
-    // Pre-fill form with Gemini AI extracted data (editable)
+    // Pre-fill form with Gemini AI extracted data (try to match dropdown options)
     if (prefillWithGemini && article.geminiAnalysis) {
+      // Try to match country name to country code
+      const matchCountry = (countryName: string | null) => {
+        if (!countryName) return '';
+        const country = countries.find(c =>
+          c.name.toLowerCase() === countryName.toLowerCase() ||
+          c.code === countryName.toUpperCase()
+        );
+        return country?.code || '';
+      };
+
+      // Try to match product name to HS code
+      const matchProduct = (productName: string | null) => {
+        if (!productName) return '';
+        const product = agriculturalProducts.find(p =>
+          p.name.toLowerCase().includes(productName.toLowerCase()) ||
+          p.hs_code === productName
+        );
+        return product?.hs_code || '';
+      };
+
       setTariffFormData({
-        countryId: article.geminiAnalysis.exporterCountry || '', // Pre-filled but editable
-        partnerCountryId: article.geminiAnalysis.importerCountry || '',
-        productId: article.geminiAnalysis.product || '', // Pre-filled but editable
+        countryId: matchCountry(article.geminiAnalysis.exporterCountry),
+        partnerCountryId: matchCountry(article.geminiAnalysis.importerCountry),
+        productId: matchProduct(article.geminiAnalysis.product),
         tariffTypeId: '',
         year: article.geminiAnalysis.year || '',
         rate: article.geminiAnalysis.tariffRate?.replace('%', '').trim() || '',
@@ -547,32 +570,21 @@ Return ONLY valid JSON (no markdown, no explanation):
 
     // Validation
     if (!tariffFormData.countryId || !tariffFormData.productId || !tariffFormData.year || !tariffFormData.rate) {
-      alert('Please fill in all required fields: Country ISO Code, Product HS Code, Year, and Rate');
-      return;
-    }
-
-    // Validate country code is 3 characters
-    if (tariffFormData.countryId.length !== 3) {
-      alert('Country ID must be a 3-character ISO code (e.g., USA, JPN, CHN)');
-      return;
-    }
-
-    if (tariffFormData.partnerCountryId && tariffFormData.partnerCountryId.length !== 3) {
-      alert('Partner Country ID must be a 3-character ISO code or left empty');
+      alert('Please fill in all required fields: From Country, Product, Year, and Rate');
       return;
     }
 
     // Validate productId is a valid integer
     const productIdNum = parseInt(tariffFormData.productId);
     if (isNaN(productIdNum)) {
-      alert('Product HS Code must be a valid integer (e.g., 100630 for rice)');
+      alert('Invalid product selection');
       return;
     }
 
     // Validate year is a valid integer
     const yearNum = parseInt(tariffFormData.year);
     if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100) {
-      alert('Year must be a valid year between 1900 and 2100');
+      alert('Invalid year selection');
       return;
     }
 
@@ -589,13 +601,13 @@ Return ONLY valid JSON (no markdown, no explanation):
       // Prepare request body matching CreateNewsTariffRateRequest
       const requestBody = {
         newsLink: selectedArticleForTariff.url,
-        countryId: tariffFormData.countryId.toUpperCase().trim(),
-        partnerCountryId: tariffFormData.partnerCountryId ? tariffFormData.partnerCountryId.toUpperCase().trim() : null,
+        countryId: tariffFormData.countryId,
+        partnerCountryId: tariffFormData.partnerCountryId || null,
         productId: productIdNum,
-        tariffTypeId: tariffFormData.tariffTypeId ? parseInt(tariffFormData.tariffTypeId) : null,
+        tariffTypeId: null, // Removed tariffTypeId field
         year: yearNum,
         rate: rateNum,
-        unit: tariffFormData.unit.trim() || '%'
+        unit: '%' // Always use %
       };
 
       console.log('Saving tariff rate:', requestBody);
@@ -1795,15 +1807,25 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <label className="text-sm font-medium text-gray-700">
                       From Country (Exporter) <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      maxLength={3}
-                      value={tariffFormData.countryId}
-                      onChange={(e) => handleTariffFormChange('countryId', e.target.value.toUpperCase())}
-                      placeholder="E.G., JPN, USA, CHN"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase text-gray-900 placeholder-gray-400"
-                    />
-                    <p className="text-xs text-gray-500">Enter 3-character ISO code</p>
+                    <Select value={tariffFormData.countryId} onValueChange={(value) => handleTariffFormChange('countryId', value)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select exporting country">
+                          {tariffFormData.countryId
+                            ? countries.find((c) => c.code === tariffFormData.countryId)?.name
+                            : "Select exporting country"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        {countries.map((country) => (
+                          <SelectItem key={country.code} value={country.code}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{country.name}</span>
+                              <span className="text-xs text-gray-600 mt-0.5">code: {country.code}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* To Country (Importer) */}
@@ -1811,15 +1833,25 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <label className="text-sm font-medium text-gray-700">
                       To Country (Importer)
                     </label>
-                    <input
-                      type="text"
-                      maxLength={3}
-                      value={tariffFormData.partnerCountryId}
-                      onChange={(e) => handleTariffFormChange('partnerCountryId', e.target.value.toUpperCase())}
-                      placeholder="E.G., USA, CHN (OPTIONAL)"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase text-gray-900 placeholder-gray-400"
-                    />
-                    <p className="text-xs text-gray-500">Optional - Leave blank if not applicable</p>
+                    <Select value={tariffFormData.partnerCountryId} onValueChange={(value) => handleTariffFormChange('partnerCountryId', value)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select importing country">
+                          {tariffFormData.partnerCountryId
+                            ? countries.find((c) => c.code === tariffFormData.partnerCountryId)?.name
+                            : "Select importing country"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        {countries.map((country) => (
+                          <SelectItem key={country.code} value={country.code}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{country.name}</span>
+                              <span className="text-xs text-gray-600 mt-0.5">code: {country.code}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Agricultural Product */}
@@ -1827,14 +1859,25 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <label className="text-sm font-medium text-gray-700">
                       Agricultural Product <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="number"
-                      value={tariffFormData.productId}
-                      onChange={(e) => handleTariffFormChange('productId', e.target.value)}
-                      placeholder="e.g., 100630 for rice"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-400"
-                    />
-                    <p className="text-xs text-gray-500">Enter HS code (e.g., 100630 for semi-milled rice)</p>
+                    <Select value={tariffFormData.productId} onValueChange={(value) => handleTariffFormChange('productId', value)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select product type">
+                          {tariffFormData.productId
+                            ? agriculturalProducts.find((p) => p.hs_code === tariffFormData.productId)?.name
+                            : "Select product type"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {agriculturalProducts.map((product) => (
+                          <SelectItem key={product.hs_code} value={product.hs_code}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{product.name}</span>
+                              <span className="text-xs text-gray-600 mt-0.5">code: {product.hs_code}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Year */}
@@ -1842,15 +1885,18 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <label className="text-sm font-medium text-gray-700">
                       Year <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="number"
-                      value={tariffFormData.year}
-                      onChange={(e) => handleTariffFormChange('year', e.target.value)}
-                      placeholder="e.g., 2024"
-                      min="1900"
-                      max="2100"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-400"
-                    />
+                    <Select value={tariffFormData.year} onValueChange={(value) => handleTariffFormChange('year', value)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015, 2010, 2005, 2000, 1998, 1995, 1990].map((yr) => (
+                          <SelectItem key={yr} value={String(yr)}>
+                            {yr}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Tariff Rate */}
@@ -1860,27 +1906,12 @@ Return ONLY valid JSON (no markdown, no explanation):
                     </label>
                     <input
                       type="number"
-                      step="0.01"
+                      step="any"
                       value={tariffFormData.rate}
                       onChange={(e) => handleTariffFormChange('rate', e.target.value)}
                       placeholder="e.g., 11.12345"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-400"
                     />
-                  </div>
-
-                  {/* Tariff Type ID (Optional) */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
-                      Tariff Type ID
-                    </label>
-                    <input
-                      type="number"
-                      value={tariffFormData.tariffTypeId}
-                      onChange={(e) => handleTariffFormChange('tariffTypeId', e.target.value)}
-                      placeholder="e.g., 1 for MFN (optional)"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-400"
-                    />
-                    <p className="text-xs text-gray-500">Optional - Database reference ID</p>
                   </div>
                 </div>
               </div>
