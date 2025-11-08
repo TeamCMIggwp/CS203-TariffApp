@@ -561,7 +561,7 @@ Return ONLY valid JSON (no markdown, no explanation):
         return result;
       };
 
-      setTariffFormData({
+      const formData = {
         countryId: matchCountry(article.geminiAnalysis.exporterCountry),
         partnerCountryId: matchCountry(article.geminiAnalysis.importerCountry),
         productId: matchProduct(article.geminiAnalysis.product),
@@ -569,7 +569,9 @@ Return ONLY valid JSON (no markdown, no explanation):
         year: article.geminiAnalysis.year || '',
         rate: article.geminiAnalysis.tariffRate?.replace('%', '').trim() || '',
         unit: article.geminiAnalysis.tariffRate?.includes('%') ? '%' : ''
-      });
+      };
+      console.log('Setting tariff form data:', formData);
+      setTariffFormData(formData);
     } else {
       // Empty form for manual entry
       setTariffFormData({
@@ -1837,7 +1839,7 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <label className="text-sm font-medium text-gray-700">
                       From Country (Exporter) <span className="text-red-500">*</span>
                     </label>
-                    <Select value={tariffFormData.countryId} onValueChange={(value) => handleTariffFormChange('countryId', value)}>
+                    <Select key={`country-${tariffFormData.countryId}`} value={tariffFormData.countryId} onValueChange={(value) => handleTariffFormChange('countryId', value)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select exporting country" />
                       </SelectTrigger>
@@ -1856,7 +1858,7 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <label className="text-sm font-medium text-gray-700">
                       To Country (Importer)
                     </label>
-                    <Select value={tariffFormData.partnerCountryId} onValueChange={(value) => handleTariffFormChange('partnerCountryId', value)}>
+                    <Select key={`partner-${tariffFormData.partnerCountryId}`} value={tariffFormData.partnerCountryId} onValueChange={(value) => handleTariffFormChange('partnerCountryId', value)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select importing country" />
                       </SelectTrigger>
@@ -1875,7 +1877,7 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <label className="text-sm font-medium text-gray-700">
                       Agricultural Product <span className="text-red-500">*</span>
                     </label>
-                    <Select value={tariffFormData.productId} onValueChange={(value) => handleTariffFormChange('productId', value)}>
+                    <Select key={`product-${tariffFormData.productId}`} value={tariffFormData.productId} onValueChange={(value) => handleTariffFormChange('productId', value)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select product type" />
                       </SelectTrigger>
@@ -1894,7 +1896,7 @@ Return ONLY valid JSON (no markdown, no explanation):
                     <label className="text-sm font-medium text-gray-700">
                       Year <span className="text-red-500">*</span>
                     </label>
-                    <Select value={tariffFormData.year} onValueChange={(value) => handleTariffFormChange('year', value)}>
+                    <Select key={`year-${tariffFormData.year}`} value={tariffFormData.year} onValueChange={(value) => handleTariffFormChange('year', value)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select year" />
                       </SelectTrigger>
