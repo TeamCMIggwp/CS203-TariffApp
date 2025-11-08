@@ -342,6 +342,43 @@ function DynamicRates() {
 
 export default function AboutPage() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const [newsArticles, setNewsArticles] = useState<Array<{
+    newsLink: string
+    remarks: string
+    timestamp: string
+    isHidden: boolean
+  }>>([])
+  const [loadingNews, setLoadingNews] = useState(true)
+
+  // Fetch news articles from API
+  useEffect(() => {
+    const fetchNews = async () => {
+      try {
+        const response = await fetch('/api/database/news/all', {
+          credentials: 'include'
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          // Filter out hidden news and sort by timestamp (newest first)
+          const visibleNews = data
+            .filter((article: any) => !article.isHidden)
+            .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+            .slice(0, 3) // Get only the 3 most recent
+
+          setNewsArticles(visibleNews)
+        } else {
+          console.error('Failed to fetch news:', response.status)
+        }
+      } catch (error) {
+        console.error('Error fetching news:', error)
+      } finally {
+        setLoadingNews(false)
+      }
+    }
+
+    fetchNews()
+  }, [])
 
   const indicators = [
     {
@@ -418,32 +455,37 @@ export default function AboutPage() {
     },
   ]
 
-  const news = [
-    {
-      title: "WTO Members Agree on New Agricultural Trade Framework",
-      description:
-        "Major breakthrough in negotiations as 164 member countries reach consensus on reducing agricultural subsidies and tariff barriers.",
-      date: "March 15, 2024",
-      category: "Policy",
-      link: "#",
-    },
-    {
-      title: "Global Food Prices Stabilize Amid Tariff Reforms",
-      description:
-        "Recent tariff reductions in key agricultural markets have contributed to more stable commodity prices worldwide.",
-      date: "March 10, 2024",
-      category: "Market Analysis",
-      link: "#",
-    },
-    {
-      title: "New Database Release: 2024 Tariff Indicators Now Available",
-      description:
-        "The latest comprehensive dataset covering agricultural tariff rates for 195 countries is now accessible through AgriTariff.",
-      date: "March 5, 2024",
-      category: "Data Release",
-      link: "#",
-    },
-  ]
+  // Helper function to extract title from news link
+  const extractTitleFromUrl = (url: string): string => {
+    try {
+      const urlObj = new URL(url)
+      const pathname = urlObj.pathname
+      // Extract last segment and clean it up
+      const segment = pathname.split('/').filter(Boolean).pop() || ''
+      return segment
+        .replace(/[-_]/g, ' ')
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ')
+        .replace(/\.(html|htm|php|aspx)$/i, '') || 'News Article'
+    } catch {
+      return 'News Article'
+    }
+  }
+
+  // Helper function to format date
+  const formatDate = (timestamp: string): string => {
+    try {
+      const date = new Date(timestamp)
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    } catch {
+      return 'Recent'
+    }
+  }
 
   return (
     <main className="relative min-h-screen bg-white/45 backdrop-blur-lg">
@@ -659,29 +701,59 @@ export default function AboutPage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            {news.map((item, index) => (
-              <Card key={index} className="flex flex-col bg-white hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Badge variant="secondary">{item.category}</Badge>
-                    <div className="flex items-center gap-1 text-sm text-gray-600">
-                      <Calendar className="w-4 h-4" />
-                      <span>{item.date}</span>
+            {loadingNews ? (
+              // Loading skeleton
+              Array.from({ length: 3 }).map((_, index) => (
+                <Card key={index} className="flex flex-col bg-white">
+                  <CardHeader>
+                    <div className="h-6 bg-gray-200 rounded animate-pulse mb-3 w-24"></div>
+                    <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+                  </CardHeader>
+                  <CardContent className="flex-1">
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4"></div>
                     </div>
-                  </div>
-                  <CardTitle className="text-xl leading-tight text-balance text-gray-900">{item.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
-                  <CardDescription className="text-base text-gray-700 leading-relaxed mb-4 flex-1">
-                    {item.description}
-                  </CardDescription>
-                  <Button variant="ghost" className="w-fit px-0 group text-blue-600 hover:text-blue-700">
-                    Read more
-                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              ))
+            ) : newsArticles.length > 0 ? (
+              newsArticles.map((article, index) => (
+                <Card key={index} className="flex flex-col bg-white hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge variant="secondary">Agricultural Trade</Badge>
+                      <div className="flex items-center gap-1 text-sm text-gray-600">
+                        <Calendar className="w-4 h-4" />
+                        <span>{formatDate(article.timestamp)}</span>
+                      </div>
+                    </div>
+                    <CardTitle className="text-xl leading-tight text-balance text-gray-900">
+                      {extractTitleFromUrl(article.newsLink)}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col">
+                    <CardDescription className="text-base text-gray-700 leading-relaxed mb-4 flex-1">
+                      {article.remarks || 'Latest agricultural trade news and tariff updates'}
+                    </CardDescription>
+                    <Button
+                      variant="ghost"
+                      className="w-fit px-0 group text-blue-600 hover:text-blue-700"
+                      onClick={() => window.open(article.newsLink, '_blank')}
+                    >
+                      Read more
+                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              // No news available
+              <div className="col-span-3 text-center py-12">
+                <p className="text-gray-500 text-lg">No news articles available at the moment</p>
+              </div>
+            )}
           </div>
         </div>
       </section>
