@@ -9,11 +9,14 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
  */
 export async function POST(request: NextRequest) {
   try {
+    console.log('[API Route] POST /api/database/news/rates called');
+    console.log('[API Route] BACKEND_URL:', BACKEND_URL);
+
     const cookieStore = await cookies();
     const accessToken = cookieStore.get('access_token')?.value;
 
     if (!accessToken) {
-      console.error('No access token found in cookies');
+      console.error('[API Route] No access token found in cookies');
       return NextResponse.json(
         { error: 'Unauthorized - No access token found' },
         { status: 401 }
@@ -22,11 +25,13 @@ export async function POST(request: NextRequest) {
 
     // Get request body
     const body = await request.json();
-    console.log('Forwarding request to backend:', `${BACKEND_URL}/api/v1/admin/news/rates`);
-    console.log('Request body:', body);
+    const targetUrl = `${BACKEND_URL}/api/v1/admin/news/rates`;
+    console.log('[API Route] Forwarding request to:', targetUrl);
+    console.log('[API Route] Request body:', body);
+    console.log('[API Route] Access token present:', !!accessToken);
 
     // Forward to backend
-    const backendResponse = await fetch(`${BACKEND_URL}/api/v1/admin/news/rates`, {
+    const backendResponse = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -48,9 +53,15 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error) {
-    console.error('Error in news tariff rates proxy:', error);
+    console.error('[API Route] Error in news tariff rates proxy:', error);
+    console.error('[API Route] Error details:', error instanceof Error ? error.message : String(error));
+    console.error('[API Route] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : String(error),
+        backendUrl: BACKEND_URL
+      },
       { status: 500 }
     );
   }
