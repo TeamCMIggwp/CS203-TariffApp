@@ -3,7 +3,8 @@
     "allow": [
       "Bash(git add:*)",
       "Bash(git commit -m \"$(cat <<''EOF''\nRemove unused country endpoint files\n\n- Delete CountryController, CountryService, CountryRepository, CountryResponse\n- These were created but not used, causing build failures\n- Using hardcoded country data in frontend instead\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nFix BACKEND_URL environment variable loading on Amplify\n\n- Add NEXT_PUBLIC_BACKEND_URL as fallback option\n- Add detailed logging to debug environment variable values\n- Matches pattern used in next.config.ts\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []
