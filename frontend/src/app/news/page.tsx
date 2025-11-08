@@ -1839,19 +1839,12 @@ Return ONLY valid JSON (no markdown, no explanation):
                     </label>
                     <Select value={tariffFormData.countryId} onValueChange={(value) => handleTariffFormChange('countryId', value)}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select exporting country">
-                          {tariffFormData.countryId
-                            ? countries.find((c) => c.code === tariffFormData.countryId)?.name
-                            : "Select exporting country"}
-                        </SelectValue>
+                        <SelectValue placeholder="Select exporting country" />
                       </SelectTrigger>
                       <SelectContent className="max-h-[300px]">
                         {countries.map((country) => (
                           <SelectItem key={country.code} value={country.code}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{country.name}</span>
-                              <span className="text-xs text-gray-600 mt-0.5">code: {country.code}</span>
-                            </div>
+                            {country.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1865,19 +1858,12 @@ Return ONLY valid JSON (no markdown, no explanation):
                     </label>
                     <Select value={tariffFormData.partnerCountryId} onValueChange={(value) => handleTariffFormChange('partnerCountryId', value)}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select importing country">
-                          {tariffFormData.partnerCountryId
-                            ? countries.find((c) => c.code === tariffFormData.partnerCountryId)?.name
-                            : "Select importing country"}
-                        </SelectValue>
+                        <SelectValue placeholder="Select importing country" />
                       </SelectTrigger>
                       <SelectContent className="max-h-[300px]">
                         {countries.map((country) => (
                           <SelectItem key={country.code} value={country.code}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{country.name}</span>
-                              <span className="text-xs text-gray-600 mt-0.5">code: {country.code}</span>
-                            </div>
+                            {country.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1891,19 +1877,12 @@ Return ONLY valid JSON (no markdown, no explanation):
                     </label>
                     <Select value={tariffFormData.productId} onValueChange={(value) => handleTariffFormChange('productId', value)}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select product type">
-                          {tariffFormData.productId
-                            ? agriculturalProducts.find((p) => p.hs_code === tariffFormData.productId)?.name
-                            : "Select product type"}
-                        </SelectValue>
+                        <SelectValue placeholder="Select product type" />
                       </SelectTrigger>
                       <SelectContent>
                         {agriculturalProducts.map((product) => (
                           <SelectItem key={product.hs_code} value={product.hs_code}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{product.name}</span>
-                              <span className="text-xs text-gray-600 mt-0.5">code: {product.hs_code}</span>
-                            </div>
+                            {product.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
