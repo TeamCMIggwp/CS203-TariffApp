@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
+const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
 /**
  * Proxy for News Tariff Rates API
@@ -10,7 +10,9 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
 export async function POST(request: NextRequest) {
   try {
     console.log('[API Route] POST /api/database/news/rates called');
-    console.log('[API Route] BACKEND_URL:', BACKEND_URL);
+    console.log('[API Route] process.env.BACKEND_URL:', process.env.BACKEND_URL);
+    console.log('[API Route] process.env.NEXT_PUBLIC_BACKEND_URL:', process.env.NEXT_PUBLIC_BACKEND_URL);
+    console.log('[API Route] Final BACKEND_URL:', BACKEND_URL);
 
     const cookieStore = await cookies();
     const accessToken = cookieStore.get('access_token')?.value;
