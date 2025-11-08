@@ -15,9 +15,6 @@ declare module "@react-three/fiber" {
   }
 }
 
-extend({ ThreeGlobe: ThreeGlobe });
-
-// Reuse a single KTX2Loader across the app to avoid multiple active instances
 let __ktx2Loader: KTX2Loader | null = null;
 function getKtx2Loader(gl: THREE.WebGLRenderer): KTX2Loader {
   if (!__ktx2Loader) {
@@ -57,9 +54,6 @@ export type GlobeConfig = {
   specularImageUrl?: string;
   cloudsImageUrl?: string;
   cloudsSpeed?: number;
-  showAtmosphere?: boolean;
-  atmosphereColor?: string;
-  atmosphereAltitude?: number;
   nightImageUrl?: string;
   showNightLights?: boolean;
   emissive?: string;
@@ -122,9 +116,6 @@ export function Globe({ globeConfig, data }: WorldProps) {
 
   const defaultProps = {
     pointSize: 1,
-    atmosphereColor: "#ffffff",
-    showAtmosphere: false,
-    atmosphereAltitude: 0.1,
     polygonColor: "rgba(255,255,255,0.7)",
     globeColor: "#1d072e",
     globeImageUrl: undefined as string | undefined,
@@ -167,6 +158,12 @@ export function Globe({ globeConfig, data }: WorldProps) {
       setIsInitialized(true);
     }
   }, []);
+
+  // Ensure built-in atmosphere is disabled at init
+  useEffect(() => {
+    if (!globeRef.current || !isInitialized) return;
+    globeRef.current.showAtmosphere(false);
+  }, [isInitialized]);
 
   // Build material when globe is initialized or when relevant props change
   useEffect(() => {
@@ -379,16 +376,10 @@ export function Globe({ globeConfig, data }: WorldProps) {
         .hexPolygonsData(countries.features)
         .hexPolygonResolution(3)
         .hexPolygonMargin(0.7)
-        .showAtmosphere(defaultProps.showAtmosphere)
-        .atmosphereColor(defaultProps.atmosphereColor)
-        .atmosphereAltitude(defaultProps.atmosphereAltitude)
         .hexPolygonColor(() => defaultProps.polygonColor);
     } else {
       globeRef.current
-        .hexPolygonsData([])
-        .showAtmosphere(defaultProps.showAtmosphere)
-        .atmosphereColor(defaultProps.atmosphereColor)
-        .atmosphereAltitude(defaultProps.atmosphereAltitude);
+        .hexPolygonsData([]);
     }
 
     globeRef.current
@@ -428,9 +419,6 @@ export function Globe({ globeConfig, data }: WorldProps) {
     isInitialized,
     data,
     defaultProps.pointSize,
-    defaultProps.showAtmosphere,
-    defaultProps.atmosphereColor,
-    defaultProps.atmosphereAltitude,
     defaultProps.polygonColor,
     defaultProps.arcLength,
     defaultProps.arcTime,
@@ -529,10 +517,7 @@ export function World(props: WorldProps) {
       ) : (
         <Starfield count={globeConfig.starfieldCount ?? 2000} />
       )}
-      {/* Atmosphere glow around Earth (opt-in only) */}
-      {globeConfig.showAtmosphere === true && (
-        <Atmosphere color="#66a6ff" intensity={0.25} radius={102} />
-      )}
+      {/* Atmosphere removed */}
       {/* Night-side city lights (requires a night lights texture) */}
       {globeConfig.showNightLights !== false && globeConfig.nightImageUrl && (
         <NightLights
