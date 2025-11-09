@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server';
 const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
 /**
- * Fetches live agricultural and trade news using the same scrape endpoint as the News page
- * GET /api/external/news
+ * Fetches live agricultural and trade news using the backend scrape endpoint
+ * GET /api/external/news -> GET /api/v1/scrape (backend)
+ * Uses same query parameters as News page: query=tariff, maxResults=5, minYear=2024
  */
 export async function GET() {
   try {
