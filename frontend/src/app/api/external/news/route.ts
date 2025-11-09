@@ -10,8 +10,8 @@ export async function GET() {
   try {
     // Use the same query and parameters as the News page
     const searchQuery = 'tariff';
-    const maxResults = 3;
-    const minYear = new Date().getFullYear() - 1; // Last year
+    const maxResults = 10; // Request more to increase chances of getting at least 3
+    const minYear = new Date().getFullYear() - 2; // Go back 2 years for more results
 
     const queryParams = new URLSearchParams({
       query: searchQuery,
