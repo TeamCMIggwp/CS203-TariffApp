@@ -1,86 +1,77 @@
 import { NextResponse } from 'next/server';
 
+const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+
 /**
- * Fetches live agricultural and trade news from NewsData.io API
+ * Fetches live agricultural and trade news using the same scrape endpoint as the News page
  * GET /api/external/news
  */
 export async function GET() {
   try {
-    // Using NewsData.io free tier API
-    // Search for agricultural trade, tariff, and WTO related news
-    const apiKey = process.env.NEWSDATA_API_KEY || 'pub_61247c05cf2cba8a3d8c6cf9bb1095823a6d4';
-    const query = 'agriculture trade OR tariff OR WTO OR agricultural exports OR trade policy';
-    const url = `https://newsdata.io/api/1/news?apikey=${apiKey}&q=${encodeURIComponent(query)}&language=en&category=business,politics&size=3`;
+    // Use the same query and parameters as the News page
+    const searchQuery = 'tariff';
+    const maxResults = 3;
+    const minYear = new Date().getFullYear() - 1; // Last year
 
-    const response = await fetch(url, {
+    const queryParams = new URLSearchParams({
+      query: searchQuery,
+      maxResults: maxResults.toString(),
+      minYear: minYear.toString()
+    });
+
+    const response = await fetch(`${BACKEND_URL}/api/v1/scrape?${queryParams.toString()}`, {
+      method: 'GET',
       headers: {
         'Accept': 'application/json',
       },
-      // Cache for 1 hour to avoid hitting API rate limits
+      // Cache for 1 hour to improve performance
       next: { revalidate: 3600 }
     });
 
     if (!response.ok) {
-      console.error('NewsData API error:', response.status);
-      // Return fallback news if API fails
-      return NextResponse.json({
-        articles: getFallbackNews()
-      });
+      console.error('Scrape API error:', response.status);
+      const errorText = await response.text();
+      console.error('Error details:', errorText);
+
+      // Return empty array if API fails - no fallback
+      return NextResponse.json(
+        {
+          articles: [],
+          error: `Failed to fetch news: ${response.status} ${response.statusText}`
+        },
+        { status: response.status }
+      );
     }
 
     const data = await response.json();
 
-    // Transform NewsData.io response to our format
-    const articles = (data.results || []).slice(0, 3).map((article: NewsDataArticle) => ({
+    // Transform scrape API response to our format
+    const articles = (data.articles || []).slice(0, 3).map((article: ScrapedArticle) => ({
       title: article.title,
-      description: article.description || article.content || 'Read more about this agricultural trade development',
-      url: article.link,
-      publishedAt: article.pubDate,
-      source: article.source_id || 'News'
+      description: article.relevantText?.[0] || 'Click to read more about this agricultural trade development',
+      url: article.url,
+      publishedAt: new Date().toISOString(), // Scrape API doesn't return dates, use current time
+      source: article.sourceDomain || 'News'
     }));
 
     return NextResponse.json({ articles });
   } catch (error) {
-    console.error('Error fetching external news:', error);
-    // Return fallback news on error
-    return NextResponse.json({
-      articles: getFallbackNews()
-    });
+    console.error('Error fetching news:', error);
+
+    // Return empty array on error - no fallback
+    return NextResponse.json(
+      {
+        articles: [],
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
   }
 }
 
-interface NewsDataArticle {
+interface ScrapedArticle {
+  url: string;
   title: string;
-  description?: string;
-  content?: string;
-  link: string;
-  pubDate: string;
-  source_id?: string;
-}
-
-// Fallback news articles if external API fails
-function getFallbackNews() {
-  return [
-    {
-      title: "WTO Agricultural Trade Monitoring Update",
-      description: "The World Trade Organization releases its latest report on agricultural trade policies and market access conditions across member countries.",
-      url: "https://www.wto.org/english/tratop_e/agric_e/agric_e.htm",
-      publishedAt: new Date().toISOString(),
-      source: "WTO"
-    },
-    {
-      title: "Global Food Security and Trade Policy Developments",
-      description: "Recent developments in international agricultural trade agreements and their impact on global food security and farmer livelihoods.",
-      url: "https://www.fao.org/trade/en/",
-      publishedAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-      source: "FAO"
-    },
-    {
-      title: "Agricultural Tariff Trends and Market Analysis",
-      description: "Analysis of current agricultural tariff trends, including changes in MFN rates and preferential trade agreements affecting global markets.",
-      url: "https://www.trade.gov/agriculture",
-      publishedAt: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-      source: "Trade.gov"
-    }
-  ];
+  sourceDomain: string;
+  relevantText?: string[];
 }
