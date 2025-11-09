@@ -362,8 +362,8 @@ export default function AboutPage() {
           const data = await response.json()
           // Filter out hidden news and sort by timestamp (newest first)
           const visibleNews = data
-            .filter((article: any) => !article.isHidden)
-            .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+            .filter((article: { newsLink: string; remarks: string; timestamp: string; isHidden: boolean }) => !article.isHidden)
+            .sort((a: { timestamp: string }, b: { timestamp: string }) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
             .slice(0, 3) // Get only the 3 most recent
 
           setNewsArticles(visibleNews)
