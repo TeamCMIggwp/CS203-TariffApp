@@ -343,30 +343,23 @@ function DynamicRates() {
 export default function AboutPage() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [newsArticles, setNewsArticles] = useState<Array<{
-    newsLink: string
-    remarks: string
-    timestamp: string
-    isHidden: boolean
+    title: string
+    description: string
+    url: string
+    publishedAt: string
+    source: string
   }>>([])
   const [loadingNews, setLoadingNews] = useState(true)
 
-  // Fetch news articles from API
+  // Fetch live news articles from external API
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const response = await fetch('/api/database/news/all', {
-          credentials: 'include'
-        })
+        const response = await fetch('/api/external/news')
 
         if (response.ok) {
           const data = await response.json()
-          // Filter out hidden news and sort by timestamp (newest first)
-          const visibleNews = data
-            .filter((article: { newsLink: string; remarks: string; timestamp: string; isHidden: boolean }) => !article.isHidden)
-            .sort((a: { timestamp: string }, b: { timestamp: string }) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-            .slice(0, 3) // Get only the 3 most recent
-
-          setNewsArticles(visibleNews)
+          setNewsArticles(data.articles || [])
         } else {
           console.error('Failed to fetch news:', response.status)
         }
@@ -455,28 +448,18 @@ export default function AboutPage() {
     },
   ]
 
-  // Helper function to extract title from news link
-  const extractTitleFromUrl = (url: string): string => {
-    try {
-      const urlObj = new URL(url)
-      const pathname = urlObj.pathname
-      // Extract last segment and clean it up
-      const segment = pathname.split('/').filter(Boolean).pop() || ''
-      return segment
-        .replace(/[-_]/g, ' ')
-        .split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ')
-        .replace(/\.(html|htm|php|aspx)$/i, '') || 'News Article'
-    } catch {
-      return 'News Article'
-    }
-  }
-
   // Helper function to format date
-  const formatDate = (timestamp: string): string => {
+  const formatDate = (dateString: string): string => {
     try {
-      const date = new Date(timestamp)
+      const date = new Date(dateString)
+      const now = new Date()
+      const diffTime = Math.abs(now.getTime() - date.getTime())
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+
+      if (diffDays === 0) return 'Today'
+      if (diffDays === 1) return 'Yesterday'
+      if (diffDays < 7) return `${diffDays} days ago`
+
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
@@ -723,24 +706,24 @@ export default function AboutPage() {
                 <Card key={index} className="flex flex-col bg-white hover:shadow-lg transition-shadow">
                   <CardHeader>
                     <div className="flex items-center gap-2 mb-3">
-                      <Badge variant="secondary">Agricultural Trade</Badge>
+                      <Badge variant="secondary">{article.source}</Badge>
                       <div className="flex items-center gap-1 text-sm text-gray-600">
                         <Calendar className="w-4 h-4" />
-                        <span>{formatDate(article.timestamp)}</span>
+                        <span>{formatDate(article.publishedAt)}</span>
                       </div>
                     </div>
                     <CardTitle className="text-xl leading-tight text-balance text-gray-900">
-                      {extractTitleFromUrl(article.newsLink)}
+                      {article.title}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="flex-1 flex flex-col">
                     <CardDescription className="text-base text-gray-700 leading-relaxed mb-4 flex-1">
-                      {article.remarks || 'Latest agricultural trade news and tariff updates'}
+                      {article.description}
                     </CardDescription>
                     <Button
                       variant="ghost"
                       className="w-fit px-0 group text-blue-600 hover:text-blue-700"
-                      onClick={() => window.open(article.newsLink, '_blank')}
+                      onClick={() => window.open(article.url, '_blank')}
                     >
                       Read more
                       <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
