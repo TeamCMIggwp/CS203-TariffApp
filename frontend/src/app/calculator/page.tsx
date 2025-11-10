@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, ScatterChart, Scatter, ZAxis } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, ScatterChart, Scatter, ZAxis, PieChart, Pie, Cell } from "recharts"
 import { BarChart3, Sparkles, Database, Globe, Plus, Trash2 } from "lucide-react"
 import { getCurrencyCode, getCurrencyName, countryToCurrency } from "@/lib/fx"
 import { ChevronDown } from "lucide-react"
@@ -39,6 +39,9 @@ type ProductRow = {
   dataSource: 'database' | 'wto' | null
   status: 'idle' | 'loading' | 'success' | 'error'
   errorMessage?: string
+  fromCountry: string
+  toCountry: string
+  year: string
 }
 
 // Derive country list as string[] from currency converter
@@ -52,7 +55,7 @@ export default function CalculatorSection() {
 
   // Changed to array of products
   const [products, setProducts] = useState<ProductRow[]>([
-    { id: '1', productCode: '100630', value: '100', tariffRate: null, tariffAmount: null, dataSource: null, status: 'idle' }
+    { id: '1', productCode: '100630', value: '100', tariffRate: null, tariffAmount: null, dataSource: null, status: 'idle', fromCountry: '004', toCountry: '840', year: '2024' }
   ])
 
   const [apiResponse, setApiResponse] = useState<GeminiApiResponse | string | null>(null)
@@ -64,6 +67,7 @@ export default function CalculatorSection() {
 
   const [showAIAnalysis, setShowAIAnalysis] = useState(false)
   const [showCharts, setShowCharts] = useState(false)
+  const [selectedPieProductId, setSelectedPieProductId] = useState<string | null>(null)
 
   // === Currency Conversion ===
   const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
@@ -124,6 +128,14 @@ export default function CalculatorSection() {
     fetchConversionRate(selectedCurrency, displayCurrency)
   }, [displayCurrency, selectedCurrency])
 
+  // Initialize pie selection to first successful product after results
+  useEffect(() => {
+    const firstSuccess = products.find(p => p.status === 'success' && p.tariffRate !== null)
+    if (firstSuccess && !selectedPieProductId) {
+      setSelectedPieProductId(firstSuccess.id)
+    }
+  }, [products, selectedPieProductId])
+
   // Helper function to convert and format amounts
   const convertAmount = (amount: number) => {
     return amount * conversionRate
@@ -142,7 +154,10 @@ export default function CalculatorSection() {
       tariffRate: null,
       tariffAmount: null,
       dataSource: null,
-      status: 'idle'
+      status: 'idle',
+      fromCountry,
+      toCountry,
+      year
     }])
   }
 
@@ -152,7 +167,11 @@ export default function CalculatorSection() {
     }
   }
 
-  const updateProduct = (id: string, field: 'productCode' | 'value', value: string) => {
+  const updateProduct = (
+    id: string,
+    field: 'productCode' | 'value' | 'fromCountry' | 'toCountry' | 'year',
+    value: string
+  ) => {
     setProducts(products.map(p =>
       p.id === id ? { ...p, [field]: value } : p
     ))
@@ -263,7 +282,12 @@ export default function CalculatorSection() {
     }
   }
 
-  const queryTariffForProduct = async (productCode: string): Promise<{
+  const queryTariffForProduct = async (
+    productCode: string,
+    importerCode: string,
+    exporterCode: string,
+    yearVal: string
+  ): Promise<{
     rate: number | null
     source: 'database' | 'wto' | null
   }> => {
@@ -274,7 +298,7 @@ export default function CalculatorSection() {
     console.log(`\n📊 STEP 1: Querying database for product ${productCode}...`)
     const startDb = performance.now()
     const productInt = parseInt(productCode, 10)
-    const dbUrl = `${API_BASE}/api/v1/tariffs?reporter=${encodeURIComponent(toCountry)}&partner=${encodeURIComponent(fromCountry)}&product=${productInt}&year=${encodeURIComponent(year)}&tariffTypeId=1`
+  const dbUrl = `${API_BASE}/api/v1/tariffs?reporter=${encodeURIComponent(importerCode)}&partner=${encodeURIComponent(exporterCode)}&product=${productInt}&year=${encodeURIComponent(yearVal)}&tariffTypeId=1`
     console.log('   📍 Database API URL:', dbUrl)
 
     try {
@@ -340,7 +364,7 @@ export default function CalculatorSection() {
     if (!foundInDatabase) {
       console.log('\n🌐 STEP 2: Querying WTO API as fallback...')
       const startWto = performance.now()
-      const wtoUrl = `${API_BASE}/api/v1/indicators/HS_P_0070/observations?i=HS_P_0070&r=${toCountry}&p=${fromCountry}&pc=${productCode}&ps=${year}&fmt=json`
+  const wtoUrl = `${API_BASE}/api/v1/indicators/HS_P_0070/observations?i=HS_P_0070&r=${importerCode}&p=${exporterCode}&pc=${productCode}&ps=${yearVal}&fmt=json`
       console.log('   📍 WTO API URL:', wtoUrl)
 
       try {
@@ -468,7 +492,12 @@ export default function CalculatorSection() {
         console.log(`\n🔍 Processing product ${product.productCode}...`)
 
         try {
-          const result = await queryTariffForProduct(product.productCode)
+          const result = await queryTariffForProduct(
+            product.productCode,
+            product.toCountry,
+            product.fromCountry,
+            product.year
+          )
           const productValue = parseFloat(product.value)
 
           if (result.rate !== null && !isNaN(productValue)) {
@@ -517,7 +546,7 @@ export default function CalculatorSection() {
         console.log('\n🤖 Starting Gemini AI analysis for FIRST PRODUCT...')
         const startAi = performance.now()
         const productName = agriculturalProducts.find(p => p.hs_code === firstProduct.productCode)?.name || firstProduct.productCode
-        const apiData = `Trade analysis: Export from ${fromCountry} to ${toCountry}. Product: ${productName} (${firstProduct.productCode}), Value: $${firstProduct.value}, Year: ${year}. Tariff Rate: ${firstProduct.tariffRate}%. Data source: ${firstProduct.dataSource === 'database' ? 'Internal Database' : 'WTO API'}`
+        const apiData = `Trade analysis: Export from ${getCountryName(firstProduct.fromCountry)} (${firstProduct.fromCountry}) to ${getCountryName(firstProduct.toCountry)} (${firstProduct.toCountry}). Product: ${productName} (${firstProduct.productCode}), Value: $${firstProduct.value}, Year: ${firstProduct.year}. Tariff Rate: ${firstProduct.tariffRate}%. Data source: ${firstProduct.dataSource === 'database' ? 'Internal Database' : 'WTO API'}`
         const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors. Note: 000 represents 'World' in country codes."
 
         // Call AI without await - let it run in background
@@ -617,6 +646,21 @@ export default function CalculatorSection() {
     ]
   }, [totalValue, totalTariff, totalCost, conversionRate])
 
+  // Product-level cost split pie: Goods Value vs Tariff Amount for selected product
+  const selectedPieProduct = useMemo(() => (
+    selectedPieProductId ? products.find(p => p.id === selectedPieProductId) ?? null : null
+  ), [selectedPieProductId, products])
+
+  const pieData = useMemo(() => {
+    if (!selectedPieProduct || selectedPieProduct.status !== 'success' || selectedPieProduct.tariffRate === null) return []
+    const goodsVal = convertAmount(parseFloat(selectedPieProduct.value) || 0)
+    const tariffVal = convertAmount(selectedPieProduct.tariffAmount || 0)
+    return [
+      { name: 'Goods Value', value: goodsVal },
+      { name: 'Tariff Amount', value: tariffVal }
+    ]
+  }, [selectedPieProduct, conversionRate])
+
   return (
     <motion.section style={{ y: calculatorY }} className="calculator-section py-20">
       <div className="max-w-4xl mx-auto px-4">
@@ -626,49 +670,7 @@ export default function CalculatorSection() {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Top row: From, To, Year, Display Currency all in one line */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="from-country">From Country (Exporter)</Label>
-                <Select value={fromCountry} onValueChange={setFromCountry}>
-                  <SelectTrigger>
-                    <SelectValue>{getCountryName(fromCountry)}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {countries.map(c => (
-                      <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="to-country">To Country (Importer)</Label>
-                <Select value={toCountry} onValueChange={setToCountry}>
-                  <SelectTrigger>
-                    <SelectValue>{getCountryName(toCountry)}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {countries.map(c => (
-                      <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="year">Year</Label>
-                <Select value={year} onValueChange={setYear}>
-                  <SelectTrigger>
-                    <SelectValue>{year}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[2024, 2023, 2022, 2021, 2020, 2019].map(y => (
-                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="display-currency" className="flex items-center gap-2">
                   <span>Display Currency</span>
@@ -698,6 +700,10 @@ export default function CalculatorSection() {
                   <p className="text-xs text-red-600">{currencyError}</p>
                 )}
               </div>
+              <div className="space-y-2">
+                <Label className="text-sm">Add Products (each with its own exporter/importer/year):</Label>
+                <p className="text-xs text-muted-foreground">Use the list below to configure multiple trade routes before calculating tariffs.</p>
+              </div>
             </div>
             
             {/* Products Section */}
@@ -716,7 +722,7 @@ export default function CalculatorSection() {
               </div>
 
               {products.map((product, index) => (
-                <div key={product.id} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg relative">
+                <div key={product.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg relative">
                   {products.length > 1 && !isCalculatingTariff && (
                     <Button
                       type="button"
@@ -756,6 +762,60 @@ export default function CalculatorSection() {
                       placeholder="Enter value"
                       disabled={isCalculatingTariff}
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Exporter Country</Label>
+                    <Select
+                      value={product.fromCountry}
+                      onValueChange={(val) => updateProduct(product.id, 'fromCountry', val)}
+                      disabled={isCalculatingTariff}
+                    >
+                      <SelectTrigger>
+                        <SelectValue>{getCountryName(product.fromCountry)}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {countries.map(c => (
+                          <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Importer Country</Label>
+                    <Select
+                      value={product.toCountry}
+                      onValueChange={(val) => updateProduct(product.id, 'toCountry', val)}
+                      disabled={isCalculatingTariff}
+                    >
+                      <SelectTrigger>
+                        <SelectValue>{getCountryName(product.toCountry)}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {countries.map(c => (
+                          <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Year</Label>
+                    <Select
+                      value={product.year}
+                      onValueChange={(val) => updateProduct(product.id, 'year', val)}
+                      disabled={isCalculatingTariff}
+                    >
+                      <SelectTrigger>
+                        <SelectValue>{product.year}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[2024, 2023, 2022, 2021, 2020, 2019].map(y => (
+                          <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {product.status === 'loading' && (
@@ -1062,6 +1122,57 @@ export default function CalculatorSection() {
                       <Bar dataKey="change" stackId="wf" name="Amount" fill="#F59E0B" />
                     </BarChart>
                   </ResponsiveContainer>
+                </Card>
+
+                {/* Product Cost Split Pie */}
+                <Card className="shadow-lg border-primary p-4 bg-white dark:bg-gray-900 xl:col-span-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-lg font-semibold">Selected Product Cost Split ({displayCurrency})</h4>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="pie-product" className="text-sm">Product</Label>
+                      <select
+                        id="pie-product"
+                        className="text-sm border rounded px-2 py-1 bg-white dark:bg-gray-800"
+                        value={selectedPieProductId || ''}
+                        onChange={(e) => setSelectedPieProductId(e.target.value || null)}
+                      >
+                        <option value="" disabled>Select</option>
+                        {products.filter(p => p.status === 'success' && p.tariffRate !== null).map(p => (
+                          <option key={p.id} value={p.id}>{productName(p.productCode)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {pieData.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No successful product selected yet.</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={320}>
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={110}
+                          paddingAngle={2}
+                          label={(entry) => `${entry.name}: ${displayCurrency} ${entry.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={index === 0 ? '#22C55E' : '#EF4444'} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(v: number, n: string) => [`${displayCurrency} ${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, n]} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
+                  {selectedPieProduct && selectedPieProduct.status === 'success' && selectedPieProduct.tariffAmount !== null && (
+                    <p className="text-xs mt-2 text-muted-foreground">
+                      Total Cost = Goods Value + Tariff Amount. Goods Value: {displayCurrency} {convertAmount(parseFloat(selectedPieProduct.value)||0).toLocaleString(undefined,{maximumFractionDigits:2})}, Tariff: {displayCurrency} {convertAmount(selectedPieProduct.tariffAmount).toLocaleString(undefined,{maximumFractionDigits:2})}
+                    </p>
+                  )}
                 </Card>
               </div>
             )}
