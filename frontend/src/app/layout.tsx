@@ -40,17 +40,18 @@ const globeConfig = {
   cloudsImageUrl: "/8k_earth_clouds.ktx2",
   cloudsSpeed: 0.0006, // even slower cloud rotation
   // Keep emissive low so the day texture retains contrast
-  emissive: "#102b4d",
-  emissiveIntensity: 0.32,
-  shininess: 8,
+  // Tuned for higher contrast: stronger key light, less ambient fill
+  emissive: "#143d70", // subtle blue base glow
+  emissiveIntensity: 0.42, // lower than before to avoid flattening shadows
+  shininess: 16, // tighter highlights for crisper specular
   polygonColor: "rgba(255,255,255,0.2)",
   showHexPolygons: false,
   ambientLight: "#7fb1ff",
-  ambientIntensity: 0.75,
+  ambientIntensity: 0.6, // lower ambient = deeper shadows
   directionalLeftLight: "#f0f5ff", // soft cool rim light
   directionalTopLight: "#deebff",
   pointLight: "#ffffff",
-  directionalIntensity: 0.72, // stronger contouring with balanced highlights
+  directionalIntensity: 1.25, // stronger key light = more contrast
   // Significantly reduce arc count and visibility
   arcDensity: 0.01, // 1% of arcs sampled
   maxArcs: 4,      // hard cap
