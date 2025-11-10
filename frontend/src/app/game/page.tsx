@@ -59,6 +59,8 @@ export default function GamePage() {
   const [score, setScore] = useState(0)
   const [lives, setLives] = useState(3)
   const [showQuiz, setShowQuiz] = useState(false)
+  const backgroundMusicRef = useRef<HTMLAudioElement | null>(null)
+  const [muted, setMuted] = useState(false)
 
   type Question = {
   id: string
@@ -66,6 +68,28 @@ export default function GamePage() {
   options: string[]
   answer: string
 }
+
+useEffect(() => {
+  backgroundMusicRef.current = new Audio("/sounds/background.mp3")
+  backgroundMusicRef.current.loop = true
+  backgroundMusicRef.current.volume = 0.5
+}, [])
+
+useEffect(() => {
+  return () => {
+    backgroundMusicRef.current?.pause()
+    backgroundMusicRef.current = null
+  }
+}, [])
+
+useEffect(() => {
+  const allSounds = [
+    backgroundMusicRef.current,
+  ]
+  allSounds.forEach((sound) => {
+    if (sound) sound.muted = muted
+  })
+}, [muted])
 
 const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
 
@@ -598,6 +622,10 @@ const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
     mapRef.current = GAME_MAP.map((row) => [...row])
     scaredTimerRef.current = 0
     gameTimerRef.current = 0
+
+    backgroundMusicRef.current?.play().catch(() => {
+      console.warn("Autoplay blocked, user must interact first.")
+    })
   }
 
   return (
@@ -613,6 +641,10 @@ const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
             <div className="text-lg font-semibold">Score: {score}</div>
             <div className="text-lg font-semibold">Lives: {"❤️".repeat(Math.max(0, lives || 0))}</div>
           </div>
+
+          <Button onClick={() => setMuted((m) => !m)}>
+            {muted ? "🔇 Unmute" : "🔊 Mute"}
+          </Button>
 
           <div className="flex justify-center">
             <canvas
