@@ -754,14 +754,15 @@ export default function CalculatorSection() {
   return (
     <motion.section style={{ y: calculatorY }} className="calculator-section py-20">
       <div className="max-w-4xl mx-auto px-4">
-        <Card className="calculator-card shadow-lg">
-          <CardHeader>
-            <CardTitle className="calculator-title">Agricultural Tariff Calculator</CardTitle>
-          </CardHeader>
+        {/* Standard header to match News page */}
+        <div className="text-center mb-6 bg-black/30 backdrop-blur-md p-6 rounded-2xl border border-white/30">
+          <h1 className="text-3xl md:text-4xl font-extrabold text-white">Agricultural Tariff Calculator</h1>
+        </div>
+        <Card className="calculator-card shadow-lg rounded-2xl bg-black/40 backdrop-blur-xl border border-white/30 text-white">
           <CardContent className="space-y-6">
             {/* Top row: Display Currency selector (per-product currencies fetched) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
+              <div className="space-y-4">
                 <Label htmlFor="display-currency" className="flex items-center gap-2">
                   <span>Display Currency</span>
                   {currencyLoading && <span className="text-xs text-blue-600">(updating...)</span>}
@@ -808,7 +809,7 @@ export default function CalculatorSection() {
               </div>
 
               {products.map((product, index) => (
-                <div key={product.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg relative">
+                <div key={product.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-lg border border-white/20 bg-black/50 relative">
                   {products.length > 1 && !isCalculatingTariff && (
                     <Button
                       type="button"
@@ -930,7 +931,7 @@ export default function CalculatorSection() {
         </Card>
 
         {aiFinished && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="calculator-results mt-8 space-y-6">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-8 space-y-6 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/30 p-6">
             <h3 className="text-2xl font-bold text-white mb-4">Tariff Calculation Results</h3>
 
             {/* Individual Product Results */}
@@ -940,7 +941,7 @@ export default function CalculatorSection() {
                 const baseCurrency = getImporterCurrency(product.toCountry)
 
                 return (
-                  <div key={product.id} className="bg-white/10 backdrop-blur-sm p-4 rounded-lg">
+                  <div key={product.id} className="rounded-lg border border-white/20 p-4 bg-black/50">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold text-white">Product {index + 1}: {productName}</h4>
                       {product.dataSource && (
@@ -1020,7 +1021,7 @@ export default function CalculatorSection() {
             </div>
 
             {/* Overall Totals */}
-            <div className="bg-white/20 backdrop-blur-sm p-6 rounded-lg border-2 border-white/30">
+            <div className="rounded-lg border border-white/20 p-6 bg-black/50">
               <h4 className="text-xl font-bold text-white mb-4">Overall Totals</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-white">
                 <div>
@@ -1074,7 +1075,7 @@ export default function CalculatorSection() {
             {showAIAnalysis && (
               <>
                 {isAnalyzing ? (
-                  <Card className="shadow-lg border-primary animate-pulse">
+                  <Card className="shadow-lg border-white/30 animate-pulse bg-black/40 backdrop-blur-xl text-white">
                     <CardContent className="p-8 text-center">
                       <Sparkles className="w-12 h-12 mx-auto mb-4 animate-spin text-primary" />
                       <h3 className="text-xl font-semibold mb-2">AI Analysis in Progress...</h3>
@@ -1082,7 +1083,7 @@ export default function CalculatorSection() {
                     </CardContent>
                   </Card>
                 ) : apiResponse && typeof apiResponse === "object" && !Array.isArray(apiResponse) ? (
-                  <Card className="shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500 border-primary">
+                  <Card className="shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500 border-white/30 bg-black/40 backdrop-blur-xl text-white">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Sparkles className="w-5 h-5" />
@@ -1151,7 +1152,7 @@ export default function CalculatorSection() {
                     </CardContent>
                   </Card>
                 ) : (
-                  <Card className="shadow-lg border-yellow-500">
+                  <Card className="shadow-lg border-white/30 bg-black/40 backdrop-blur-xl text-white">
                     <CardContent className="p-6">
                       <p className="text-muted-foreground">No AI analysis available. Please try again.</p>
                     </CardContent>
@@ -1163,7 +1164,7 @@ export default function CalculatorSection() {
             {showCharts && (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-4">
                 {/* A1: Tariff rate comparative bar */}
-                <Card className="shadow-lg border-primary p-4 bg-white dark:bg-gray-900">
+                <Card className="shadow-lg p-4 bg-black/40 backdrop-blur-xl border border-white/30 text-white">
                   <h4 className="text-lg font-semibold mb-2">Tariff Rate by Product (%)</h4>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={tariffRateBarData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
@@ -1178,7 +1179,7 @@ export default function CalculatorSection() {
                 </Card>
 
                 {/* A2: Stacked bar cost decomposition */}
-                <Card className="shadow-lg border-primary p-4 bg-white dark:bg-gray-900">
+                <Card className="shadow-lg p-4 bg-black/40 backdrop-blur-xl border border-white/30 text-white">
                   <h4 className="text-lg font-semibold mb-2">Cost Decomposition per Product ({displayCurrency})</h4>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={costStackedData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
@@ -1194,7 +1195,7 @@ export default function CalculatorSection() {
                 </Card>
 
                 {/* B1: Scatter (Value vs Rate) */}
-                <Card className="shadow-lg border-primary p-4 bg-white dark:bg-gray-900">
+                <Card className="shadow-lg p-4 bg-black/40 backdrop-blur-xl border border-white/30 text-white">
                   <h4 className="text-lg font-semibold mb-2">Value vs Tariff Rate ({displayCurrency})</h4>
                   <ResponsiveContainer width="100%" height={300}>
                     <ScatterChart margin={{ top: 10, right: 20, bottom: 20, left: 0 }}>
@@ -1210,7 +1211,7 @@ export default function CalculatorSection() {
                 </Card>
 
                 {/* B2: Waterfall (approximate) */}
-                <Card className="shadow-lg border-primary p-4 bg-white dark:bg-gray-900 xl:col-span-2">
+                <Card className="shadow-lg p-4 bg-black/40 backdrop-blur-xl border border-white/30 text-white xl:col-span-2">
                   <h4 className="text-lg font-semibold mb-2">Landed Cost Waterfall & Split ({displayCurrency})</h4>
                   <ResponsiveContainer width="100%" height={340}>
                     <BarChart data={waterfallData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
@@ -1230,7 +1231,7 @@ export default function CalculatorSection() {
                 </Card>
 
                 {/* Total Cost Composition Pie (route + product, multi-color) */}
-                <Card className="shadow-lg border-primary p-4 bg-white dark:bg-gray-900 xl:col-span-2">
+                <Card className="shadow-lg p-4 bg-black/40 backdrop-blur-xl border border-white/30 text-white xl:col-span-2">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-lg font-semibold">Total Cost Composition ({displayCurrency})</h4>
                   </div>

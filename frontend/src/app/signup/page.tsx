@@ -4,13 +4,8 @@ import React, { useState } from "react";
 import Link from "next/link";
 import styles from "./signup.module.css";
 import countries from "world-countries";
-import {
-  Card,
-  CardHeader,
-  CardContent,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
+import PageShell from "@/components/PageShell";
 
 const countryOptions = countries.map(c => ({
   value: c.cca2,
@@ -64,11 +59,11 @@ export default function SignupPage() {
   }
 
   return (
-    <div className={styles.container}>
-      <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/80">
+    <PageShell title="Create Account" subtitle="Join to access tariff tools and news" maxWidthClassName="max-w-3xl">
+      <Card className="w-full max-w-md mx-auto bg-black/40 backdrop-blur-xl border border-white/30 text-white">
         <CardHeader>
-          <CardTitle className="text-center text-2xl font-bold">Tariff</CardTitle>
-          <CardDescription className="text-center">
+          <CardTitle className="text-center text-2xl font-bold text-white">Sign Up</CardTitle>
+          <CardDescription className="text-center text-white/70">
             Create your account to get started.
           </CardDescription>
         </CardHeader>
@@ -163,6 +158,6 @@ export default function SignupPage() {
           </p>
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }

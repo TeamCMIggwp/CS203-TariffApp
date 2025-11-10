@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowLeftRight } from "lucide-react"
 import { countryToCurrency, getCurrencyCode, getCurrencyName } from "@/lib/fx"
+import PageShell from "@/components/PageShell"
 
 // ----- FX response shapes and type guards -----
 
@@ -134,10 +135,10 @@ export default function CurrencyConverterCard() {
     }
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center p-6">
-            <Card className="w-full max-w-3xl rounded-2xl bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 shadow-xl">
+        <PageShell title="Currency Converter" subtitle="Convert between importer/exporter currencies with live rates" maxWidthClassName="max-w-4xl">
+            <Card className="w-full max-w-3xl rounded-2xl bg-black/40 backdrop-blur-xl border border-white/30 text-white mx-auto">
                 <CardHeader className="pb-2">
-                    <CardTitle className="text-3xl text-center">Currency Converter</CardTitle>
+                    <CardTitle className="text-3xl text-center text-white">Currency Converter</CardTitle>
                 </CardHeader>
 
                 <CardContent className="space-y-6">
@@ -214,26 +215,30 @@ export default function CurrencyConverterCard() {
                     </div>
 
                     {/* Result */}
-                    <div className="rounded-lg border p-4 bg-gray-50 dark:bg-neutral-800">
+                    <div className="rounded-lg border border-white/20 p-4 bg-black/50">
                         {error ? (
-                            <p className="text-sm text-red-600">{error}</p>
+                            <p className="text-sm text-red-300">{error}</p>
                         ) : rate !== null && result !== null ? (
                             <div className="space-y-1">
-                                <p className="text-sm text-muted-foreground">
-                                    Rate: 1 {fromCcy} = {rate.toFixed(6)} {resolvedToCcy}
-                                </p>
-                                <p className="text-xl font-medium">
+                                <span className="inline-flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs md:text-sm text-amber-200">
+                                  <span className="font-semibold">FX:</span>
+                                  <span>1 {fromCcy}</span>
+                                  <span className="opacity-70">≈</span>
+                                  <span className="font-mono">{rate.toFixed(6)}</span>
+                                  <span>{resolvedToCcy}</span>
+                                </span>
+                                <p className="text-xl font-medium text-white">
                                     {Number(amount).toLocaleString()} {fromCcy} = {result.toLocaleString()} {resolvedToCcy}
                                 </p>
                             </div>
                         ) : (
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm text-white/70">
                                 Enter an amount and click Convert to see the result.
                             </p>
                         )}
                     </div>
                 </CardContent>
             </Card>
-        </div>
+        </PageShell>
     )
 }

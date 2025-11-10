@@ -470,7 +470,8 @@ export function WebGLRendererConfig() {
     // Cap DPR to reduce GPU memory pressure and avoid WebGL context loss
     gl.setPixelRatio(1);
     gl.setSize(size.width, size.height);
-    gl.setClearColor(0x000010, 1);
+    // Make canvas fully transparent so it blends with page background without edge artifacts
+    gl.setClearColor(0x000000, 0);
 
     // Guard against WebGL context loss; allow the browser to attempt restore
     const canvas = gl.domElement as HTMLCanvasElement;
@@ -497,12 +498,14 @@ export function World(props: WorldProps) {
   const worldCfg = { enableBloom: true, forceBloomInDev: false, ...globeConfig } as GlobeConfig;
   const scene = new THREE.Scene();
   scene.fog = null;
+  const isProd = process.env.NODE_ENV === 'production';
   return (
     <Canvas
       scene={scene}
       camera={{ fov: 50, near: 180, far: 1800, position: [0, 0, 300] }}
       dpr={[1, 1]}
-      gl={{ powerPreference: 'high-performance', antialias: false, alpha: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: false }}
+      // Enable antialiasing and transparent background to avoid a dark fringe around the globe on some GPUs/browsers
+      gl={{ powerPreference: 'high-performance', antialias: true, alpha: true, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: false }}
     >
       <WebGLRendererConfig />
   <ambientLight color={globeConfig.ambientLight} intensity={globeConfig.ambientIntensity ?? 0.35} />
@@ -857,9 +860,10 @@ function Clouds({ cloudsImageUrl, speed = 0.0025, flipTextureVertically, flipTex
       <meshPhongMaterial
         map={texture}
         transparent
-        opacity={0.35}
+        // Use normal alpha blending and a slightly lower opacity to prevent a dark/bright rim at the limb
+        opacity={0.25}
         depthWrite={false}
-        blending={THREE.AdditiveBlending}
+        blending={THREE.NormalBlending}
         side={THREE.FrontSide}
       />
     </mesh>

@@ -18,6 +18,8 @@ interface WithGoogleWindow extends Window {
 }
 type AuthResponse = { accessToken?: string; role?: string; message?: string };
 
+import PageShell from "@/components/PageShell";
+
 export default function LoginPage() {
   const {
     username,
@@ -123,12 +125,12 @@ export default function LoginPage() {
   }, [router]);
 
   return (
-    <div className={styles.container}>
-      <Card className="w-full max-w-md mx-auto">
+    <PageShell title="Sign In" subtitle="Access your dashboard and tools" maxWidthClassName="max-w-3xl">
+      <Card className="w-full max-w-md mx-auto bg-black/40 backdrop-blur-xl border border-white/30 text-white">
         <CardHeader>
-          <CardTitle className="text-center text-2xl font-bold">Tariff</CardTitle>
-          <CardDescription className="text-center">
-            Welcome back. Please enter your details.
+          <CardTitle className="text-center text-2xl font-bold text-white">Welcome Back</CardTitle>
+          <CardDescription className="text-center text-white/70">
+            Enter your credentials or use Google to continue.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -194,6 +196,6 @@ export default function LoginPage() {
           </p>
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }
