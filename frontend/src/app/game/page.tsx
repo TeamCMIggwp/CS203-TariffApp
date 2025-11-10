@@ -642,11 +642,19 @@ const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 pb-25">
+    <div
+      className="min-h-screen flex flex-col items-center justify-center p-4 pb-25 relative overflow-hidden"
+      style={{
+        backgroundImage: 'url("/backgrounds/animated-background.gif")',
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
       <div className="max-w-4xl w-full space-y-6">
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-foreground">Tariff Pac-Man</h1>
-          <p className="text-muted-foreground">Collect dollar signs, answer tariff questions, and avoid the enemies!</p>
+          <h1 className="text-4xl font-bold text-white">Tariff Pac-Man</h1>
+          <p className="text-white/80">Collect dollar signs, answer tariff questions, and avoid the enemies!</p>
         </div>
 
         <Card className="p-6 space-y-4">
@@ -679,23 +687,23 @@ const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
           )}
         </Card>
 
-        <div className="text-center text-sm text-muted-foreground space-y-1">
+        <div className="text-center text-sm text-white/80 space-y-1">
           <p>🟢 Green orbs trigger tariff quiz questions</p>
           <p>Answer correctly to make enemies scared and earn bonus points!</p>
         </div>
       </div>
 
       {showQuiz && currentQuestion && (
-  <QuizModal
-    question={{
-      question: currentQuestion.questionText,
-      type: "multiple-choice",          // or whatever type is appropriate
-      correctAnswer: currentQuestion.answer,
-      options: currentQuestion.options,
-    }}
-    onAnswer={handleQuizAnswer}
-  />
-)}
+      <QuizModal
+        question={{
+          question: currentQuestion.questionText,
+          type: "multiple-choice",          // or whatever type is appropriate
+          correctAnswer: currentQuestion.answer,
+          options: currentQuestion.options,
+        }}
+        onAnswer={handleQuizAnswer}
+      />
+    )}
 
       {gameOver && (
       <GameOverModal
