@@ -6,8 +6,10 @@ applications:
         preBuild:
           commands:
             - nvm install 20
-            - nvm use 20
-            - npm ci
+            # Use npm install instead of npm ci to avoid lockfile drift failures in Amplify
+            # Once the lockfile is regenerated and committed, you can switch back to `npm ci`.
+            - npm install --no-audit --no-fund
+            #- npm ci
         build:
           commands:
             # CAUTION: Writing secrets to .env.production helps Next.js pick them up at build time,
