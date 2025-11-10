@@ -747,6 +747,50 @@ function getRandomQuestion() {
         "A seasonal tariff",
       ],
     },
+    {
+      question: "What does the TP_A_0160 Tariff Indicator stand for?",
+      type: "multiple-choice",
+      correctAnswer: "Simple Average MFN Applied Tariff",
+      options: [
+        "Simple Average MFN Applied Tariff",
+        "Trade-Weighted MFN Applied Tariff",
+        "Simple Average Bound Tariff",
+        "Percentage of Bound Tariff Lines",
+      ],
+    },
+    {
+      question: "What does the TP_A_0170 Tariff Indicator stand for?",
+      type: "multiple-choice",
+      correctAnswer: "Trade-Weighted MFN Applied Tariff",
+      options: [
+        "Simple Average MFN Applied Tariff",
+        "Trade-Weighted MFN Applied Tariff",
+        "Simple Average Bound Tariff",
+        "Percentage of Bound Tariff Lines",
+      ],
+    },
+    {
+      question: "What does the TP_B_0180 Tariff Indicator stand for?",
+      type: "multiple-choice",
+      correctAnswer: "Simple Average Bound Tariff",
+      options: [
+        "Simple Average MFN Applied Tariff",
+        "Trade-Weighted MFN Applied Tariff",
+        "Simple Average Bound Tariff",
+        "Percentage of Bound Tariff Lines",
+      ],
+    },
+    {
+      question: "What does the TP_B_0190 Tariff Indicator stand for?",
+      type: "multiple-choice",
+      correctAnswer: "Percentage of Bound Tariff Lines",
+      options: [
+        "Simple Average MFN Applied Tariff",
+        "Trade-Weighted MFN Applied Tariff",
+        "Simple Average Bound Tariff",
+        "Percentage of Bound Tariff Lines",
+      ],
+    },
   ]
 
   return questions[Math.floor(Math.random() * questions.length)]
