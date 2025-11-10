@@ -11,6 +11,7 @@ import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, ScatterChart, Scatter, ZAxis, PieChart, Pie, Cell } from "recharts"
 import { BarChart3, Sparkles, Database, Globe, Plus, Trash2 } from "lucide-react"
 import { getCurrencyCode, getCurrencyName, countryToCurrency } from "@/lib/fx"
+import { fetchFxQuote } from "@/lib/fxApi"
 import { ChevronDown } from "lucide-react"
 
 type MetricValue = string | number
@@ -67,7 +68,7 @@ export default function CalculatorSection() {
 
   const [showAIAnalysis, setShowAIAnalysis] = useState(false)
   const [showCharts, setShowCharts] = useState(false)
-  const [selectedPieProductId, setSelectedPieProductId] = useState<string | null>(null)
+  // No per-product selection needed for pie; we'll show overall composition
 
   // === Currency Conversion ===
   const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
@@ -75,47 +76,82 @@ export default function CalculatorSection() {
   const [conversionRate, setConversionRate] = useState<number>(1)
   const [currencyLoading, setCurrencyLoading] = useState(false)
   const [currencyError, setCurrencyError] = useState<string | null>(null)
+  // Map of baseCurrency -> rate to displayCurrency (1 base = rate display)
+  const [fxRates, setFxRates] = useState<Record<string, number>>({})
 
   // Backend API base URL, configurable via environment for Amplify and local dev
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
 
-  // Fetch currency conversion rate
-  const fetchConversionRate = async (fromCurrency: string, toCurrency: string) => {
-    if (fromCurrency === toCurrency) {
-      setConversionRate(1)
-      return
+  // Helper: get currency code for a given importer country code
+  // 1) Try code→currency map from tariff-data
+  // 2) Fallback to country name→currency map from fx
+  // 3) Default to USD
+  const getImporterCurrency = (importerCountryCode: string) => {
+    const direct = currencies[importerCountryCode as keyof typeof currencies] as string | undefined
+    if (direct) return direct
+    const countryName = countries.find(c => c.code === importerCountryCode)?.name
+    if (countryName) {
+      const byName = (countryToCurrency as Record<string, string | undefined>)[countryName]
+      if (byName) return byName
     }
+    return "USD"
+  }
 
-    setCurrencyLoading(true)
+  // Fetch per-base conversion rates to the current display currency
+  useEffect(() => {
+    let cancelled = false
     setCurrencyError(null)
 
-    try {
-      const url = `${API_BASE}/api/v1/exchange?base=${encodeURIComponent(fromCurrency)}`
-      const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } })
+    // Unique base currencies from current products (their importer currencies)
+    const basesSet = new Set<string>()
+    products.forEach(p => basesSet.add(getImporterCurrency(p.toCountry)))
+    // Always include display currency with a self-rate of 1
+    basesSet.add(displayCurrency)
+    const bases = Array.from(basesSet)
 
-      if (!res.ok) throw new Error(`Currency API error: ${res.status}`)
+    // IMPORTANT: Rates depend on the current displayCurrency. If displayCurrency changes, previously
+    // cached fxRates are no longer valid. Always re-fetch every base (except the displayCurrency itself)
+    // to avoid stale 1:1 mappings.
+    const toFetch = bases.filter(b => b !== displayCurrency)
+    // Always ensure display currency self-rate is set; we'll still continue to fetch others.
+    setFxRates(prev => ({ ...prev, [displayCurrency]: 1 }))
 
-      const data: ExchangeApiResponse = await res.json()
+    setCurrencyLoading(true)
 
-      // Handle different response formats
-      let rate = 1
-      if (data.conversionRates && data.conversionRates[toCurrency]) {
-        rate = data.conversionRates[toCurrency]
-      } else if (data.rates && data.rates[toCurrency]) {
-        rate = data.rates[toCurrency]
-      } else if (data.rate) {
-        rate = data.rate
+    const fetchRateForBase = async (base: string) => {
+      try {
+        const { rate } = await fetchFxQuote(base, displayCurrency)
+        return { base, rate }
+      } catch (err) {
+        console.error('Currency conversion error (per-product):', err)
+        setCurrencyError(`Failed to fetch ${base}→${displayCurrency} rate`)
+        return { base, rate: NaN }
       }
-
-      setConversionRate(rate)
-    } catch (err) {
-      console.error('Currency conversion error:', err)
-      setCurrencyError('Failed to fetch exchange rate')
-      setConversionRate(1)
-    } finally {
-      setCurrencyLoading(false)
     }
-  }
+
+    Promise.all(toFetch.map(fetchRateForBase))
+      .then(results => {
+        if (cancelled) return
+        setFxRates(prev => {
+          const next = { [displayCurrency]: 1 } // rebuild fresh map for current display currency
+          results.forEach(r => {
+            if (r && Number.isFinite(r.rate)) {
+              next[r.base] = r.rate as number
+            }
+          })
+          return next
+        })
+      })
+      .catch(err => {
+        console.error('Currency conversion batch error:', err)
+        setCurrencyError('Failed to fetch some exchange rates')
+      })
+      .finally(() => {
+        if (!cancelled) setCurrencyLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [products, displayCurrency])
   
   // Update display currency when importer country changes
   useEffect(() => {
@@ -123,26 +159,55 @@ export default function CalculatorSection() {
     setDisplayCurrency(newCurrency)
   }, [toCountry])
 
-  // Update conversion rate when display currency changes
+  // Keep legacy single-rate in sync for UI fallback (based on global importer)
   useEffect(() => {
-    fetchConversionRate(selectedCurrency, displayCurrency)
+    const singleBase = selectedCurrency
+    if (singleBase === displayCurrency) {
+      setConversionRate(1)
+      return
+    }
+    // Prefer the fetched fxRates if available
+    if (fxRates[singleBase] !== undefined) {
+      setConversionRate(fxRates[singleBase])
+      return
+    }
+    // Otherwise fetch once
+    const fetchLegacy = async () => {
+      try {
+        setCurrencyLoading(true)
+        const { rate } = await fetchFxQuote(singleBase, displayCurrency)
+        setConversionRate(rate)
+        setFxRates(prev => ({ ...prev, [singleBase]: rate, [displayCurrency]: 1 }))
+      } catch (err) {
+        console.error('Currency conversion error (legacy):', err)
+        setCurrencyError(`Failed to fetch ${singleBase}→${displayCurrency} rate`)
+      } finally {
+        setCurrencyLoading(false)
+      }
+    }
+    fetchLegacy()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayCurrency, selectedCurrency])
 
-  // Initialize pie selection to first successful product after results
-  useEffect(() => {
-    const firstSuccess = products.find(p => p.status === 'success' && p.tariffRate !== null)
-    if (firstSuccess && !selectedPieProductId) {
-      setSelectedPieProductId(firstSuccess.id)
-    }
-  }, [products, selectedPieProductId])
+  // (Removed pie product selection effect – pie now aggregates all products.)
 
-  // Helper function to convert and format amounts
-  const convertAmount = (amount: number) => {
-    return amount * conversionRate
+  // Unique importer currencies across all products (for UI hints)
+  const importerCurrencies = useMemo(() => {
+    const set = new Set<string>()
+    products.forEach(p => set.add(getImporterCurrency(p.toCountry)))
+    return Array.from(set)
+  }, [products])
+
+  // Helper functions to convert/format amounts from a given base currency to the display currency
+  const convertAmountFrom = (amount: number, baseCurrency: string) => {
+    if (!Number.isFinite(amount)) return 0
+    if (baseCurrency === displayCurrency) return amount
+    const rate = fxRates[baseCurrency]
+    return Number.isFinite(rate) ? amount * rate : amount
   }
 
-  const formatCurrency = (amount: number) => {
-    return convertAmount(amount).toLocaleString(undefined, { maximumFractionDigits: 2 })
+  const formatCurrencyFrom = (amount: number, baseCurrency: string) => {
+    return convertAmountFrom(amount, baseCurrency).toLocaleString(undefined, { maximumFractionDigits: 2 })
   }
 
   const addProduct = () => {
@@ -585,10 +650,19 @@ export default function CalculatorSection() {
     return country ? country.name : code
   }
 
-  // Calculate totals
-  const totalValue = products.reduce((sum, p) => sum + (parseFloat(p.value) || 0), 0)
-  const totalTariff = products.reduce((sum, p) => sum + (p.tariffAmount || 0), 0)
-  const totalCost = totalValue + totalTariff
+  // Calculate totals (converted to display currency using each product's importer currency)
+  const totals = useMemo(() => {
+    let value = 0
+    let tariff = 0
+    products.forEach(p => {
+      const base = getImporterCurrency(p.toCountry)
+      const v = parseFloat(p.value) || 0
+      const t = p.tariffAmount || 0
+      value += convertAmountFrom(v, base)
+      tariff += convertAmountFrom(t, base)
+    })
+    return { value, tariff, cost: value + tariff }
+  }, [products, fxRates, displayCurrency])
 
   const dummyChartData = [
     { product: "Wheat", tariff: 5.2 },
@@ -607,59 +681,75 @@ export default function CalculatorSection() {
     agriculturalProducts.find(p => p.hs_code === code)?.name || code
   )
 
+  // Generate a short country code (acronym) from numeric code
+  const shortCountry = (code: string) => {
+    const name = getCountryName(code)
+    if (!name) return code
+    // Take first letter of up to first 3 words (to avoid very long names)
+    const parts = name.replace(/['’]/g,'').split(/\s+/).filter(Boolean).slice(0,3)
+    const acronym = parts.map(p => p[0].toUpperCase()).join('')
+    return acronym || code
+  }
+
   // A1: Comparative bar (HS product vs tariff %)
   const tariffRateBarData = useMemo(() => (
     successfulProducts.map(p => ({
-      name: productName(p.productCode),
+      // Include exporter→importer short country acronyms for differentiation
+      name: `${productName(p.productCode)} (${shortCountry(p.fromCountry)}→${shortCountry(p.toCountry)})`,
       tariffRate: Number(p.tariffRate || 0)
     }))
   ), [successfulProducts])
 
   // A2: Stacked bar (Goods Value vs Tariff Amount) per product (in display currency)
   const costStackedData = useMemo(() => (
-    successfulProducts.map(p => ({
-      name: productName(p.productCode),
-      goodsValue: convertAmount(parseFloat(p.value) || 0),
-      tariffAmount: convertAmount(p.tariffAmount || 0)
-    }))
-  ), [successfulProducts, conversionRate])
+    successfulProducts.map(p => {
+      const base = getImporterCurrency(p.toCountry)
+      return {
+        name: `${productName(p.productCode)} (${shortCountry(p.fromCountry)}→${shortCountry(p.toCountry)})`,
+        goodsValue: convertAmountFrom(parseFloat(p.value) || 0, base),
+        tariffAmount: convertAmountFrom(p.tariffAmount || 0, base)
+      }
+    })
+  ), [successfulProducts, fxRates, displayCurrency])
 
   // B1: Scatter (Goods Value vs Tariff Rate)
   const valueVsRateScatter = useMemo(() => (
     successfulProducts.map(p => ({
-      x: convertAmount(parseFloat(p.value) || 0),
+      x: convertAmountFrom(parseFloat(p.value) || 0, getImporterCurrency(p.toCountry)),
       y: Number(p.tariffRate || 0),
       name: productName(p.productCode)
     }))
-  ), [successfulProducts, conversionRate])
+  ), [successfulProducts, fxRates, displayCurrency])
 
   // B2: Waterfall (Import Value -> +Tariff -> Total Cost)
   const waterfallData = useMemo(() => {
-    const importVal = convertAmount(totalValue)
-    const tariffVal = convertAmount(totalTariff)
-    const total = convertAmount(totalCost)
-    // Use an offset bar (base) + delta bar (change) to simulate waterfall
+    const importVal = totals.value
+    const tariffVal = totals.tariff
+    const total = totals.cost
+    // For enhanced visualization: keep steps plus a final split bar
     return [
       { name: 'Import Value', base: 0, change: importVal },
-      { name: 'Tariff', base: importVal, change: tariffVal },
-      { name: 'Total Cost', base: 0, change: total }
+      { name: 'Tariff Added', base: importVal, change: tariffVal },
+      // Final stacked representation for total cost (two components)
+      { name: 'Total Cost (Split)', goodsValue: importVal, tariffAmount: tariffVal }
     ]
-  }, [totalValue, totalTariff, totalCost, conversionRate])
+  }, [totals])
 
-  // Product-level cost split pie: Goods Value vs Tariff Amount for selected product
-  const selectedPieProduct = useMemo(() => (
-    selectedPieProductId ? products.find(p => p.id === selectedPieProductId) ?? null : null
-  ), [selectedPieProductId, products])
-
+  // Aggregated pie data: each product contributes two slices (Product Value, Product Tariff)
   const pieData = useMemo(() => {
-    if (!selectedPieProduct || selectedPieProduct.status !== 'success' || selectedPieProduct.tariffRate === null) return []
-    const goodsVal = convertAmount(parseFloat(selectedPieProduct.value) || 0)
-    const tariffVal = convertAmount(selectedPieProduct.tariffAmount || 0)
-    return [
-      { name: 'Goods Value', value: goodsVal },
-      { name: 'Tariff Amount', value: tariffVal }
-    ]
-  }, [selectedPieProduct, conversionRate])
+    const slices: { name: string; value: number }[] = []
+    products.forEach((p, idx) => {
+      if (p.status === 'success' && p.tariffRate !== null) {
+        const base = getImporterCurrency(p.toCountry)
+        const goodsVal = convertAmountFrom(parseFloat(p.value) || 0, base)
+        const tariffVal = convertAmountFrom(p.tariffAmount || 0, base)
+        const route = `${shortCountry(p.fromCountry)}→${shortCountry(p.toCountry)}`
+        slices.push({ name: `P${idx + 1} ${route}`, value: goodsVal })
+        slices.push({ name: `P${idx + 1} ${route} Tariff`, value: tariffVal })
+      }
+    })
+    return slices
+  }, [products, fxRates, displayCurrency])
 
   return (
     <motion.section style={{ y: calculatorY }} className="calculator-section py-20">
@@ -669,7 +759,7 @@ export default function CalculatorSection() {
             <CardTitle className="calculator-title">Agricultural Tariff Calculator</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Top row: From, To, Year, Display Currency all in one line */}
+            {/* Top row: Display Currency selector (per-product currencies fetched) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="display-currency" className="flex items-center gap-2">
@@ -691,11 +781,7 @@ export default function CalculatorSection() {
                     })}
                   </SelectContent>
                 </Select>
-                {displayCurrency !== selectedCurrency && conversionRate !== 1 && (
-                  <p className="text-xs text-muted-foreground">
-                    1 {selectedCurrency} = {conversionRate.toFixed(4)} {displayCurrency}
-                  </p>
-                )}
+                {/* Per-product FX rates are shown in results section now */}
                 {currencyError && (
                   <p className="text-xs text-red-600">{currencyError}</p>
                 )}
@@ -754,7 +840,7 @@ export default function CalculatorSection() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor={`value-${product.id}`}>Value of Goods ({displayCurrency})</Label>
+                    <Label htmlFor={`value-${product.id}`}>Value of Goods (Importer Currency: {getImporterCurrency(product.toCountry)})</Label>
                     <Input
                       type="number"
                       value={product.value}
@@ -847,21 +933,11 @@ export default function CalculatorSection() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="calculator-results mt-8 space-y-6">
             <h3 className="text-2xl font-bold text-white mb-4">Tariff Calculation Results</h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white">
-              <div>
-                <p className="text-gray-300">Trade Route:</p>
-                <p className="font-semibold">{getCountryName(fromCountry)} → {getCountryName(toCountry)}</p>
-              </div>
-              <div>
-                <p className="text-gray-300">Year:</p>
-                <p className="font-semibold">{year}</p>
-              </div>
-            </div>
-
             {/* Individual Product Results */}
             <div className="space-y-4">
               {products.map((product, index) => {
                 const productName = agriculturalProducts.find(p => p.hs_code === product.productCode)?.name || product.productCode
+                const baseCurrency = getImporterCurrency(product.toCountry)
 
                 return (
                   <div key={product.id} className="bg-white/10 backdrop-blur-sm p-4 rounded-lg">
@@ -883,27 +959,53 @@ export default function CalculatorSection() {
                         </div>
                       )}
                     </div>
+                    <div className="text-xs md:text-sm text-gray-300 mb-2">
+                      Route: <span className="font-medium text-white">{getCountryName(product.fromCountry)}</span>
+                      <span className="mx-1">→</span>
+                      <span className="font-medium text-white">{getCountryName(product.toCountry)}</span>
+                      <span className="mx-2">•</span>
+                      Year: <span className="font-medium text-white">{product.year}</span>
+                    </div>
+                    {/* Show FX rate for this product's importer currency to the current display currency (more visible) */}
+                    <div className="mb-3">
+                      {baseCurrency === displayCurrency ? (
+                        <span className="inline-flex items-center gap-2 rounded-md border border-gray-500/40 bg-gray-500/10 px-3 py-1.5 text-xs md:text-sm text-gray-200">
+                          <span className="font-semibold">FX:</span>
+                          <span>Same currency</span>
+                          <span className="opacity-70">•</span>
+                          <span className="font-mono">{displayCurrency}</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs md:text-sm text-amber-200">
+                          <span className="font-semibold">FX:</span>
+                          <span>1 {baseCurrency}</span>
+                          <span className="opacity-70">≈</span>
+                          <span className="font-mono">{Number.isFinite(fxRates[baseCurrency]) ? fxRates[baseCurrency].toFixed(4) : '...'}</span>
+                          <span>{displayCurrency}</span>
+                        </span>
+                      )}
+                    </div>
 
                     {product.status === 'success' && product.tariffRate !== null ? (
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white">
                         <div>
-                          <p className="text-gray-300 text-sm">Goods Value:</p>
-                          <p className="font-semibold">{displayCurrency} {formatCurrency(Number.parseFloat(product.value))}</p>
+                          <p className="text-gray-300 text-sm">Goods Value ({baseCurrency} → {displayCurrency}):</p>
+                          <p className="font-semibold">{displayCurrency} {formatCurrencyFrom(Number.parseFloat(product.value), baseCurrency)}</p>
                         </div>
                         <div>
                           <p className="text-gray-300 text-sm">Tariff Rate:</p>
                           <p className="font-semibold">{product.tariffRate.toFixed(2)}%</p>
                         </div>
                         <div>
-                          <p className="text-gray-300 text-sm">Tariff Amount:</p>
+                          <p className="text-gray-300 text-sm">Tariff Amount ({baseCurrency} → {displayCurrency}):</p>
                           <p className="font-semibold text-red-300">
-                            {displayCurrency} {formatCurrency(product.tariffAmount || 0)}
+                            {displayCurrency} {formatCurrencyFrom(product.tariffAmount || 0, baseCurrency)}
                           </p>
                         </div>
                         <div>
-                          <p className="text-gray-300 text-sm">Total Cost:</p>
+                          <p className="text-gray-300 text-sm">Total Cost ({baseCurrency} → {displayCurrency}):</p>
                           <p className="font-semibold text-green-300">
-                            {displayCurrency} {formatCurrency(parseFloat(product.value) + (product.tariffAmount || 0))}
+                            {displayCurrency} {formatCurrencyFrom((parseFloat(product.value) || 0) + (product.tariffAmount || 0), baseCurrency)}
                           </p>
                         </div>
                       </div>
@@ -923,15 +1025,15 @@ export default function CalculatorSection() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-white">
                 <div>
                   <p className="text-gray-300">Total Import Value:</p>
-                  <p className="text-2xl font-bold">{displayCurrency} {formatCurrency(totalValue)}</p>
+                  <p className="text-2xl font-bold">{displayCurrency} {totals.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
                 </div>
                 <div>
                   <p className="text-gray-300">Total Tariff:</p>
-                  <p className="text-2xl font-bold text-red-300">{displayCurrency} {formatCurrency(totalTariff)}</p>
+                  <p className="text-2xl font-bold text-red-300">{displayCurrency} {totals.tariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
                 </div>
                 <div>
                   <p className="text-gray-300">Total Cost:</p>
-                  <p className="text-2xl font-bold text-green-300">{displayCurrency} {formatCurrency(totalCost)}</p>
+                  <p className="text-2xl font-bold text-green-300">{displayCurrency} {totals.cost.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
                 </div>
               </div>
             </div>
@@ -1109,42 +1211,31 @@ export default function CalculatorSection() {
 
                 {/* B2: Waterfall (approximate) */}
                 <Card className="shadow-lg border-primary p-4 bg-white dark:bg-gray-900 xl:col-span-2">
-                  <h4 className="text-lg font-semibold mb-2">Landed Cost Waterfall ({displayCurrency})</h4>
-                  <ResponsiveContainer width="100%" height={320}>
-                    <BarChart data={waterfallData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                  <h4 className="text-lg font-semibold mb-2">Landed Cost Waterfall & Split ({displayCurrency})</h4>
+                  <ResponsiveContainer width="100%" height={340}>
+                    <BarChart data={waterfallData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis />
-                      <Tooltip formatter={(v: number) => `${displayCurrency} ${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} />
+                      <Tooltip formatter={(v: number, n: string) => `${displayCurrency} ${Number(v).toLocaleString(undefined,{maximumFractionDigits:2})}${n==='tariffAmount'||n==='change'?' (Tariff)':''}`} />
                       <Legend />
-                      {/* base is transparent to offset the change bar */}
+                      {/* Step bars */}
                       <Bar dataKey="base" stackId="wf" fill="transparent" isAnimationActive={false} />
-                      <Bar dataKey="change" stackId="wf" name="Amount" fill="#F59E0B" />
+                      <Bar dataKey="change" stackId="wf" name="Step Change" fill="#6366F1" />
+                      {/* Final split stacked bar */}
+                      <Bar dataKey="goodsValue" stackId="totalSplit" name="Import Value Portion" fill="#22C55E" />
+                      <Bar dataKey="tariffAmount" stackId="totalSplit" name="Tariff Portion" fill="#EF4444" />
                     </BarChart>
                   </ResponsiveContainer>
                 </Card>
 
-                {/* Product Cost Split Pie */}
+                {/* Total Cost Composition Pie (route + product, multi-color) */}
                 <Card className="shadow-lg border-primary p-4 bg-white dark:bg-gray-900 xl:col-span-2">
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-lg font-semibold">Selected Product Cost Split ({displayCurrency})</h4>
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="pie-product" className="text-sm">Product</Label>
-                      <select
-                        id="pie-product"
-                        className="text-sm border rounded px-2 py-1 bg-white dark:bg-gray-800"
-                        value={selectedPieProductId || ''}
-                        onChange={(e) => setSelectedPieProductId(e.target.value || null)}
-                      >
-                        <option value="" disabled>Select</option>
-                        {products.filter(p => p.status === 'success' && p.tariffRate !== null).map(p => (
-                          <option key={p.id} value={p.id}>{productName(p.productCode)}</option>
-                        ))}
-                      </select>
-                    </div>
+                    <h4 className="text-lg font-semibold">Total Cost Composition ({displayCurrency})</h4>
                   </div>
                   {pieData.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No successful product selected yet.</p>
+                    <p className="text-sm text-muted-foreground">No successful products to summarize yet.</p>
                   ) : (
                     <ResponsiveContainer width="100%" height={320}>
                       <PieChart>
@@ -1159,18 +1250,27 @@ export default function CalculatorSection() {
                           paddingAngle={2}
                           label={(entry) => `${entry.name}: ${displayCurrency} ${entry.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
                         >
-                          {pieData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={index === 0 ? '#22C55E' : '#EF4444'} />
-                          ))}
+                          {pieData.map((entry, index) => {
+                            const palette = [
+                              '#22C55E','#EF4444','#6366F1','#F59E0B','#06B6D4',
+                              '#8B5CF6','#10B981','#F97316','#EC4899','#3B82F6',
+                              '#84CC16','#D946EF','#16A34A','#DC2626','#1D4ED8'
+                            ]
+                            // Differentiate tariff slices by darkening color or using next palette item
+                            const baseColor = palette[index % palette.length]
+                            const isTariff = /Tariff$/i.test(entry.name)
+                            const color = isTariff ? palette[(index+1) % palette.length] : baseColor
+                            return <Cell key={`cell-${index}`} fill={color} />
+                          })}
                         </Pie>
                         <Tooltip formatter={(v: number, n: string) => [`${displayCurrency} ${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, n]} />
                         <Legend />
                       </PieChart>
                     </ResponsiveContainer>
                   )}
-                  {selectedPieProduct && selectedPieProduct.status === 'success' && selectedPieProduct.tariffAmount !== null && (
+                  {pieData.length > 0 && (
                     <p className="text-xs mt-2 text-muted-foreground">
-                      Total Cost = Goods Value + Tariff Amount. Goods Value: {displayCurrency} {convertAmount(parseFloat(selectedPieProduct.value)||0).toLocaleString(undefined,{maximumFractionDigits:2})}, Tariff: {displayCurrency} {convertAmount(selectedPieProduct.tariffAmount).toLocaleString(undefined,{maximumFractionDigits:2})}
+                      Pie total equals Overall Total Cost: {displayCurrency} {totals.cost.toLocaleString(undefined,{maximumFractionDigits:2})}
                     </p>
                   )}
                 </Card>
