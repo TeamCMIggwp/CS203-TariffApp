@@ -553,7 +553,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <html lang="en">
-      <body className="font-sans relative bg-white text-white">
+      <body className="font-sans relative bg-black text-white">
         {/* Globe Background */}
         <div className="fixed top-0 left-0 w-screen h-screen z-0 pointer-events-none">
           <ErrorBoundary fallback={null}>

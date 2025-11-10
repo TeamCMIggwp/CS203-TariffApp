@@ -502,7 +502,7 @@ export function World(props: WorldProps) {
   return (
     <Canvas
       scene={scene}
-      camera={{ fov: 50, near: 180, far: 1800, position: [0, 0, 300] }}
+      camera={{ fov: 50, near: 180, far: 3000, position: [0, 0, 300] }}
       dpr={[1, 1]}
       // Enable antialiasing and transparent background to avoid a dark fringe around the globe on some GPUs/browsers
       gl={{ powerPreference: 'high-performance', antialias: true, alpha: true, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: false }}
@@ -516,7 +516,7 @@ export function World(props: WorldProps) {
       />
       {/* Background */}
       {globeConfig.useSkybox ? (
-        <SkySphere textureUrl={globeConfig.starsBackgroundUrl} />
+        <SkySphere textureUrl={globeConfig.starsBackgroundUrl} radius={2200} />
       ) : (
         <Starfield count={globeConfig.starfieldCount ?? 2000} />
       )}
