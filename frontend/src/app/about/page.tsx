@@ -470,6 +470,12 @@ export default function AboutPage() {
     }
   }
 
+  // Helper function to truncate description to ~200 characters (about 3-4 lines)
+  const truncateDescription = (text: string, maxLength: number = 200): string => {
+    if (text.length <= maxLength) return text
+    return text.substring(0, maxLength).trim() + '...'
+  }
+
   return (
     <main className="relative min-h-screen bg-white/45 backdrop-blur-lg">
       <section className="py-20 px-4">
@@ -717,8 +723,8 @@ export default function AboutPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="flex-1 flex flex-col">
-                    <CardDescription className="text-base text-gray-700 leading-relaxed mb-4 flex-1">
-                      {article.description}
+                    <CardDescription className="text-base text-gray-700 leading-relaxed mb-4 flex-1 line-clamp-4">
+                      {truncateDescription(article.description)}
                     </CardDescription>
                     <Button
                       variant="ghost"
