@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, ScatterChart, Scatter, ZAxis } from "recharts"
 import { BarChart3, Sparkles, Database, Globe, Plus, Trash2 } from "lucide-react"
 import { getCurrencyCode, getCurrencyName, countryToCurrency } from "@/lib/fx"
 import { ChevronDown } from "lucide-react"
@@ -568,6 +568,54 @@ export default function CalculatorSection() {
     { product: "Soybeans", tariff: 10.0 },
     { product: "Barley", tariff: 6.3 },
   ]
+  
+  // ===== Chart Data (A: Direct, B: Derived) =====
+  const successfulProducts = useMemo(() => (
+    products.filter(p => p.status === 'success' && p.tariffRate !== null)
+  ), [products])
+
+  const productName = (code: string) => (
+    agriculturalProducts.find(p => p.hs_code === code)?.name || code
+  )
+
+  // A1: Comparative bar (HS product vs tariff %)
+  const tariffRateBarData = useMemo(() => (
+    successfulProducts.map(p => ({
+      name: productName(p.productCode),
+      tariffRate: Number(p.tariffRate || 0)
+    }))
+  ), [successfulProducts])
+
+  // A2: Stacked bar (Goods Value vs Tariff Amount) per product (in display currency)
+  const costStackedData = useMemo(() => (
+    successfulProducts.map(p => ({
+      name: productName(p.productCode),
+      goodsValue: convertAmount(parseFloat(p.value) || 0),
+      tariffAmount: convertAmount(p.tariffAmount || 0)
+    }))
+  ), [successfulProducts, conversionRate])
+
+  // B1: Scatter (Goods Value vs Tariff Rate)
+  const valueVsRateScatter = useMemo(() => (
+    successfulProducts.map(p => ({
+      x: convertAmount(parseFloat(p.value) || 0),
+      y: Number(p.tariffRate || 0),
+      name: productName(p.productCode)
+    }))
+  ), [successfulProducts, conversionRate])
+
+  // B2: Waterfall (Import Value -> +Tariff -> Total Cost)
+  const waterfallData = useMemo(() => {
+    const importVal = convertAmount(totalValue)
+    const tariffVal = convertAmount(totalTariff)
+    const total = convertAmount(totalCost)
+    // Use an offset bar (base) + delta bar (change) to simulate waterfall
+    return [
+      { name: 'Import Value', base: 0, change: importVal },
+      { name: 'Tariff', base: importVal, change: tariffVal },
+      { name: 'Total Cost', base: 0, change: total }
+    ]
+  }, [totalValue, totalTariff, totalCost, conversionRate])
 
   return (
     <motion.section style={{ y: calculatorY }} className="calculator-section py-20">
@@ -951,22 +999,71 @@ export default function CalculatorSection() {
             )}
 
             {showCharts && (
-              <Card className="shadow-lg border-primary p-4 mt-4 bg-white dark:bg-gray-900">
-                <h4 className="text-lg font-semibold mb-2">Tariff Comparisons</h4>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={dummyChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="product" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="tariff" fill="hsl(var(--chart-1))" />
-                  </BarChart>
-                </ResponsiveContainer>
-                <p className="text-center text-sm text-muted-foreground mt-2">
-                  This bar chart compares tariffs for different agricultural products.
-                </p>
-              </Card>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-4">
+                {/* A1: Tariff rate comparative bar */}
+                <Card className="shadow-lg border-primary p-4 bg-white dark:bg-gray-900">
+                  <h4 className="text-lg font-semibold mb-2">Tariff Rate by Product (%)</h4>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={tariffRateBarData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" interval={0} angle={-20} textAnchor="end" height={60} />
+                      <YAxis unit="%" />
+                      <Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} />
+                      <Legend />
+                      <Bar dataKey="tariffRate" name="Tariff %" fill="#6366F1" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Card>
+
+                {/* A2: Stacked bar cost decomposition */}
+                <Card className="shadow-lg border-primary p-4 bg-white dark:bg-gray-900">
+                  <h4 className="text-lg font-semibold mb-2">Cost Decomposition per Product ({displayCurrency})</h4>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={costStackedData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" interval={0} angle={-20} textAnchor="end" height={60} />
+                      <YAxis />
+                      <Tooltip formatter={(v: number) => `${displayCurrency} ${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} />
+                      <Legend />
+                      <Bar dataKey="goodsValue" stackId="a" name="Goods Value" fill="#22C55E" />
+                      <Bar dataKey="tariffAmount" stackId="a" name="Tariff Amount" fill="#EF4444" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Card>
+
+                {/* B1: Scatter (Value vs Rate) */}
+                <Card className="shadow-lg border-primary p-4 bg-white dark:bg-gray-900">
+                  <h4 className="text-lg font-semibold mb-2">Value vs Tariff Rate ({displayCurrency})</h4>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <ScatterChart margin={{ top: 10, right: 20, bottom: 20, left: 0 }}>
+                      <CartesianGrid />
+                      <XAxis type="number" dataKey="x" name="Goods Value" tickFormatter={(v) => `${(v as number).toLocaleString()}`} />
+                      <YAxis type="number" dataKey="y" name="Tariff %" unit="%" />
+                      <ZAxis range={[60, 120]} />
+                      <Tooltip cursor={{ strokeDasharray: '3 3' }} formatter={(v: number, n: string) => n === 'y' ? `${v.toFixed(2)}%` : `${displayCurrency} ${(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}`} />
+                      <Legend />
+                      <Scatter data={valueVsRateScatter} name="Products" fill="#06B6D4" />
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                </Card>
+
+                {/* B2: Waterfall (approximate) */}
+                <Card className="shadow-lg border-primary p-4 bg-white dark:bg-gray-900 xl:col-span-2">
+                  <h4 className="text-lg font-semibold mb-2">Landed Cost Waterfall ({displayCurrency})</h4>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <BarChart data={waterfallData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip formatter={(v: number) => `${displayCurrency} ${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} />
+                      <Legend />
+                      {/* base is transparent to offset the change bar */}
+                      <Bar dataKey="base" stackId="wf" fill="transparent" isAnimationActive={false} />
+                      <Bar dataKey="change" stackId="wf" name="Amount" fill="#F59E0B" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Card>
+              </div>
             )}
           </motion.div>
         )}
