@@ -60,6 +60,8 @@ export default function GamePage() {
   const [lives, setLives] = useState(3)
   const [showQuiz, setShowQuiz] = useState(false)
   const backgroundMusicRef = useRef<HTMLAudioElement | null>(null)
+  const winSoundRef = useRef<HTMLAudioElement | null>(null)
+  const loseSoundRef = useRef<HTMLAudioElement | null>(null)
   const [muted, setMuted] = useState(false)
 
   type Question = {
@@ -73,6 +75,9 @@ useEffect(() => {
   backgroundMusicRef.current = new Audio("/sounds/background.mp3")
   backgroundMusicRef.current.loop = true
   backgroundMusicRef.current.volume = 0.5
+
+  winSoundRef.current = new Audio("/sounds/win.mp3")
+  loseSoundRef.current = new Audio("/sounds/lose.mp3")
 }, [])
 
 useEffect(() => {
@@ -85,6 +90,8 @@ useEffect(() => {
 useEffect(() => {
   const allSounds = [
     backgroundMusicRef.current,
+    winSoundRef.current,
+    loseSoundRef.current,
   ]
   allSounds.forEach((sound) => {
     if (sound) sound.muted = muted
@@ -174,6 +181,8 @@ const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
 
           // Check if all dollar signs collected
           if (checkWinCondition()) {
+            backgroundMusicRef.current?.pause()
+            winSoundRef.current?.play()
             setGameOver(true)
             return
           }
@@ -385,6 +394,8 @@ const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
           setLives((l) => {
             const newLives = l - 1
             if (newLives <= 0) {
+              backgroundMusicRef.current?.pause()
+              loseSoundRef.current?.play()
               setGameOver(true)
             }
             return newLives
@@ -487,6 +498,8 @@ const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
           setScore((s) => s + 10)
 
           if (checkWinCondition()) {
+            backgroundMusicRef.current?.pause()
+            winSoundRef.current?.play()
             setGameOver(true)
             return
           }
