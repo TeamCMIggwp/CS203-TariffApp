@@ -48,11 +48,11 @@ const tariffFeatures = [
 
 function DynamicRates() {
   const countries = [
-    { name: "USA", code: "840" },
-    { name: "Singapore", code: "702" },
-    { name: "China", code: "156" },
-    { name: "India", code: "356" },
-    { name: "Australia", code: "036" },
+    { name: "USA", code: "840", flag: "🇺🇸" },
+    { name: "Singapore", code: "702", flag: "🇸🇬" },
+    { name: "China", code: "156", flag: "🇨🇳" },
+    { name: "India", code: "356", flag: "🇮🇳" },
+    { name: "Australia", code: "036", flag: "🇦🇺" },
   ]
 
   const [currentCountry, setCurrentCountry] = useState(0)
@@ -225,13 +225,14 @@ function DynamicRates() {
           <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16">
             <div className="text-center min-w-[200px]">
               <p className="text-sm font-semibold tracking-wider text-white/80 mb-2">COUNTRY</p>
-              <p
-                className={`text-3xl font-bold text-white transition-all duration-300 ${
+              <div
+                className={`flex items-center justify-center gap-3 text-3xl font-bold text-white transition-all duration-300 ${
                   isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
                 }`}
               >
-                {countries[currentCountry].name}
-              </p>
+                <span className="text-5xl">{countries[currentCountry].flag}</span>
+                <span>{countries[currentCountry].name}</span>
+              </div>
             </div>
 
             <div className="text-center min-w-[250px]">

@@ -38,6 +38,7 @@ type ProductRow = {
   tariffRate: number | null
   tariffAmount: number | null
   dataSource: 'database' | 'wto' | null
+  savedToDatabase: boolean
   status: 'idle' | 'loading' | 'success' | 'error'
   errorMessage?: string
   fromCountry: string
@@ -56,7 +57,7 @@ export default function CalculatorSection() {
 
   // Changed to array of products
   const [products, setProducts] = useState<ProductRow[]>([
-    { id: '1', productCode: '100630', value: '100', tariffRate: null, tariffAmount: null, dataSource: null, status: 'idle', fromCountry: '004', toCountry: '840', year: '2024' }
+    { id: '1', productCode: '100630', value: '100', tariffRate: null, tariffAmount: null, dataSource: null, savedToDatabase: false, status: 'idle', fromCountry: '004', toCountry: '840', year: '2024' }
   ])
 
   const [isCalculatingTariff, setIsCalculatingTariff] = useState(false)
@@ -215,6 +216,7 @@ export default function CalculatorSection() {
       tariffRate: null,
       tariffAmount: null,
       dataSource: null,
+      savedToDatabase: false,
       status: 'idle',
       fromCountry,
       toCountry,
@@ -309,6 +311,7 @@ export default function CalculatorSection() {
   ): Promise<{
     rate: number | null
     source: 'database' | 'wto' | null
+    savedToDatabase: boolean
   }> => {
     let parsedPercentage: number | null = null
     let foundInDatabase = false
@@ -353,7 +356,7 @@ export default function CalculatorSection() {
               if (Number.isFinite(parsedPercentage)) {
                 console.log('   ✅ ✅ SUCCESS! Found tariff in database:', parsedPercentage, '%')
                 foundInDatabase = true
-                return { rate: parsedPercentage, source: 'database' }
+                return { rate: parsedPercentage, source: 'database', savedToDatabase: false }
               }
             } else {
               console.log('   ❌ Database response missing rate field')
@@ -428,7 +431,7 @@ export default function CalculatorSection() {
                     console.log('   ✅ ✅ SUCCESS! Found tariff in WTO API:', parsedPercentage, '%')
 
                     // Save to database if found in WTO API
-                    await saveTariffToDatabase(
+                    const saveSuccess = await saveTariffToDatabase(
                       importerCode,     // reporter (importer)
                       exporterCode,     // partner (exporter)
                       productInt,       // product code
@@ -437,7 +440,7 @@ export default function CalculatorSection() {
                       "percent"         // unit
                     )
 
-                    return { rate: parsedPercentage, source: 'wto' }
+                    return { rate: parsedPercentage, source: 'wto', savedToDatabase: saveSuccess }
                   }
                 }
               } else {
@@ -470,7 +473,7 @@ export default function CalculatorSection() {
       console.log('\n⏭️  STEP 2: Skipping WTO API (data found in database)')
     }
 
-    return { rate: null, source: null }
+    return { rate: null, source: null, savedToDatabase: false }
   }
 
   const calculateTariff = async () => {
@@ -498,7 +501,8 @@ export default function CalculatorSection() {
       status: 'loading' as const,
       tariffRate: null,
       tariffAmount: null,
-      dataSource: null
+      dataSource: null,
+      savedToDatabase: false
     })))
 
     try {
@@ -524,6 +528,7 @@ export default function CalculatorSection() {
               tariffRate: result.rate,
               tariffAmount: tariffAmount,
               dataSource: result.source,
+              savedToDatabase: result.savedToDatabase,
               status: 'success' as const
             }
           } else {
@@ -533,6 +538,7 @@ export default function CalculatorSection() {
               tariffRate: null,
               tariffAmount: null,
               dataSource: null,
+              savedToDatabase: false,
               status: 'error' as const,
               errorMessage: 'No tariff data found (MFN may apply)'
             }
@@ -888,17 +894,25 @@ export default function CalculatorSection() {
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold text-white">Product {index + 1}: {productName}</h4>
                       {product.dataSource && (
-                        <div className="flex items-center gap-2 bg-blue-600/20 border border-blue-600 rounded-lg px-3 py-1 text-blue-200">
-                          {product.dataSource === "database" ? (
-                            <>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 bg-blue-600/20 border border-blue-600 rounded-lg px-3 py-1 text-blue-200">
+                            {product.dataSource === "database" ? (
+                              <>
+                                <Database className="w-4 h-4" />
+                                <span className="text-sm">Database</span>
+                              </>
+                            ) : (
+                              <>
+                                <Globe className="w-4 h-4" />
+                                <span className="text-sm">WTO API</span>
+                              </>
+                            )}
+                          </div>
+                          {product.savedToDatabase && (
+                            <div className="flex items-center gap-2 bg-green-600/20 border border-green-600 rounded-lg px-3 py-1 text-green-200">
                               <Database className="w-4 h-4" />
-                              <span className="text-sm">Database</span>
-                            </>
-                          ) : (
-                            <>
-                              <Globe className="w-4 h-4" />
-                              <span className="text-sm">WTO API</span>
-                            </>
+                              <span className="text-sm">Saved to Database</span>
+                            </div>
                           )}
                         </div>
                       )}
