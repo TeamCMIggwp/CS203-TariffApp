@@ -2,6 +2,7 @@ package leaderboard.repository;
 
 import leaderboard.entity.LeaderboardEntryEntity;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -13,6 +14,7 @@ import java.util.Optional;
 public class LeaderboardRepository {
 
     @Autowired
+    @Qualifier("appJdbcTemplate")
     private JdbcTemplate jdbcTemplate;
 
     private final RowMapper<LeaderboardEntryEntity> rowMapper = (rs, rowNum) ->
