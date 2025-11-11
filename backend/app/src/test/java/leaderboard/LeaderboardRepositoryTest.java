@@ -11,8 +11,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -195,14 +193,9 @@ class LeaderboardRepositoryTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void rowMapper_withValidResultSet_mapsCorrectly() throws SQLException {
+    void rowMapper_withValidResultSet_mapsCorrectly() {
         // Arrange
-        ResultSet rs = mock(ResultSet.class);
-        when(rs.getLong("id")).thenReturn(10L);
-        when(rs.getString("name")).thenReturn("MappedPlayer");
-        when(rs.getInt("score")).thenReturn(600);
-
-        // Simulate calling the rowMapper by querying
+        // Test that the repository correctly maps query results to entities
         LeaderboardEntryEntity expectedEntity = new LeaderboardEntryEntity(10L, "MappedPlayer", 600);
         when(jdbcTemplate.query(anyString(), any(RowMapper.class), anyString()))
                 .thenReturn(Collections.singletonList(expectedEntity));
