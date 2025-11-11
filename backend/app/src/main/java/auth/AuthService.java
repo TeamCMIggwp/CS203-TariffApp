@@ -465,7 +465,7 @@ public class AuthService {
         var row = jdbc.queryForMap(
             "SELECT s.user_id, u.role, s.expires_at FROM accounts.sessions s JOIN accounts.users u ON u.id = s.user_id WHERE s.id = ?",
                     refreshToken);
-            var expiresAt = (java.sql.Timestamp) row.get("expires_at");
+            var expiresAt = toTimestamp(row.get("expires_at"));
             if (expiresAt.toInstant().isBefore(Instant.now())) {
                 jdbc.update("DELETE FROM accounts.sessions WHERE id = ?", refreshToken);
                 throw new Unauthorized("Session expired");
@@ -818,8 +818,8 @@ public class AuthService {
                     throw new EmptyResultDataAccessException(1);
                 }
             }
-            java.sql.Timestamp expiresAt = (java.sql.Timestamp) row.get("expires_at");
-            java.sql.Timestamp usedAt = (java.sql.Timestamp) row.get("used_at");
+            java.sql.Timestamp expiresAt = toTimestamp(row.get("expires_at"));
+            java.sql.Timestamp usedAt = toTimestamp(row.get("used_at"));
             if (usedAt != null) {
                 return Map.of("updated", 0, "message", "Token already used");
             }
@@ -861,8 +861,8 @@ public class AuthService {
                 var row = jdbc.queryForMap(
                     "SELECT user_id, expires_at, used_at FROM accounts.password_reset_tokens WHERE token = ?",
                     token);
-                java.sql.Timestamp expiresAt = (java.sql.Timestamp) row.get("expires_at");
-                java.sql.Timestamp usedAt = (java.sql.Timestamp) row.get("used_at");
+                java.sql.Timestamp expiresAt = toTimestamp(row.get("expires_at"));
+                java.sql.Timestamp usedAt = toTimestamp(row.get("used_at"));
                 if (usedAt != null) {
                     return Map.of("updated", 0, "message", "Token already used");
                 }
@@ -908,6 +908,26 @@ public class AuthService {
                 "  created_at DATETIME NOT NULL\n" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         } catch (org.springframework.jdbc.BadSqlGrammarException ignore) {}
+    }
+
+    // Safely convert vendor-specific temporal objects to java.sql.Timestamp
+    private static java.sql.Timestamp toTimestamp(Object value) {
+        if (value == null) return null;
+        if (value instanceof java.sql.Timestamp ts) return ts;
+        if (value instanceof java.time.LocalDateTime ldt) return java.sql.Timestamp.valueOf(ldt);
+        if (value instanceof java.util.Date d) return new java.sql.Timestamp(d.getTime());
+        // Best-effort parse from String (ISO-8601) if encountered
+        if (value instanceof String s) {
+            try {
+                java.time.OffsetDateTime odt = java.time.OffsetDateTime.parse(s);
+                return java.sql.Timestamp.from(odt.toInstant());
+            } catch (Exception ignore) {}
+            try {
+                java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(s);
+                return java.sql.Timestamp.valueOf(ldt);
+            } catch (Exception ignore) {}
+        }
+        throw new IllegalArgumentException("Unsupported temporal type: " + value.getClass());
     }
 
     private static String sha256Hex(String s) {
