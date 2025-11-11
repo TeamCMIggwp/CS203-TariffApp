@@ -680,10 +680,13 @@ export default function CalculatorSection() {
     <motion.section style={{ y: calculatorY }} className="calculator-section py-20">
       <div className="max-w-4xl mx-auto px-4">
         {/* Standard header to match News page */}
-        <div className="text-center mb-6 bg-black/30 backdrop-blur-md p-6 rounded-2xl border border-white/30">
-          <h1 className="text-3xl md:text-4xl font-extrabold text-white">Agricultural Tariff Calculator</h1>
+        <div className="text-center mb-6 bg-black/30 backdrop-blur-md p-6 rounded-2xl">
+          <h1 className="text-3xl md:text-4xl font-extrabold text-white">
+            Agricultural Tariff Calculator
+          </h1>
         </div>
-        <Card className="calculator-card shadow-lg rounded-2xl bg-black/40 backdrop-blur-xl border border-white/30 text-white">
+
+        <Card className="calculator-card shadow-lg rounded-2xl bg-black/40 backdrop-blur-xl text-white">
           <CardContent className="space-y-6">
             {/* Top row: Display Currency selector (per-product currencies fetched) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
