@@ -61,13 +61,12 @@ function DynamicRates() {
   const [loading, setLoading] = useState(true)
   const [cachedRates, setCachedRates] = useState<Map<string, number>>(new Map())
 
-  // Fetch tariff data for a country
   const fetchTariffData = async (countryCode: string): Promise<number | null> => {
     try {
       const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
-      const indicator = 'TP_A_0160' // Simple average MFN applied tariff
-      const currentYear = (new Date().getFullYear() - 1).toString() // Current year - 1
-      const previousYear = (new Date().getFullYear() - 2).toString() // Fallback to current year - 2
+      const indicator = 'TP_A_0160'
+      const currentYear = (new Date().getFullYear() - 1).toString()
+      const previousYear = (new Date().getFullYear() - 2).toString()
 
       const url = new URL(`${API_BASE}/api/v1/indicators/${encodeURIComponent(indicator)}/observations`)
       url.searchParams.set('r', countryCode)
@@ -76,85 +75,43 @@ function DynamicRates() {
       url.searchParams.set('mode', 'full')
       url.searchParams.set('echo', 'false')
 
-      console.log('Fetching tariff data:', {
-        country: countries.find(c => c.code === countryCode)?.name,
-        countryCode,
-        url: url.toString()
-      })
-
       const res = await fetch(url.toString(), { credentials: 'include' })
       const text = await res.text()
 
-      console.log('API Response:', {
-        status: res.status,
-        ok: res.ok,
-        textLength: text.length,
-        preview: text.substring(0, 200)
-      })
-
       if (!res.ok) {
-        console.warn(`API returned ${res.status} for ${countryCode}, trying previous year...`)
-
-        // Try previous year if current year fails
         url.searchParams.set('ps', previousYear)
         const retryRes = await fetch(url.toString(), { credentials: 'include' })
         const retryText = await retryRes.text()
 
         if (!retryRes.ok || !retryText || retryText.trim() === '') {
-          console.warn(`No data available for country ${countryCode}`)
           return null
         }
 
         try {
           const json = JSON.parse(retryText)
           const value = extractValueFromObj(json, previousYear)
-          console.log('Extracted tariff value (previous year):', {
-            country: countries.find(c => c.code === countryCode)?.name,
-            value,
-            year: previousYear
-          })
           return value
         } catch (parseError) {
-          console.error('Failed to parse retry response:', parseError)
           return null
         }
       }
 
-      // Check if response is empty or not valid JSON
       if (!text || text.trim() === '') {
-        console.warn('Empty response from API for country:', countryCode)
         return null
       }
 
       try {
         const json = JSON.parse(text)
-        console.log('Parsed JSON structure:', {
-          hasData: !!json,
-          keys: Object.keys(json || {}).slice(0, 5)
-        })
-
         const value = extractValueFromObj(json, currentYear)
-        console.log('Extracted tariff value:', {
-          country: countries.find(c => c.code === countryCode)?.name,
-          value,
-          year: currentYear
-        })
-
         return value
       } catch (parseError) {
-        console.error('Failed to parse JSON response:', {
-          error: parseError,
-          responsePreview: text.substring(0, 100)
-        })
         return null
       }
     } catch (error) {
-      console.error('Error fetching tariff data:', error)
       return null
     }
   }
 
-  // Extract numeric value from API response
   const extractValueFromObj = (obj: unknown, preferYear?: string): number | null => {
     if (obj == null) return null
 
@@ -193,41 +150,27 @@ function DynamicRates() {
     return null
   }
 
-  // Initial load - fetch all countries once when component mounts
   useEffect(() => {
     let isMounted = true
 
     const loadAllData = async () => {
-      console.log('=== Starting initial tariff data load for all countries ===')
       const ratesMap = new Map<string, number>()
 
-      // Fetch data for all countries
       for (const country of countries) {
-        console.log(`Fetching data for ${country.name} (${country.code})`)
         const rate = await fetchTariffData(country.code)
-
         if (rate !== null) {
           ratesMap.set(country.code, rate)
-          console.log(`✓ ${country.name}: ${rate}%`)
-        } else {
-          console.warn(`✗ Failed to load data for ${country.name}`)
         }
       }
 
       if (isMounted) {
         setCachedRates(ratesMap)
-
-        // Set initial display with first country that has data
         const firstCountryWithData = countries.find(c => ratesMap.has(c.code))
         if (firstCountryWithData) {
           const rate = ratesMap.get(firstCountryWithData.code)!
           setCurrentRate(rate)
           setCurrentCountry(countries.indexOf(firstCountryWithData))
-          console.log('Initial data loaded successfully')
-        } else {
-          console.warn('No data available for any country')
         }
-
         setLoading(false)
       }
     }
@@ -239,31 +182,23 @@ function DynamicRates() {
     }
   }, [])
 
-  // Rotate countries - only starts after initial load, uses cached data
   useEffect(() => {
-    // Don't start rotation if still loading or no cached data
     if (loading || cachedRates.size === 0) return
 
-    console.log('Starting country rotation timer')
     const interval = setInterval(() => {
       setIsAnimating(true)
       setTimeout(() => {
-        // Find next country with cached data
         let nextIndex = (currentCountry + 1) % countries.length
         let attempts = 0
 
-        // Skip countries without data
         while (!cachedRates.has(countries[nextIndex].code) && attempts < countries.length) {
           nextIndex = (nextIndex + 1) % countries.length
           attempts++
         }
 
-        // If we found a country with data
         if (cachedRates.has(countries[nextIndex].code)) {
           const country = countries[nextIndex]
           const rate = cachedRates.get(country.code)!
-
-          console.log(`Rotating to country ${nextIndex + 1}/${countries.length}: ${country.name} - ${rate}%`)
           setCurrentCountry(nextIndex)
           setCurrentRate(rate)
         }
@@ -273,28 +208,25 @@ function DynamicRates() {
     }, 3000)
 
     return () => {
-      console.log('Cleaning up country rotation timer')
       clearInterval(interval)
     }
   }, [currentCountry, loading, cachedRates])
 
   return (
     <div className="relative">
-      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 rounded-2xl" />
-      <div className="relative bg-background/80 backdrop-blur-sm border-2 border-primary/20 rounded-2xl p-12 shadow-2xl">
+      <div className="relative bg-black/40 backdrop-blur-xl border border-white/30 rounded-2xl p-12 shadow-2xl">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-center gap-3 mb-8">
-            <Activity className="w-6 h-6 text-primary animate-pulse" />
-            <h3 className="text-2xl font-bold text-foreground">Live Tariff Updates</h3>
-            <Activity className="w-6 h-6 text-primary animate-pulse" />
+            <Activity className="w-6 h-6 text-cyan-300 animate-pulse" />
+            <h3 className="text-2xl font-bold text-white">Live Tariff Updates</h3>
+            <Activity className="w-6 h-6 text-cyan-300 animate-pulse" />
           </div>
 
           <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16">
-            {/* Country */}
             <div className="text-center min-w-[200px]">
-              <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">COUNTRY</p>
+              <p className="text-sm font-semibold tracking-wider text-white/80 mb-2">COUNTRY</p>
               <p
-                className={`text-3xl font-bold text-foreground transition-all duration-300 ${
+                className={`text-3xl font-bold text-white transition-all duration-300 ${
                   isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
                 }`}
               >
@@ -302,11 +234,10 @@ function DynamicRates() {
               </p>
             </div>
 
-            {/* Current Rate */}
             <div className="text-center min-w-[250px]">
-              <p className="text-sm font-semibold tracking-wider text-muted-foreground mb-2">CURRENT RATE</p>
+              <p className="text-sm font-semibold tracking-wider text-white/80 mb-2">CURRENT RATE</p>
               <div
-                className={`text-7xl font-bold tabular-nums text-black transition-all duration-300 ${
+                className={`text-7xl font-bold tabular-nums text-white transition-all duration-300 ${
                   isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
                 }`}
               >
@@ -315,7 +246,7 @@ function DynamicRates() {
                 ) : currentRate !== null ? (
                   <>
                     {currentRate.toFixed(1)}
-                    <span className="text-4xl text-muted-foreground">%</span>
+                    <span className="text-4xl text-white/80">%</span>
                   </>
                 ) : (
                   <span className="text-3xl">N/A</span>
@@ -325,11 +256,11 @@ function DynamicRates() {
           </div>
 
           <div className="mt-8 text-center">
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-white/90">
               Agricultural tariff rates from WTO Database (TP_A_0160 - Simple Average MFN Applied Tariff)
             </p>
             {cachedRates.size > 0 && (
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-white/70 mt-2">
                 Displaying {cachedRates.size} of {countries.length} countries with available data
               </p>
             )}
@@ -351,17 +282,13 @@ export default function AboutPage() {
   }>>([])
   const [loadingNews, setLoadingNews] = useState(true)
 
-  // Fetch live news articles from external API
   useEffect(() => {
     const fetchNews = async () => {
       try {
         const response = await fetch('/api/external/news')
-
         if (response.ok) {
           const data = await response.json()
           setNewsArticles(data.articles || [])
-        } else {
-          console.error('Failed to fetch news:', response.status)
         }
       } catch (error) {
         console.error('Error fetching news:', error)
@@ -448,7 +375,6 @@ export default function AboutPage() {
     },
   ]
 
-  // Helper function to format date
   const formatDate = (dateString: string): string => {
     try {
       const date = new Date(dateString)
@@ -470,23 +396,22 @@ export default function AboutPage() {
     }
   }
 
-  // Helper function to truncate description to ~200 characters (about 3-4 lines)
   const truncateDescription = (text: string, maxLength: number = 200): string => {
     if (text.length <= maxLength) return text
     return text.substring(0, maxLength).trim() + '...'
   }
 
   return (
-    <main className="relative min-h-screen bg-white/5 backdrop-blur-lg">
+    <main className="relative min-h-screen">
       <section className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
           {/* Hero Content */}
           <div className="text-center mb-16">
-            <p className="text-sm font-semibold tracking-[0.3em] text-gray-400 mb-6">ABOUT</p>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 text-balance leading-tight text-gray-900">
+            <p className="text-sm font-semibold tracking-[0.3em] text-white/80 mb-6">ABOUT</p>
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 text-balance leading-tight text-white">
               AgriTariff
             </h1>
-            <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
               Calculate tariffs with confidence and clarity.
             </p>
           </div>
@@ -495,22 +420,20 @@ export default function AboutPage() {
             {tariffFeatures.map((feature) => (
               <div key={feature.id} className="relative">
                 <div className="relative group">
-                  {/* Image Container */}
-                  <div className="relative overflow-hidden rounded-3xl bg-gray-100 aspect-[3/4] mb-6">
+                  <div className="relative overflow-hidden rounded-3xl bg-black/60 aspect-[3/4] mb-6 border border-white/30">
                     <img
                       src={feature.image || "/placeholder.svg"}
                       alt={feature.title}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover opacity-70"
                     />
                   </div>
 
-                  {/* Content Card */}
-                  <div className="bg-[#E8E5D5] rounded-2xl p-6">
+                  <div className="bg-black/40 backdrop-blur-xl border border-white/30 rounded-2xl p-6">
                     <div className="flex items-start gap-4">
-                      <span className="text-4xl font-bold text-gray-900">{feature.number}</span>
+                      <span className="text-4xl font-bold text-white">{feature.number}</span>
                       <div className="flex-1">
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">{feature.title}</h3>
-                        <p className="text-sm text-gray-700 leading-relaxed">{feature.description}</p>
+                        <h3 className="text-xl font-bold text-white mb-2">{feature.title}</h3>
+                        <p className="text-sm text-white/90 leading-relaxed">{feature.description}</p>
                       </div>
                     </div>
                   </div>
@@ -525,47 +448,47 @@ export default function AboutPage() {
       <section className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="mb-12 max-w-3xl">
-            <h2 className="text-4xl font-bold mb-4 text-gray-900">What Are Tariffs?</h2>
-            <p className="text-lg text-gray-700 leading-relaxed">
+            <h2 className="text-4xl font-bold mb-4 text-white">What Are Tariffs?</h2>
+            <p className="text-lg text-white/90 leading-relaxed">
               Tariffs are taxes imposed by governments on imported goods. In agricultural trade, they serve as crucial
               policy instruments that affect food security, farmer livelihoods, and international trade relationships.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            <Card className="bg-white border-2 hover:border-blue-500 transition-colors">
+            <Card className="bg-black/40 backdrop-blur-xl border border-white/30 hover:border-cyan-400/50 transition-colors">
               <CardContent className="pt-6">
-                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-4">
-                  <BookOpen className="w-6 h-6 text-blue-600" />
+                <div className="w-12 h-12 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center mb-4">
+                  <BookOpen className="w-6 h-6 text-cyan-300" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3 text-gray-900">Historical Context</h3>
-                <p className="text-gray-700 leading-relaxed">
+                <h3 className="text-xl font-semibold mb-3 text-white">Historical Context</h3>
+                <p className="text-white/90 leading-relaxed">
                   Agricultural tariffs have evolved since the GATT Uruguay Round (1986-1994), which transformed
                   non-tariff barriers into transparent tariff measures.
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-white border-2 hover:border-blue-500 transition-colors">
+            <Card className="bg-black/40 backdrop-blur-xl border border-white/30 hover:border-cyan-400/50 transition-colors">
               <CardContent className="pt-6">
-                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-4">
-                  <Globe className="w-6 h-6 text-blue-600" />
+                <div className="w-12 h-12 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center mb-4">
+                  <Globe className="w-6 h-6 text-cyan-300" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3 text-gray-900">Global Impact</h3>
-                <p className="text-gray-700 leading-relaxed">
+                <h3 className="text-xl font-semibold mb-3 text-white">Global Impact</h3>
+                <p className="text-white/90 leading-relaxed">
                   Tariffs directly influence food prices, market access for farmers, and the competitiveness of
                   agricultural products in international markets.
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-white border-2 hover:border-blue-500 transition-colors">
+            <Card className="bg-black/40 backdrop-blur-xl border border-white/30 hover:border-cyan-400/50 transition-colors">
               <CardContent className="pt-6">
-                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-4">
-                  <TrendingUp className="w-6 h-6 text-blue-600" />
+                <div className="w-12 h-12 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center mb-4">
+                  <TrendingUp className="w-6 h-6 text-cyan-300" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3 text-gray-900">Trade Dynamics</h3>
-                <p className="text-gray-700 leading-relaxed">
+                <h3 className="text-xl font-semibold mb-3 text-white">Trade Dynamics</h3>
+                <p className="text-white/90 leading-relaxed">
                   Understanding tariff structures helps stakeholders navigate complex trade agreements and make informed
                   decisions about market entry strategies.
                 </p>
@@ -579,8 +502,8 @@ export default function AboutPage() {
       <section className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4 text-gray-900">Why Tariffs Matter</h2>
-            <p className="text-lg text-gray-700 max-w-3xl mx-auto leading-relaxed">
+            <h2 className="text-4xl font-bold mb-4 text-white">Why Tariffs Matter</h2>
+            <p className="text-lg text-white/90 max-w-3xl mx-auto leading-relaxed">
               Agricultural tariffs play a critical role in shaping global food systems, economic development, and
               international trade relationships
             </p>
@@ -590,17 +513,17 @@ export default function AboutPage() {
             {reasons.map((reason, index) => {
               const Icon = reason.icon
               return (
-                <Card key={index} className="bg-white border-2">
+                <Card key={index} className="bg-black/40 backdrop-blur-xl border border-white/30 hover:border-cyan-400/50 transition-colors">
                   <CardContent className="pt-6">
                     <div className="flex gap-4">
                       <div className="flex-shrink-0">
-                        <div className="w-14 h-14 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                        <div className="w-14 h-14 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center">
                           <Icon className="w-7 h-7" />
                         </div>
                       </div>
                       <div>
-                        <h3 className="text-xl font-semibold mb-2 text-gray-900">{reason.title}</h3>
-                        <p className="text-gray-700 leading-relaxed">{reason.description}</p>
+                        <h3 className="text-xl font-semibold mb-2 text-white">{reason.title}</h3>
+                        <p className="text-white/90 leading-relaxed">{reason.description}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -615,8 +538,8 @@ export default function AboutPage() {
       <section className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4 text-gray-900">Key Tariff Indicators</h2>
-            <p className="text-lg text-gray-700 max-w-3xl mx-auto leading-relaxed">
+            <h2 className="text-4xl font-bold mb-4 text-white">Key Tariff Indicators</h2>
+            <p className="text-lg text-white/90 max-w-3xl mx-auto leading-relaxed">
               Understanding WTO tariff indicators is essential for analyzing agricultural trade policies and market
               access conditions across countries. Hover over each card to see detailed information.
             </p>
@@ -630,7 +553,7 @@ export default function AboutPage() {
               return (
                 <Card
                   key={index}
-                  className="bg-white border-2 hover:shadow-xl transition-all duration-300 cursor-pointer relative overflow-hidden aspect-square flex flex-col"
+                  className="bg-black/40 backdrop-blur-xl border border-white/30 hover:border-cyan-400/50 hover:shadow-xl transition-all duration-300 cursor-pointer relative overflow-hidden aspect-square flex flex-col"
                   onMouseEnter={() => setHoveredIndex(index)}
                   onMouseLeave={() => setHoveredIndex(null)}
                 >
@@ -644,8 +567,8 @@ export default function AboutPage() {
                     >
                       <Icon className="w-6 h-6" />
                     </div>
-                    <h3 className="font-bold text-sm mb-2 leading-tight text-gray-900">{indicator.title}</h3>
-                    <p className="text-xs font-mono text-gray-600">{indicator.code}</p>
+                    <h3 className="font-bold text-sm mb-2 leading-tight text-white">{indicator.title}</h3>
+                    <p className="text-xs font-mono text-white/80">{indicator.code}</p>
                   </div>
 
                   <div
@@ -659,11 +582,11 @@ export default function AboutPage() {
                       >
                         <Icon className="w-3 h-3" />
                       </div>
-                      <p className="text-xs font-mono text-gray-600">{indicator.code}</p>
+                      <p className="text-xs font-mono text-white/80">{indicator.code}</p>
                     </div>
-                    <h3 className="font-bold text-xs mb-2 leading-tight text-gray-900">{indicator.title}</h3>
-                    <p className="text-xs text-gray-700 mb-2 leading-relaxed">{indicator.description}</p>
-                    <p className="text-xs text-gray-700 leading-relaxed flex-1 overflow-y-auto">{indicator.details}</p>
+                    <h3 className="font-bold text-xs mb-2 leading-tight text-white">{indicator.title}</h3>
+                    <p className="text-xs text-white/90 mb-2 leading-relaxed">{indicator.description}</p>
+                    <p className="text-xs text-white/90 leading-relaxed flex-1 overflow-y-auto">{indicator.details}</p>
                   </div>
                 </Card>
               )
@@ -684,51 +607,50 @@ export default function AboutPage() {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-12">
             <div>
-              <h2 className="text-4xl font-bold mb-2 text-gray-900">Latest News</h2>
-              <p className="text-lg text-gray-700">Stay updated on agricultural trade developments</p>
+              <h2 className="text-4xl font-bold mb-2 text-white">Latest News</h2>
+              <p className="text-lg text-white/90">Stay updated on agricultural trade developments</p>
             </div>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
             {loadingNews ? (
-              // Loading skeleton
               Array.from({ length: 3 }).map((_, index) => (
-                <Card key={index} className="flex flex-col bg-white">
+                <Card key={index} className="flex flex-col bg-black/40 backdrop-blur-xl border border-white/30">
                   <CardHeader>
-                    <div className="h-6 bg-gray-200 rounded animate-pulse mb-3 w-24"></div>
-                    <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+                    <div className="h-6 bg-white/10 rounded animate-pulse mb-3 w-24"></div>
+                    <div className="h-8 bg-white/10 rounded animate-pulse"></div>
                   </CardHeader>
                   <CardContent className="flex-1">
                     <div className="space-y-2">
-                      <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                      <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                      <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4"></div>
+                      <div className="h-4 bg-white/10 rounded animate-pulse"></div>
+                      <div className="h-4 bg-white/10 rounded animate-pulse"></div>
+                      <div className="h-4 bg-white/10 rounded animate-pulse w-3/4"></div>
                     </div>
                   </CardContent>
                 </Card>
               ))
             ) : newsArticles.length > 0 ? (
               newsArticles.map((article, index) => (
-                <Card key={index} className="flex flex-col bg-white hover:shadow-lg transition-shadow">
+                <Card key={index} className="flex flex-col bg-black/40 backdrop-blur-xl border border-white/30 hover:border-cyan-400/50 hover:shadow-lg transition-all">
                   <CardHeader>
                     <div className="flex items-center gap-2 mb-3">
-                      <Badge variant="secondary">{article.source}</Badge>
-                      <div className="flex items-center gap-1 text-sm text-gray-600">
+                      <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">{article.source}</Badge>
+                      <div className="flex items-center gap-1 text-sm text-white/80">
                         <Calendar className="w-4 h-4" />
                         <span>{formatDate(article.publishedAt)}</span>
                       </div>
                     </div>
-                    <CardTitle className="text-xl leading-tight text-balance text-gray-900">
+                    <CardTitle className="text-xl leading-tight text-balance text-white">
                       {article.title}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="flex-1 flex flex-col">
-                    <CardDescription className="text-base text-gray-700 leading-relaxed mb-4 flex-1 line-clamp-4">
+                    <CardDescription className="text-base text-white/90 leading-relaxed mb-4 flex-1 line-clamp-4">
                       {truncateDescription(article.description)}
                     </CardDescription>
                     <Button
                       variant="ghost"
-                      className="w-fit px-0 group text-blue-600 hover:text-blue-700"
+                      className="w-fit px-0 group text-cyan-300 hover:text-cyan-100 hover:bg-transparent"
                       onClick={() => window.open(article.url, '_blank')}
                     >
                       Read more
@@ -738,9 +660,8 @@ export default function AboutPage() {
                 </Card>
               ))
             ) : (
-              // No news available
               <div className="col-span-3 text-center py-12">
-                <p className="text-gray-500 text-lg">No news articles available at the moment</p>
+                <p className="text-white/80 text-lg">No news articles available at the moment</p>
               </div>
             )}
           </div>
