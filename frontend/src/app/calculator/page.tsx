@@ -59,9 +59,14 @@ export default function CalculatorSection() {
     { id: '1', productCode: '100630', value: '100', tariffRate: null, tariffAmount: null, dataSource: null, status: 'idle', fromCountry: '004', toCountry: '840', year: '2024' }
   ])
 
+  const [apiResponse, setApiResponse] = useState<GeminiApiResponse | string | null>(null)
   const [isCalculatingTariff, setIsCalculatingTariff] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [inputError, setInputError] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
+  const [aiFinished, setAiFinished] = useState(false)
+
+  const [showAIAnalysis, setShowAIAnalysis] = useState(false)
   const [showCharts, setShowCharts] = useState(false)
   // No per-product selection needed for pie; we'll show overall composition
 
@@ -147,7 +152,7 @@ export default function CalculatorSection() {
 
     return () => { cancelled = true }
   }, [products, displayCurrency])
-
+  
   // Update display currency when importer country changes
   useEffect(() => {
     const newCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
@@ -300,6 +305,48 @@ export default function CalculatorSection() {
     }
   }
 
+  const callGeminiApi = async (data: string, prompt?: string) => {
+    try {
+      console.log('   📤 Sending request to Gemini API...')
+      console.log('   📝 Data:', data)
+      console.log('   📝 Prompt:', prompt)
+      const url = `${API_BASE}/api/v1/gemini/analyses`
+      const startTime = performance.now()
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data, prompt })
+      })
+
+      const responseTime = performance.now() - startTime
+      console.log(`   ⏱️  Gemini API response time: ${responseTime.toFixed(2)}ms`)
+      console.log('   📥 Response status:', response.status)
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+      console.log('   📊 Gemini API result:', result)
+
+      if (result?.success && result?.analysis) {
+        setApiResponse(result.analysis)
+        console.log('   ✅ Analysis set successfully')
+      } else {
+        setApiResponse("No analysis data returned from API.")
+        console.log('   ⚠️  No analysis data in response')
+      }
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error occurred"
+      setApiError(errorMsg)
+      console.error('   ❌ Gemini API Error:', errorMsg)
+      if (err instanceof Error && err.stack) {
+        console.error('   ❌ Stack:', err.stack)
+      }
+    }
+  }
+
   const queryTariffForProduct = async (
     productCode: string,
     importerCode: string,
@@ -316,7 +363,7 @@ export default function CalculatorSection() {
     console.log(`\n📊 STEP 1: Querying database for product ${productCode}...`)
     const startDb = performance.now()
     const productInt = parseInt(productCode, 10)
-    const dbUrl = `${API_BASE}/api/v1/tariffs?reporter=${encodeURIComponent(importerCode)}&partner=${encodeURIComponent(exporterCode)}&product=${productInt}&year=${encodeURIComponent(yearVal)}&tariffTypeId=1`
+  const dbUrl = `${API_BASE}/api/v1/tariffs?reporter=${encodeURIComponent(importerCode)}&partner=${encodeURIComponent(exporterCode)}&product=${productInt}&year=${encodeURIComponent(yearVal)}&tariffTypeId=1`
     console.log('   📍 Database API URL:', dbUrl)
 
     try {
@@ -382,7 +429,7 @@ export default function CalculatorSection() {
     if (!foundInDatabase) {
       console.log('\n🌐 STEP 2: Querying WTO API as fallback...')
       const startWto = performance.now()
-      const wtoUrl = `${API_BASE}/api/v1/indicators/HS_P_0070/observations?i=HS_P_0070&r=${importerCode}&p=${exporterCode}&pc=${productCode}&ps=${yearVal}&fmt=json`
+  const wtoUrl = `${API_BASE}/api/v1/indicators/HS_P_0070/observations?i=HS_P_0070&r=${importerCode}&p=${exporterCode}&pc=${productCode}&ps=${yearVal}&fmt=json`
       console.log('   📍 WTO API URL:', wtoUrl)
 
       try {
@@ -487,8 +534,11 @@ export default function CalculatorSection() {
 
     setInputError(null)
     setApiError(null)
+    setApiResponse(null)
     setIsCalculatingTariff(true)
-    setCalculationFinished(false)
+    setIsAnalyzing(true)
+    setAiFinished(false)
+    setShowAIAnalysis(false)
     setShowCharts(false)
 
     // Reset all products to loading state
@@ -552,8 +602,33 @@ export default function CalculatorSection() {
 
       setProducts(updatedProducts)
       setIsCalculatingTariff(false)
-      setCalculationFinished(true)
+      setAiFinished(true)
       console.log('   ✅ Tariff results displayed to user')
+
+      // STEP: Start AI analysis for FIRST PRODUCT ONLY (non-blocking)
+      const firstProduct = updatedProducts[0]
+      if (firstProduct && firstProduct.tariffRate !== null) {
+        console.log('\n🤖 Starting Gemini AI analysis for FIRST PRODUCT...')
+        const startAi = performance.now()
+        const productName = agriculturalProducts.find(p => p.hs_code === firstProduct.productCode)?.name || firstProduct.productCode
+        const apiData = `Trade analysis: Export from ${getCountryName(firstProduct.fromCountry)} (${firstProduct.fromCountry}) to ${getCountryName(firstProduct.toCountry)} (${firstProduct.toCountry}). Product: ${productName} (${firstProduct.productCode}), Value: $${firstProduct.value}, Year: ${firstProduct.year}. Tariff Rate: ${firstProduct.tariffRate}%. Data source: ${firstProduct.dataSource === 'database' ? 'Internal Database' : 'WTO API'}`
+        const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors. Note: 000 represents 'World' in country codes."
+
+        // Call AI without await - let it run in background
+        callGeminiApi(apiData, prompt).then(() => {
+          const aiTime = performance.now() - startAi
+          console.log(`   ✅ Gemini AI analysis completed in ${aiTime.toFixed(2)}ms`)
+          console.log('   ✅ AI analysis ready for display')
+        }).catch((err) => {
+          console.error('   ❌ Gemini AI analysis failed:', err)
+        }).finally(() => {
+          setIsAnalyzing(false)
+        })
+
+        console.log('   🚀 AI analysis started (running in background)')
+      } else {
+        setIsAnalyzing(false)
+      }
 
       console.log('\n═══════════════════════════════════════════')
       console.log('✅ TARIFF CALCULATION COMPLETE')
@@ -562,12 +637,13 @@ export default function CalculatorSection() {
     } catch (err) {
       console.error('\n❌❌❌ ERROR in calculateTariff:', err)
       setApiError(err instanceof Error ? err.message : "Unknown error occurred")
-      setCalculationFinished(true)
+      setAiFinished(true)
       console.error('   Stack trace:', err instanceof Error ? err.stack : 'N/A')
     } finally {
       setIsCalculatingTariff(false)
     }
   }
+
 
   const getCountryName = (code: string) => {
     const country = countries.find(c => c.code === code)
@@ -595,7 +671,7 @@ export default function CalculatorSection() {
     { product: "Soybeans", tariff: 10.0 },
     { product: "Barley", tariff: 6.3 },
   ]
-
+  
   // ===== Chart Data (A: Direct, B: Derived) =====
   const successfulProducts = useMemo(() => (
     products.filter(p => p.status === 'success' && p.tariffRate !== null)
@@ -610,7 +686,7 @@ export default function CalculatorSection() {
     const name = getCountryName(code)
     if (!name) return code
     // Take first letter of up to first 3 words (to avoid very long names)
-    const parts = name.replace(/['’]/g, '').split(/\s+/).filter(Boolean).slice(0, 3)
+    const parts = name.replace(/['’]/g,'').split(/\s+/).filter(Boolean).slice(0,3)
     const acronym = parts.map(p => p[0].toUpperCase()).join('')
     return acronym || code
   }
@@ -716,7 +792,7 @@ export default function CalculatorSection() {
                 <p className="text-xs text-muted-foreground">Use the list below to configure multiple trade routes before calculating tariffs.</p>
               </div>
             </div>
-
+            
             {/* Products Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -733,133 +809,133 @@ export default function CalculatorSection() {
               </div>
 
               {products.map((product, index) => {
-                const importerCurrency = getImporterCurrency(product.toCountry)
+  const importerCurrency = getImporterCurrency(product.toCountry)
+  
+  return (
+    <div key={product.id} className="p-4 rounded-lg border border-white/20 bg-black/50 relative space-y-4">
+      {products.length > 1 && !isCalculatingTariff && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="absolute top-2 right-2"
+          onClick={() => removeProduct(product.id)}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      )}
 
-                return (
-                  <div key={product.id} className="p-4 rounded-lg border border-white/20 bg-black/50 relative space-y-4">
-                    {products.length > 1 && !isCalculatingTariff && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute top-2 right-2"
-                        onClick={() => removeProduct(product.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
+      {/* First Row: Product, Exporter, Importer, Year */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor={`product-${product.id}`}>Product {index + 1}</Label>
+          <Select
+            value={product.productCode}
+            onValueChange={(val) => updateProduct(product.id, 'productCode', val)}
+            disabled={isCalculatingTariff}
+          >
+            <SelectTrigger>
+              <SelectValue>{agriculturalProducts.find(p => p.hs_code === product.productCode)?.name}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {agriculturalProducts.map(p => (
+                <SelectItem key={p.hs_code} value={p.hs_code}>{p.name} ({p.hs_code})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-                    {/* First Row: Product, Exporter, Importer, Year */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor={`product-${product.id}`}>Product {index + 1}</Label>
-                        <Select
-                          value={product.productCode}
-                          onValueChange={(val) => updateProduct(product.id, 'productCode', val)}
-                          disabled={isCalculatingTariff}
-                        >
-                          <SelectTrigger>
-                            <SelectValue>{agriculturalProducts.find(p => p.hs_code === product.productCode)?.name}</SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {agriculturalProducts.map(p => (
-                              <SelectItem key={p.hs_code} value={p.hs_code}>{p.name} ({p.hs_code})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+        <div className="space-y-2">
+          <Label>Exporter</Label>
+          <Select
+            value={product.fromCountry}
+            onValueChange={(val) => updateProduct(product.id, 'fromCountry', val)}
+            disabled={isCalculatingTariff}
+          >
+            <SelectTrigger>
+              <SelectValue>{getCountryName(product.fromCountry)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {countries.map(c => (
+                <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-                      <div className="space-y-2">
-                        <Label>Exporter</Label>
-                        <Select
-                          value={product.fromCountry}
-                          onValueChange={(val) => updateProduct(product.id, 'fromCountry', val)}
-                          disabled={isCalculatingTariff}
-                        >
-                          <SelectTrigger>
-                            <SelectValue>{getCountryName(product.fromCountry)}</SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {countries.map(c => (
-                              <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+        <div className="space-y-2">
+          <Label>Importer</Label>
+          <Select
+            value={product.toCountry}
+            onValueChange={(val) => updateProduct(product.id, 'toCountry', val)}
+            disabled={isCalculatingTariff}
+          >
+            <SelectTrigger>
+              <SelectValue>{getCountryName(product.toCountry)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {countries.map(c => (
+                <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-                      <div className="space-y-2">
-                        <Label>Importer</Label>
-                        <Select
-                          value={product.toCountry}
-                          onValueChange={(val) => updateProduct(product.id, 'toCountry', val)}
-                          disabled={isCalculatingTariff}
-                        >
-                          <SelectTrigger>
-                            <SelectValue>{getCountryName(product.toCountry)}</SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {countries.map(c => (
-                              <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+        <div className="space-y-2">
+          <Label>Year</Label>
+          <Select
+            value={product.year}
+            onValueChange={(val) => updateProduct(product.id, 'year', val)}
+            disabled={isCalculatingTariff}
+          >
+            <SelectTrigger>
+              <SelectValue>{product.year}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {[2024, 2023, 2022, 2021, 2020, 2019].map(y => (
+                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-                      <div className="space-y-2">
-                        <Label>Year</Label>
-                        <Select
-                          value={product.year}
-                          onValueChange={(val) => updateProduct(product.id, 'year', val)}
-                          disabled={isCalculatingTariff}
-                        >
-                          <SelectTrigger>
-                            <SelectValue>{product.year}</SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[2024, 2023, 2022, 2021, 2020, 2019].map(y => (
-                              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+      {/* Second Row: Value of Goods */}
+      <div className="space-y-2">
+        <Label htmlFor={`value-${product.id}`} className="flex items-center gap-2">
+          <span>Value of Goods</span>
+          <span className="text-xs font-normal text-muted-foreground">
+            (Importer Currency: {importerCurrency})
+          </span>
+        </Label>
+        <Input
+          type="number"
+          id={`value-${product.id}`}
+          value={product.value}
+          onChange={e => updateProduct(product.id, 'value', e.target.value)}
+          placeholder={`Enter value in ${importerCurrency}`}
+          disabled={isCalculatingTariff}
+          className="max-w-md"
+        />
+      </div>
 
-                    {/* Second Row: Value of Goods */}
-                    <div className="space-y-2">
-                      <Label htmlFor={`value-${product.id}`} className="flex items-center gap-2">
-                        <span>Value of Goods</span>
-                        <span className="text-xs font-normal text-muted-foreground">
-                          (Importer Currency: {importerCurrency})
-                        </span>
-                      </Label>
-                      <Input
-                        type="number"
-                        id={`value-${product.id}`}
-                        value={product.value}
-                        onChange={e => updateProduct(product.id, 'value', e.target.value)}
-                        placeholder={`Enter value in ${importerCurrency}`}
-                        disabled={isCalculatingTariff}
-                        className="max-w-md"
-                      />
-                    </div>
-
-                    {product.status === 'loading' && (
-                      <div className="text-center text-sm text-gray-500">
-                        <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
-                        Loading tariff data...
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+      {product.status === 'loading' && (
+        <div className="text-center text-sm text-gray-500">
+          <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
+          Loading tariff data...
+        </div>
+      )}
+    </div>
+  )
+})}
             </div>
 
             <Button
               onClick={calculateTariff}
-              disabled={!fromCountry || !toCountry || isCalculatingTariff}
+              disabled={!fromCountry || !toCountry || isCalculatingTariff || isAnalyzing}
               className="w-full py-4"
             >
-              {isCalculatingTariff ? "Calculating..." : "Calculate Tariff"}
+              {isCalculatingTariff ? "Calculating..." : isAnalyzing ? "Analyzing..." : "Calculate Tariff"}
             </Button>
 
             {inputError && <div className="bg-red-600 text-white p-4 rounded-lg">{inputError}</div>}
@@ -1157,7 +1233,7 @@ export default function CalculatorSection() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis />
-                      <Tooltip formatter={(v: number, n: string) => `${displayCurrency} ${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}${n === 'tariffAmount' || n === 'change' ? ' (Tariff)' : ''}`} />
+                      <Tooltip formatter={(v: number, n: string) => `${displayCurrency} ${Number(v).toLocaleString(undefined,{maximumFractionDigits:2})}${n==='tariffAmount'||n==='change'?' (Tariff)':''}`} />
                       <Legend />
                       {/* Step bars */}
                       <Bar dataKey="base" stackId="wf" fill="transparent" isAnimationActive={false} />
@@ -1192,14 +1268,14 @@ export default function CalculatorSection() {
                         >
                           {pieData.map((entry, index) => {
                             const palette = [
-                              '#22C55E', '#EF4444', '#6366F1', '#F59E0B', '#06B6D4',
-                              '#8B5CF6', '#10B981', '#F97316', '#EC4899', '#3B82F6',
-                              '#84CC16', '#D946EF', '#16A34A', '#DC2626', '#1D4ED8'
+                              '#22C55E','#EF4444','#6366F1','#F59E0B','#06B6D4',
+                              '#8B5CF6','#10B981','#F97316','#EC4899','#3B82F6',
+                              '#84CC16','#D946EF','#16A34A','#DC2626','#1D4ED8'
                             ]
                             // Differentiate tariff slices by darkening color or using next palette item
                             const baseColor = palette[index % palette.length]
                             const isTariff = /Tariff$/i.test(entry.name)
-                            const color = isTariff ? palette[(index + 1) % palette.length] : baseColor
+                            const color = isTariff ? palette[(index+1) % palette.length] : baseColor
                             return <Cell key={`cell-${index}`} fill={color} />
                           })}
                         </Pie>
@@ -1210,7 +1286,7 @@ export default function CalculatorSection() {
                   )}
                   {pieData.length > 0 && (
                     <p className="text-xs mt-2 text-muted-foreground">
-                      Pie total equals Overall Total Cost: {displayCurrency} {totals.cost.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      Pie total equals Overall Total Cost: {displayCurrency} {totals.cost.toLocaleString(undefined,{maximumFractionDigits:2})}
                     </p>
                   )}
                 </Card>
