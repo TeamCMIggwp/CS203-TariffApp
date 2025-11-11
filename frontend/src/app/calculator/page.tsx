@@ -1,1123 +1,672 @@
 "use client"
-
-import { useState, useEffect, useMemo } from "react"
-import { motion, useMotionValue, AnimatePresence } from "framer-motion"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, ScatterChart, Scatter, ZAxis, PieChart, Pie, Cell } from "recharts"
-import { BarChart3, Sparkles, Database, Globe, Plus, Trash2 } from "lucide-react"
-import { getCurrencyCode, getCurrencyName, countryToCurrency } from "@/lib/fx"
-import { fetchFxQuote } from "@/lib/fxApi"
-import { ChevronDown } from "lucide-react"
-
-type MetricValue = string | number
-
-// Define the possible API response shape
-interface ExchangeApiResponse {
-  conversionRates?: Record<string, number>
-  rates?: Record<string, number>
-  rate?: number
-}
-
-type GeminiApiResponse = {
-  summary?: string
-  insights?: string[]
-  metrics?: Record<string, MetricValue>
-  recommendations?: string[]
-  confidence?: string
-} | string | null
-
-type ProductRow = {
-  id: string
-  productCode: string
-  value: string
-  tariffRate: number | null
-  tariffAmount: number | null
-  dataSource: 'database' | 'wto' | null
-  status: 'idle' | 'loading' | 'success' | 'error'
-  errorMessage?: string
-  fromCountry: string
-  toCountry: string
-  year: string
-}
-
-// Derive country list as string[] from currency converter
-const countryNames = Object.keys(countryToCurrency as Record<string, unknown>) as string[]
-
-export default function CalculatorSection() {
-  const calculatorY = useMotionValue(0)
-  const [fromCountry, setFromCountry] = useState("004")
-  const [toCountry, setToCountry] = useState("840")
-  const [year, setYear] = useState("2024")
-
-  // Changed to array of products
-  const [products, setProducts] = useState<ProductRow[]>([
-    { id: '1', productCode: '100630', value: '100', tariffRate: null, tariffAmount: null, dataSource: null, status: 'idle', fromCountry: '004', toCountry: '840', year: '2024' }
-  ])
-
-  const [isCalculatingTariff, setIsCalculatingTariff] = useState(false)
-  const [inputError, setInputError] = useState<string | null>(null)
-  const [apiError, setApiError] = useState<string | null>(null)
-  const [calculationFinished, setCalculationFinished] = useState(false)
-  const [showCharts, setShowCharts] = useState(false)
-  // No per-product selection needed for pie; we'll show overall composition
-
-  // === Currency Conversion ===
-  const selectedCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
-  const [displayCurrency, setDisplayCurrency] = useState<string>(selectedCurrency)
-  const [conversionRate, setConversionRate] = useState<number>(1)
-  const [currencyLoading, setCurrencyLoading] = useState(false)
-  const [currencyError, setCurrencyError] = useState<string | null>(null)
-  // Map of baseCurrency -> rate to displayCurrency (1 base = rate display)
-  const [fxRates, setFxRates] = useState<Record<string, number>>({})
-
-  // Backend API base URL, configurable via environment for Amplify and local dev
-  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080'
-
-  // Helper: get currency code for a given importer country code
-  // 1) Try code→currency map from tariff-data
-  // 2) Fallback to country name→currency map from fx
-  // 3) Default to USD
-  const getImporterCurrency = (importerCountryCode: string) => {
-    const direct = currencies[importerCountryCode as keyof typeof currencies] as string | undefined
-    if (direct) return direct
-    const countryName = countries.find(c => c.code === importerCountryCode)?.name
-    if (countryName) {
-      const byName = (countryToCurrency as Record<string, string | undefined>)[countryName]
-      if (byName) return byName
-    }
-    return "USD"
-  }
-
-  // Fetch per-base conversion rates to the current display currency
-  useEffect(() => {
-    let cancelled = false
-    setCurrencyError(null)
-
-    // Unique base currencies from current products (their importer currencies)
-    const basesSet = new Set<string>()
-    products.forEach(p => basesSet.add(getImporterCurrency(p.toCountry)))
-    // Always include display currency with a self-rate of 1
-    basesSet.add(displayCurrency)
-    const bases = Array.from(basesSet)
-
-    // IMPORTANT: Rates depend on the current displayCurrency. If displayCurrency changes, previously
-    // cached fxRates are no longer valid. Always re-fetch every base (except the displayCurrency itself)
-    // to avoid stale 1:1 mappings.
-    const toFetch = bases.filter(b => b !== displayCurrency)
-    // Always ensure display currency self-rate is set; we'll still continue to fetch others.
-    setFxRates(prev => ({ ...prev, [displayCurrency]: 1 }))
-
-    setCurrencyLoading(true)
-
-    const fetchRateForBase = async (base: string) => {
-      try {
-        const { rate } = await fetchFxQuote(base, displayCurrency)
-        return { base, rate }
-      } catch (err) {
-        console.error('Currency conversion error (per-product):', err)
-        setCurrencyError(`Failed to fetch ${base}→${displayCurrency} rate`)
-        return { base, rate: NaN }
-      }
-    }
-
-    Promise.all(toFetch.map(fetchRateForBase))
-      .then(results => {
-        if (cancelled) return
-        setFxRates(prev => {
-          const next = { [displayCurrency]: 1 } // rebuild fresh map for current display currency
-          results.forEach(r => {
-            if (r && Number.isFinite(r.rate)) {
-              next[r.base] = r.rate as number
-            }
-          })
-          return next
-        })
-      })
-      .catch(err => {
-        console.error('Currency conversion batch error:', err)
-        setCurrencyError('Failed to fetch some exchange rates')
-      })
-      .finally(() => {
-        if (!cancelled) setCurrencyLoading(false)
-      })
-
-    return () => { cancelled = true }
-  }, [products, displayCurrency])
-
-  // Update display currency when importer country changes
-  useEffect(() => {
-    const newCurrency = toCountry ? currencies[toCountry as keyof typeof currencies] || "USD" : "USD"
-    setDisplayCurrency(newCurrency)
-  }, [toCountry])
-
-  // Keep legacy single-rate in sync for UI fallback (based on global importer)
-  useEffect(() => {
-    const singleBase = selectedCurrency
-    if (singleBase === displayCurrency) {
-      setConversionRate(1)
-      return
-    }
-    // Prefer the fetched fxRates if available
-    if (fxRates[singleBase] !== undefined) {
-      setConversionRate(fxRates[singleBase])
-      return
-    }
-    // Otherwise fetch once
-    const fetchLegacy = async () => {
-      try {
-        setCurrencyLoading(true)
-        const { rate } = await fetchFxQuote(singleBase, displayCurrency)
-        setConversionRate(rate)
-        setFxRates(prev => ({ ...prev, [singleBase]: rate, [displayCurrency]: 1 }))
-      } catch (err) {
-        console.error('Currency conversion error (legacy):', err)
-        setCurrencyError(`Failed to fetch ${singleBase}→${displayCurrency} rate`)
-      } finally {
-        setCurrencyLoading(false)
-      }
-    }
-    fetchLegacy()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayCurrency, selectedCurrency])
-
-  // (Removed pie product selection effect – pie now aggregates all products.)
-
-  // Unique importer currencies across all products (for UI hints)
-  const importerCurrencies = useMemo(() => {
-    const set = new Set<string>()
-    products.forEach(p => set.add(getImporterCurrency(p.toCountry)))
-    return Array.from(set)
-  }, [products])
-
-  // Helper functions to convert/format amounts from a given base currency to the display currency
-  const convertAmountFrom = (amount: number, baseCurrency: string) => {
-    if (!Number.isFinite(amount)) return 0
-    if (baseCurrency === displayCurrency) return amount
-    const rate = fxRates[baseCurrency]
-    return Number.isFinite(rate) ? amount * rate : amount
-  }
-
-  const formatCurrencyFrom = (amount: number, baseCurrency: string) => {
-    return convertAmountFrom(amount, baseCurrency).toLocaleString(undefined, { maximumFractionDigits: 2 })
-  }
-
-  const addProduct = () => {
-    const newId = String(Date.now())
-    setProducts([...products, {
-      id: newId,
-      productCode: '100630',
-      value: '',
-      tariffRate: null,
-      tariffAmount: null,
-      dataSource: null,
-      status: 'idle',
-      fromCountry,
-      toCountry,
-      year
-    }])
-  }
-
-  const removeProduct = (id: string) => {
-    if (products.length > 1) {
-      setProducts(products.filter(p => p.id !== id))
-    }
-  }
-
-  const updateProduct = (
-    id: string,
-    field: 'productCode' | 'value' | 'fromCountry' | 'toCountry' | 'year',
-    value: string
-  ) => {
-    setProducts(products.map(p =>
-      p.id === id ? { ...p, [field]: value } : p
-    ))
-  }
-
-  // NEW: Function to save tariff to database
-  const saveTariffToDatabase = async (
-    reporter: string,
-    partner: string,
-    productCode: number,
-    yearVal: string,
-    rate: number,
-    unit: string = "percent"
-  ) => {
-    try {
-      console.log('\n💾 SAVING TO DATABASE...')
-      const saveUrl = `${API_BASE}/api/v1/tariffs`
-      const startTime = performance.now()
-
-      const payload = {
-        reporter: reporter,
-        partner: partner,
-        product: productCode,
-        year: yearVal,
-        tariff_type_id: 1, // Default to tariff type 1
-        rate: rate,
-        unit: unit
-      }
-
-      console.log('   📤 Payload:', JSON.stringify(payload, null, 2))
-
-      const response = await fetch(saveUrl, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify(payload)
-      })
-
-      const saveTime = performance.now() - startTime
-      console.log(`   ⏱️  Save response time: ${saveTime.toFixed(2)}ms`)
-      console.log('   📥 Save response status:', response.status)
-
-      if (response.status === 201) {
-        const result = await response.json()
-        console.log('   ✅ Successfully saved tariff to database!')
-        console.log('   📊 Saved data:', result)
-        return true
-      } else if (response.status === 409) {
-        console.log('   ⚠️  Tariff already exists in database (409 Conflict)')
-        // Not an error - it just already exists
-        return true
-      } else {
-        const errorText = await response.text()
-        console.error('   ❌ Failed to save tariff:', response.status, errorText)
-        return false
-      }
-    } catch (err) {
-      console.error('   ❌ Exception while saving tariff:', err)
-      if (err instanceof Error) {
-        console.error('   ❌ Error:', err.message)
-      }
-      return false
-    }
-  }
-
-  const queryTariffForProduct = async (
-    productCode: string,
-    importerCode: string,
-    exporterCode: string,
-    yearVal: string
-  ): Promise<{
-    rate: number | null
-    source: 'database' | 'wto' | null
-  }> => {
-    let parsedPercentage: number | null = null
-    let foundInDatabase = false
-
-    // STEP 1: Query your database first
-    console.log(`\n📊 STEP 1: Querying database for product ${productCode}...`)
-    const startDb = performance.now()
-    const productInt = parseInt(productCode, 10)
-    const dbUrl = `${API_BASE}/api/v1/tariffs?reporter=${encodeURIComponent(importerCode)}&partner=${encodeURIComponent(exporterCode)}&product=${productInt}&year=${encodeURIComponent(yearVal)}&tariffTypeId=1`
-    console.log('   📍 Database API URL:', dbUrl)
-
-    try {
-      const dbResponse = await fetch(dbUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      })
-
-      const dbTime = performance.now() - startDb
-      console.log(`   ⏱️  Database response time: ${dbTime.toFixed(2)}ms`)
-      console.log('   📥 Database response status:', dbResponse.status)
-
-      if (dbResponse.status === 204) {
-        console.log('   ❌ Database returned 204 No Content - tariff not found')
-      } else if (dbResponse.ok) {
-        const responseText = await dbResponse.text()
-        console.log('   📄 Database raw response length:', responseText.length, 'chars')
-
-        if (!responseText || responseText.trim() === '') {
-          console.log('   ❌ Database returned empty response')
-        } else {
-          try {
-            const dbData = JSON.parse(responseText)
-            console.log('   ✅ Database parsed response:', JSON.stringify(dbData, null, 2))
-
-            if (dbData && dbData.rate !== undefined && dbData.rate !== null) {
-              parsedPercentage = typeof dbData.rate === 'number' ? dbData.rate : parseFloat(String(dbData.rate))
-
-              if (Number.isFinite(parsedPercentage)) {
-                console.log('   ✅ ✅ SUCCESS! Found tariff in database:', parsedPercentage, '%')
-                foundInDatabase = true
-                return { rate: parsedPercentage, source: 'database' }
-              }
-            } else {
-              console.log('   ❌ Database response missing rate field')
-            }
-          } catch (parseErr) {
-            console.error('   ❌ Failed to parse database JSON:', parseErr)
-          }
-        }
-      } else if (dbResponse.status === 404) {
-        console.log('   ❌ Tariff not found in database (404)')
-      } else if (dbResponse.status === 502) {
-        const errorText = await dbResponse.text()
-        console.error('   ❌ Database 502 error response:', errorText)
-      } else {
-        console.warn('   ⚠️  Database query returned status:', dbResponse.status)
-        const errorText = await dbResponse.text()
-        console.warn('   ⚠️  Error response:', errorText)
-      }
-    } catch (dbErr) {
-      console.error('   ❌ Database query exception:', dbErr)
-      if (dbErr instanceof Error) {
-        console.error('   ❌ Error details:', dbErr.message, dbErr.stack)
-      }
-    }
-
-    // STEP 2: If not found in database, query WTO API
-    if (!foundInDatabase) {
-      console.log('\n🌐 STEP 2: Querying WTO API as fallback...')
-      const startWto = performance.now()
-      const wtoUrl = `${API_BASE}/api/v1/indicators/HS_P_0070/observations?i=HS_P_0070&r=${importerCode}&p=${exporterCode}&pc=${productCode}&ps=${yearVal}&fmt=json`
-      console.log('   📍 WTO API URL:', wtoUrl)
-
-      try {
-        const wtoResponse = await fetch(wtoUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          mode: 'cors',
-          credentials: 'omit'
-        })
-        const wtoTime = performance.now() - startWto
-        console.log(`   ⏱️  WTO API response time: ${wtoTime.toFixed(2)}ms`)
-        console.log('   📥 WTO API response status:', wtoResponse.status)
-
-        if (wtoResponse.status === 204) {
-          console.log('   ❌ WTO API returned 204 No Content - tariff not found')
-        } else if (wtoResponse.ok) {
-          const responseText = await wtoResponse.text()
-          console.log('   📄 WTO API raw response length:', responseText.length, 'chars')
-
-          if (!responseText || responseText.trim() === '') {
-            console.log('   ❌ WTO API returned empty response')
-          } else {
-            try {
-              const wtoData = JSON.parse(responseText)
-              console.log('   ✅ WTO API parsed data:', JSON.stringify(wtoData, null, 2))
-
-              type WTORecord = { Year?: number; Value?: string | number;[key: string]: unknown }
-              if (wtoData.Dataset && Array.isArray(wtoData.Dataset) && wtoData.Dataset.length > 0) {
-                const records = (wtoData.Dataset as WTORecord[]).sort((a: WTORecord, b: WTORecord) => ((b.Year ?? 0) - (a.Year ?? 0)))
-                const latestRecord = records[0]
-                console.log('   📊 Latest WTO record:', latestRecord)
-
-                if (latestRecord && latestRecord.Value !== undefined) {
-                  const v = latestRecord.Value
-                  const num = typeof v === 'number' ? v : parseFloat(String(v))
-                  parsedPercentage = Number.isFinite(num) ? num : null
-
-                  if (parsedPercentage !== null) {
-                    console.log('   ✅ ✅ SUCCESS! Found tariff in WTO API:', parsedPercentage, '%')
-
-                    // Save to database if found in WTO API
-                    await saveTariffToDatabase(
-                      importerCode,     // reporter (importer)
-                      exporterCode,     // partner (exporter)
-                      productInt,       // product code
-                      yearVal,          // year
-                      parsedPercentage, // rate
-                      "percent"         // unit
-                    )
-
-                    return { rate: parsedPercentage, source: 'wto' }
-                  }
-                }
-              } else {
-                console.log('   ❌ WTO API returned no dataset or empty dataset')
-              }
-            } catch (parseErr) {
-              console.error('   ❌ Failed to parse WTO API JSON:', parseErr)
-              console.log('   📄 Response text was:', responseText.substring(0, 500))
-            }
-          }
-
-          if (parsedPercentage === null) {
-            console.warn('   ⚠️  Could not parse tariff rate from WTO API response')
-          }
-        } else if (wtoResponse.status === 404 || wtoResponse.status === 422) {
-          console.log('   ❌ Tariff not found in WTO API (404/422)')
-        } else if (wtoResponse.status === 502) {
-          const errorText = await wtoResponse.text()
-          console.error('   ❌ WTO API 502 error:', errorText)
-        } else {
-          console.warn('   ⚠️  WTO API returned status:', wtoResponse.status)
-        }
-      } catch (wtoErr) {
-        console.error('   ❌ WTO API fetch failed:', wtoErr)
-        if (wtoErr instanceof Error) {
-          console.error('   ❌ Error:', wtoErr.message)
-        }
-      }
-    } else {
-      console.log('\n⏭️  STEP 2: Skipping WTO API (data found in database)')
-    }
-
-    return { rate: null, source: null }
-  }
-
-  const calculateTariff = async () => {
-    // Validate all products have data
-    const hasEmptyProducts = products.some(p => !p.productCode || !p.value)
-    if (!fromCountry || !toCountry || !year || hasEmptyProducts) {
-      setInputError("Please fill in all required fields for all products.")
-      return
-    }
-
-    console.log('═══════════════════════════════════════════')
-    console.log('🚀 STARTING TARIFF CALCULATION')
-    console.log('═══════════════════════════════════════════')
-    console.log('Parameters:', { fromCountry, toCountry, year, productCount: products.length })
-
-    setInputError(null)
-    setApiError(null)
-    setIsCalculatingTariff(true)
-    setCalculationFinished(false)
-    setShowCharts(false)
-
-    // Reset all products to loading state
-    setProducts(products.map(p => ({
-      ...p,
-      status: 'loading' as const,
-      tariffRate: null,
-      tariffAmount: null,
-      dataSource: null
-    })))
-
-    try {
-      // Query tariffs for all products concurrently
-      console.log(`\n🚀 Processing ${products.length} products concurrently...`)
-      const productPromises = products.map(async (product) => {
-        console.log(`\n🔍 Processing product ${product.productCode}...`)
-
-        try {
-          const result = await queryTariffForProduct(
-            product.productCode,
-            product.toCountry,
-            product.fromCountry,
-            product.year
-          )
-          const productValue = parseFloat(product.value)
-
-          if (result.rate !== null && !isNaN(productValue)) {
-            const tariffAmount = (result.rate / 100) * productValue
-            console.log(`   ✅ Tariff calculated: ${result.rate}% = ${tariffAmount}`)
-            return {
-              ...product,
-              tariffRate: result.rate,
-              tariffAmount: tariffAmount,
-              dataSource: result.source,
-              status: 'success' as const
-            }
-          } else {
-            console.log(`   ⚠️ No tariff data found`)
-            return {
-              ...product,
-              tariffRate: null,
-              tariffAmount: null,
-              dataSource: null,
-              status: 'error' as const,
-              errorMessage: 'No tariff data found (MFN may apply)'
-            }
-          }
-        } catch (err) {
-          console.error(`   ❌ Error processing product:`, err)
-          return {
-            ...product,
-            status: 'error' as const,
-            errorMessage: err instanceof Error ? err.message : 'Unknown error'
-          }
-        }
-      })
-
-      // Wait for all product queries to complete concurrently
-      const updatedProducts = await Promise.all(productPromises)
-      console.log(`\n✅ All ${products.length} products processed concurrently`)
-
-      setProducts(updatedProducts)
-      setIsCalculatingTariff(false)
-      setCalculationFinished(true)
-      console.log('   ✅ Tariff results displayed to user')
-
-      console.log('\n═══════════════════════════════════════════')
-      console.log('✅ TARIFF CALCULATION COMPLETE')
-      console.log('═══════════════════════════════════════════\n')
-
-    } catch (err) {
-      console.error('\n❌❌❌ ERROR in calculateTariff:', err)
-      setApiError(err instanceof Error ? err.message : "Unknown error occurred")
-      setCalculationFinished(true)
-      console.error('   Stack trace:', err instanceof Error ? err.stack : 'N/A')
-    } finally {
-      setIsCalculatingTariff(false)
-    }
-  }
-
-  const getCountryName = (code: string) => {
-    const country = countries.find(c => c.code === code)
-    return country ? country.name : code
-  }
-
-  // Calculate totals (converted to display currency using each product's importer currency)
-  const totals = useMemo(() => {
-    let value = 0
-    let tariff = 0
-    products.forEach(p => {
-      const base = getImporterCurrency(p.toCountry)
-      const v = parseFloat(p.value) || 0
-      const t = p.tariffAmount || 0
-      value += convertAmountFrom(v, base)
-      tariff += convertAmountFrom(t, base)
-    })
-    return { value, tariff, cost: value + tariff }
-  }, [products, fxRates, displayCurrency])
-
-  const dummyChartData = [
-    { product: "Wheat", tariff: 5.2 },
-    { product: "Rice", tariff: 12.5 },
-    { product: "Corn", tariff: 8.1 },
-    { product: "Soybeans", tariff: 10.0 },
-    { product: "Barley", tariff: 6.3 },
+import {
+  BookOpen,
+  Globe,
+  TrendingUp,
+  Shield,
+  Users,
+  BarChart3,
+  Leaf,
+  Percent,
+  TrendingDown,
+  Scale,
+  Lock,
+  CheckCircle,
+  Calendar,
+  ArrowRight,
+  Activity,
+} from "lucide-react"
+
+const tariffFeatures = [
+  {
+    id: 1,
+    title: "Real-Time Calculations",
+    description: "Instant tariff calculations for agricultural products across 195+ countries with up-to-date rates",
+    image: "/pic1.jpg",
+    number: "01",
+  },
+  {
+    id: 2,
+    title: "Global Database Access",
+    description:
+      "Comprehensive WTO tariff data covering MFN rates, preferential agreements, and bound tariff commitments",
+    image: "/pic2.jpg",
+    number: "02",
+  },
+  {
+    id: 3,
+    title: "Trade Compliance Tools",
+    description: "Navigate complex trade regulations with confidence using our compliance verification system",
+    image: "/pic3.jpg",
+    number: "03",
+  },
+]
+
+function DynamicRates() {
+  const countries = [
+    { name: "USA", code: "840" },
+    { name: "Singapore", code: "702" },
+    { name: "China", code: "156" },
+    { name: "India", code: "356" },
+    { name: "Australia", code: "036" },
   ]
 
-  // ===== Chart Data (A: Direct, B: Derived) =====
-  const successfulProducts = useMemo(() => (
-    products.filter(p => p.status === 'success' && p.tariffRate !== null)
-  ), [products])
+  const [currentCountry, setCurrentCountry] = useState(0)
+  const [isAnimating, setIsAnimating] = useState(false)
+  const [currentRate, setCurrentRate] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [cachedRates, setCachedRates] = useState<Map<string, number>>(new Map())
 
-  const productName = (code: string) => (
-    agriculturalProducts.find(p => p.hs_code === code)?.name || code
-  )
+  const fetchTariffData = async (countryCode: string): Promise<number | null> => {
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
+      const indicator = 'TP_A_0160'
+      const currentYear = (new Date().getFullYear() - 1).toString()
+      const previousYear = (new Date().getFullYear() - 2).toString()
 
-  // Generate a short country code (acronym) from numeric code
-  const shortCountry = (code: string) => {
-    const name = getCountryName(code)
-    if (!name) return code
-    // Take first letter of up to first 3 words (to avoid very long names)
-    const parts = name.replace(/['’]/g, '').split(/\s+/).filter(Boolean).slice(0, 3)
-    const acronym = parts.map(p => p[0].toUpperCase()).join('')
-    return acronym || code
+      const url = new URL(`${API_BASE}/api/v1/indicators/${encodeURIComponent(indicator)}/observations`)
+      url.searchParams.set('r', countryCode)
+      url.searchParams.set('ps', currentYear)
+      url.searchParams.set('fmt', 'json')
+      url.searchParams.set('mode', 'full')
+      url.searchParams.set('echo', 'false')
+
+      const res = await fetch(url.toString(), { credentials: 'include' })
+      const text = await res.text()
+
+      if (!res.ok) {
+        url.searchParams.set('ps', previousYear)
+        const retryRes = await fetch(url.toString(), { credentials: 'include' })
+        const retryText = await retryRes.text()
+
+        if (!retryRes.ok || !retryText || retryText.trim() === '') {
+          return null
+        }
+
+        try {
+          const json = JSON.parse(retryText)
+          const value = extractValueFromObj(json, previousYear)
+          return value
+        } catch (parseError) {
+          return null
+        }
+      }
+
+      if (!text || text.trim() === '') {
+        return null
+      }
+
+      try {
+        const json = JSON.parse(text)
+        const value = extractValueFromObj(json, currentYear)
+        return value
+      } catch (parseError) {
+        return null
+      }
+    } catch (error) {
+      return null
+    }
   }
 
-  // A1: Comparative bar (HS product vs tariff %)
-  const tariffRateBarData = useMemo(() => (
-    successfulProducts.map(p => ({
-      // Include exporter→importer short country acronyms for differentiation
-      name: `${productName(p.productCode)} (${shortCountry(p.fromCountry)}→${shortCountry(p.toCountry)})`,
-      tariffRate: Number(p.tariffRate || 0)
-    }))
-  ), [successfulProducts])
+  const extractValueFromObj = (obj: unknown, preferYear?: string): number | null => {
+    if (obj == null) return null
 
-  // A2: Stacked bar (Goods Value vs Tariff Amount) per product (in display currency)
-  const costStackedData = useMemo(() => (
-    successfulProducts.map(p => {
-      const base = getImporterCurrency(p.toCountry)
-      return {
-        name: `${productName(p.productCode)} (${shortCountry(p.fromCountry)}→${shortCountry(p.toCountry)})`,
-        goodsValue: convertAmountFrom(parseFloat(p.value) || 0, base),
-        tariffAmount: convertAmountFrom(p.tariffAmount || 0, base)
+    if (Array.isArray(obj)) {
+      for (const el of obj) {
+        if (el && typeof el === "object" && "Value" in el && el.Value != null && !isNaN(Number(el.Value))) {
+          const yearVal = el.Year ?? null
+          if (preferYear && yearVal != null && String(yearVal) === String(preferYear)) return Number(el.Value)
+        }
       }
-    })
-  ), [successfulProducts, fxRates, displayCurrency])
-
-  // B1: Scatter (Goods Value vs Tariff Rate)
-  const valueVsRateScatter = useMemo(() => (
-    successfulProducts.map(p => ({
-      x: convertAmountFrom(parseFloat(p.value) || 0, getImporterCurrency(p.toCountry)),
-      y: Number(p.tariffRate || 0),
-      name: productName(p.productCode)
-    }))
-  ), [successfulProducts, fxRates, displayCurrency])
-
-  // B2: Waterfall (Import Value -> +Tariff -> Total Cost)
-  const waterfallData = useMemo(() => {
-    const importVal = totals.value
-    const tariffVal = totals.tariff
-    const total = totals.cost
-    // For enhanced visualization: keep steps plus a final split bar
-    return [
-      { name: 'Import Value', base: 0, change: importVal },
-      { name: 'Tariff Added', base: importVal, change: tariffVal },
-      // Final stacked representation for total cost (two components)
-      { name: 'Total Cost (Split)', goodsValue: importVal, tariffAmount: tariffVal }
-    ]
-  }, [totals])
-
-  // Aggregated pie data: each product contributes two slices (Product Value, Product Tariff)
-  const pieData = useMemo(() => {
-    const slices: { name: string; value: number }[] = []
-    products.forEach((p, idx) => {
-      if (p.status === 'success' && p.tariffRate !== null) {
-        const base = getImporterCurrency(p.toCountry)
-        const goodsVal = convertAmountFrom(parseFloat(p.value) || 0, base)
-        const tariffVal = convertAmountFrom(p.tariffAmount || 0, base)
-        const route = `${shortCountry(p.fromCountry)}→${shortCountry(p.toCountry)}`
-        slices.push({ name: `P${idx + 1} ${route}`, value: goodsVal })
-        slices.push({ name: `P${idx + 1} ${route} Tariff`, value: tariffVal })
+      for (const el of obj) {
+        const v = extractValueFromObj(el, preferYear)
+        if (v !== null) return v
       }
-    })
-    return slices
-  }, [products, fxRates, displayCurrency])
+      return null
+    }
+
+    if (typeof obj === "object") {
+      const rec = obj as Record<string, unknown>
+      if ("Value" in rec && rec.Value != null && !isNaN(Number(rec.Value))) {
+        const hasYearField = Object.prototype.hasOwnProperty.call(rec, "Year")
+        const yearVal = rec["Year"] ?? null
+        if (hasYearField && yearVal != null && preferYear && String(yearVal) === String(preferYear)) {
+          return Number(rec.Value)
+        }
+        if (!hasYearField || yearVal == null) {
+          return Number(rec.Value)
+        }
+      }
+      for (const k of Object.keys(rec)) {
+        const v = extractValueFromObj(rec[k], preferYear)
+        if (v !== null) return v
+      }
+    }
+
+    return null
+  }
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadAllData = async () => {
+      const ratesMap = new Map<string, number>()
+
+      for (const country of countries) {
+        const rate = await fetchTariffData(country.code)
+        if (rate !== null) {
+          ratesMap.set(country.code, rate)
+        }
+      }
+
+      if (isMounted) {
+        setCachedRates(ratesMap)
+        const firstCountryWithData = countries.find(c => ratesMap.has(c.code))
+        if (firstCountryWithData) {
+          const rate = ratesMap.get(firstCountryWithData.code)!
+          setCurrentRate(rate)
+          setCurrentCountry(countries.indexOf(firstCountryWithData))
+        }
+        setLoading(false)
+      }
+    }
+
+    loadAllData()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (loading || cachedRates.size === 0) return
+
+    const interval = setInterval(() => {
+      setIsAnimating(true)
+      setTimeout(() => {
+        let nextIndex = (currentCountry + 1) % countries.length
+        let attempts = 0
+
+        while (!cachedRates.has(countries[nextIndex].code) && attempts < countries.length) {
+          nextIndex = (nextIndex + 1) % countries.length
+          attempts++
+        }
+
+        if (cachedRates.has(countries[nextIndex].code)) {
+          const country = countries[nextIndex]
+          const rate = cachedRates.get(country.code)!
+          setCurrentCountry(nextIndex)
+          setCurrentRate(rate)
+        }
+
+        setTimeout(() => setIsAnimating(false), 50)
+      }, 300)
+    }, 3000)
+
+    return () => {
+      clearInterval(interval)
+    }
+  }, [currentCountry, loading, cachedRates])
 
   return (
-    <motion.section style={{ y: calculatorY }} className="calculator-section py-20">
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Standard header to match News page */}
-        <div className="text-center mb-6 bg-black/30 backdrop-blur-md p-6 rounded-2xl">
-          <h1 className="text-3xl md:text-4xl font-extrabold text-white">
-            Agricultural Tariff Calculator
-          </h1>
-        </div>
+    <div className="relative">
+      <div className="relative bg-black/40 backdrop-blur-xl border border-white/30 rounded-2xl p-12 shadow-2xl">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-center gap-3 mb-8">
+            <Activity className="w-6 h-6 text-cyan-300 animate-pulse" />
+            <h3 className="text-2xl font-bold text-white">Live Tariff Updates</h3>
+            <Activity className="w-6 h-6 text-cyan-300 animate-pulse" />
+          </div>
 
-        <Card className="calculator-card shadow-lg rounded-2xl bg-black/40 backdrop-blur-xl text-white">
-          <CardContent className="space-y-6">
-            {/* Top row: Display Currency selector (per-product currencies fetched) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <Label htmlFor="display-currency" className="flex items-center gap-2">
-                  <span>Display Currency</span>
-                  {currencyLoading && <span className="text-xs text-blue-600">(updating...)</span>}
-                </Label>
-                <Select value={displayCurrency} onValueChange={setDisplayCurrency}>
-                  <SelectTrigger>
-                    <SelectValue>{displayCurrency}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {countryNames.map(name => {
-                      const code = getCurrencyCode(name)
-                      return (
-                        <SelectItem key={name} value={code}>
-                          {name} — {getCurrencyName(code)} ({code})
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
-                {/* Per-product FX rates are shown in results section now */}
-                {currencyError && (
-                  <p className="text-xs text-red-600">{currencyError}</p>
+          <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16">
+            <div className="text-center min-w-[200px]">
+              <p className="text-sm font-semibold tracking-wider text-white/80 mb-2">COUNTRY</p>
+              <p
+                className={`text-3xl font-bold text-white transition-all duration-300 ${
+                  isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
+                }`}
+              >
+                {countries[currentCountry].name}
+              </p>
+            </div>
+
+            <div className="text-center min-w-[250px]">
+              <p className="text-sm font-semibold tracking-wider text-white/80 mb-2">CURRENT RATE</p>
+              <div
+                className={`text-7xl font-bold tabular-nums text-white transition-all duration-300 ${
+                  isAnimating ? "scale-110 opacity-0 blur-sm" : "scale-100 opacity-100 blur-0"
+                }`}
+              >
+                {loading ? (
+                  <span className="text-4xl">Loading...</span>
+                ) : currentRate !== null ? (
+                  <>
+                    {currentRate.toFixed(1)}
+                    <span className="text-4xl text-white/80">%</span>
+                  </>
+                ) : (
+                  <span className="text-3xl">N/A</span>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label className="text-sm">Add Products (each with its own exporter/importer/year):</Label>
-                <p className="text-xs text-muted-foreground">Use the list below to configure multiple trade routes before calculating tariffs.</p>
-              </div>
             </div>
+          </div>
 
-            {/* Products Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>Products</Label>
-                <Button
-                  type="button"
-                  onClick={addProduct}
-                  disabled={isCalculatingTariff}
-                  className="flex items-center bg-black hover:bg-neutral-800 text-white font-medium rounded-lg px-4 py-2 shadow-md transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  <Plus className="w-4 h-4 mr-1" />
-                  <span>Add Product</span>
-                </Button>
-              </div>
-
-              {products.map((product, index) => {
-                const importerCurrency = getImporterCurrency(product.toCountry)
-
-                return (
-                  <div key={product.id} className="p-4 rounded-lg border border-white/20 bg-black/50 relative space-y-4">
-                    {products.length > 1 && !isCalculatingTariff && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute top-2 right-2"
-                        onClick={() => removeProduct(product.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-
-                    {/* First Row: Product, Exporter, Importer, Year */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor={`product-${product.id}`}>Product {index + 1}</Label>
-                        <Select
-                          value={product.productCode}
-                          onValueChange={(val) => updateProduct(product.id, 'productCode', val)}
-                          disabled={isCalculatingTariff}
-                        >
-                          <SelectTrigger>
-                            <SelectValue>{agriculturalProducts.find(p => p.hs_code === product.productCode)?.name}</SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {agriculturalProducts.map(p => (
-                              <SelectItem key={p.hs_code} value={p.hs_code}>{p.name} ({p.hs_code})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Exporter</Label>
-                        <Select
-                          value={product.fromCountry}
-                          onValueChange={(val) => updateProduct(product.id, 'fromCountry', val)}
-                          disabled={isCalculatingTariff}
-                        >
-                          <SelectTrigger>
-                            <SelectValue>{getCountryName(product.fromCountry)}</SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {countries.map(c => (
-                              <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Importer</Label>
-                        <Select
-                          value={product.toCountry}
-                          onValueChange={(val) => updateProduct(product.id, 'toCountry', val)}
-                          disabled={isCalculatingTariff}
-                        >
-                          <SelectTrigger>
-                            <SelectValue>{getCountryName(product.toCountry)}</SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {countries.map(c => (
-                              <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Year</Label>
-                        <Select
-                          value={product.year}
-                          onValueChange={(val) => updateProduct(product.id, 'year', val)}
-                          disabled={isCalculatingTariff}
-                        >
-                          <SelectTrigger>
-                            <SelectValue>{product.year}</SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[2024, 2023, 2022, 2021, 2020, 2019].map(y => (
-                              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {/* Second Row: Value of Goods */}
-                    <div className="space-y-2">
-                      <Label htmlFor={`value-${product.id}`} className="flex items-center gap-2">
-                        <span>Value of Goods</span>
-                        <span className="text-xs font-normal text-muted-foreground">
-                          (Importer Currency: {importerCurrency})
-                        </span>
-                      </Label>
-                      <Input
-                        type="number"
-                        id={`value-${product.id}`}
-                        value={product.value}
-                        onChange={e => updateProduct(product.id, 'value', e.target.value)}
-                        placeholder={`Enter value in ${importerCurrency}`}
-                        disabled={isCalculatingTariff}
-                        className="max-w-md"
-                      />
-                    </div>
-
-                    {product.status === 'loading' && (
-                      <div className="text-center text-sm text-gray-500">
-                        <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
-                        Loading tariff data...
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            <Button
-              onClick={calculateTariff}
-              disabled={!fromCountry || !toCountry || isCalculatingTariff}
-              className="w-full py-4"
-            >
-              {isCalculatingTariff ? "Calculating..." : "Calculate Tariff"}
-            </Button>
-
-            {inputError && <div className="bg-red-600 text-white p-4 rounded-lg">{inputError}</div>}
-            {apiError && !inputError && (
-              <div className="bg-yellow-600 text-white p-4 rounded-lg">{apiError}</div>
+          <div className="mt-8 text-center">
+            <p className="text-sm text-white/90">
+              Agricultural tariff rates from WTO Database (TP_A_0160 - Simple Average MFN Applied Tariff)
+            </p>
+            {cachedRates.size > 0 && (
+              <p className="text-xs text-white/70 mt-2">
+                Displaying {cachedRates.size} of {countries.length} countries with available data
+              </p>
             )}
-          </CardContent>
-        </Card>
-
-        {calculationFinished && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-8 space-y-6 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/30 p-6">
-            <h3 className="text-2xl font-bold text-white mb-4">Tariff Calculation Results</h3>
-
-            {/* Individual Product Results */}
-            <div className="space-y-4">
-              {products.map((product, index) => {
-                const productName = agriculturalProducts.find(p => p.hs_code === product.productCode)?.name || product.productCode
-                const baseCurrency = getImporterCurrency(product.toCountry)
-
-                return (
-                  <div key={product.id} className="rounded-lg border border-white/20 p-4 bg-black/50">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-white">Product {index + 1}: {productName}</h4>
-                      {product.dataSource && (
-                        <div className="flex items-center gap-2 bg-blue-600/20 border border-blue-600 rounded-lg px-3 py-1 text-blue-200">
-                          {product.dataSource === "database" ? (
-                            <>
-                              <Database className="w-4 h-4" />
-                              <span className="text-sm">Database</span>
-                            </>
-                          ) : (
-                            <>
-                              <Globe className="w-4 h-4" />
-                              <span className="text-sm">WTO API</span>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-xs md:text-sm text-gray-300 mb-2">
-                      Route: <span className="font-medium text-white">{getCountryName(product.fromCountry)}</span>
-                      <span className="mx-1">→</span>
-                      <span className="font-medium text-white">{getCountryName(product.toCountry)}</span>
-                      <span className="mx-2">•</span>
-                      Year: <span className="font-medium text-white">{product.year}</span>
-                    </div>
-                    {/* Show FX rate for this product's importer currency to the current display currency */}
-                    <div className="mb-3">
-                      {baseCurrency === displayCurrency ? (
-                        <span className="inline-flex items-center gap-2 rounded-md border border-gray-500/40 bg-gray-500/10 px-3 py-1.5 text-xs md:text-sm text-gray-200">
-                          <span className="font-semibold">FX:</span>
-                          <span>Same currency</span>
-                          <span className="opacity-70">•</span>
-                          <span className="font-mono">{displayCurrency}</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs md:text-sm text-amber-200">
-                          <span className="font-semibold">FX:</span>
-                          <span>1 {baseCurrency}</span>
-                          <span className="opacity-70">≈</span>
-                          <span className="font-mono">{Number.isFinite(fxRates[baseCurrency]) ? fxRates[baseCurrency].toFixed(4) : '...'}</span>
-                          <span>{displayCurrency}</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {product.status === 'success' && product.tariffRate !== null ? (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white">
-                        <div>
-                          <p className="text-gray-300 text-sm">Goods Value ({baseCurrency} → {displayCurrency}):</p>
-                          <p className="font-semibold">{displayCurrency} {formatCurrencyFrom(Number.parseFloat(product.value), baseCurrency)}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-300 text-sm">Tariff Rate:</p>
-                          <p className="font-semibold">{product.tariffRate.toFixed(2)}%</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-300 text-sm">Tariff Amount ({baseCurrency} → {displayCurrency}):</p>
-                          <p className="font-semibold text-red-300">
-                            {displayCurrency} {formatCurrencyFrom(product.tariffAmount || 0, baseCurrency)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-300 text-sm">Total Cost ({baseCurrency} → {displayCurrency}):</p>
-                          <p className="font-semibold text-green-300">
-                            {displayCurrency} {formatCurrencyFrom((parseFloat(product.value) || 0) + (product.tariffAmount || 0), baseCurrency)}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-yellow-300">
-                        {product.errorMessage || "Data Not Available - MFN rates may apply"}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Overall Totals */}
-            <div className="rounded-lg border border-white/20 p-6 bg-black/50">
-              <h4 className="text-xl font-bold text-white mb-4">Overall Totals</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-white">
-                <div>
-                  <p className="text-gray-300">Total Import Value:</p>
-                  <p className="text-2xl font-bold">{displayCurrency} {totals.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
-                </div>
-                <div>
-                  <p className="text-gray-300">Total Tariff:</p>
-                  <p className="text-2xl font-bold text-red-300">{displayCurrency} {totals.tariff.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
-                </div>
-                <div>
-                  <p className="text-gray-300">Total Cost:</p>
-                  <p className="text-2xl font-bold text-green-300">{displayCurrency} {totals.cost.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Charts Button */}
-            <div className="mt-6">
-              <Button
-                onClick={() => setShowCharts(!showCharts)}
-                size="lg"
-                className={`w-full py-6 border-2 transition-all ${showCharts ? 'bg-primary text-white border-primary hover:bg-primary/90' : 'bg-white text-black border-white hover:bg-gray-100'
-                  }`}
-              >
-                <BarChart3 className="w-5 h-5 mr-2" />
-                <div className="text-left">
-                  <div className="font-semibold">Charts & Diagrams</div>
-                  <div className="text-xs opacity-80">Visualize tariff comparisons</div>
-                </div>
-              </Button>
-            </div>
-
-
-            {showCharts && (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-4">
-                {/* A1: Tariff rate comparative bar */}
-                <Card className="shadow-lg p-4 bg-black/40 backdrop-blur-xl border border-white/30 text-white">
-                  <h4 className="text-lg font-semibold mb-2">Tariff Rate by Product (%)</h4>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={tariffRateBarData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" interval={0} angle={-20} textAnchor="end" height={60} />
-                      <YAxis unit="%" />
-                      <Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} />
-                      <Legend />
-                      <Bar dataKey="tariffRate" name="Tariff %" fill="#6366F1" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </Card>
-
-                {/* A2: Stacked bar cost decomposition */}
-                <Card className="shadow-lg p-4 bg-black/40 backdrop-blur-xl border border-white/30 text-white">
-                  <h4 className="text-lg font-semibold mb-2">Cost Decomposition per Product ({displayCurrency})</h4>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={costStackedData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" interval={0} angle={-20} textAnchor="end" height={60} />
-                      <YAxis />
-                      <Tooltip formatter={(v: number) => `${displayCurrency} ${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} />
-                      <Legend />
-                      <Bar dataKey="goodsValue" stackId="a" name="Goods Value" fill="#22C55E" />
-                      <Bar dataKey="tariffAmount" stackId="a" name="Tariff Amount" fill="#EF4444" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </Card>
-
-                {/* B1: Scatter (Value vs Rate) */}
-                <Card className="shadow-lg p-4 bg-black/40 backdrop-blur-xl border border-white/30 text-white">
-                  <h4 className="text-lg font-semibold mb-2">Value vs Tariff Rate ({displayCurrency})</h4>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <ScatterChart margin={{ top: 10, right: 20, bottom: 20, left: 0 }}>
-                      <CartesianGrid />
-                      <XAxis type="number" dataKey="x" name="Goods Value" tickFormatter={(v) => `${(v as number).toLocaleString()}`} />
-                      <YAxis type="number" dataKey="y" name="Tariff %" unit="%" />
-                      <ZAxis range={[60, 120]} />
-                      <Tooltip cursor={{ strokeDasharray: '3 3' }} formatter={(v: number, n: string) => n === 'y' ? `${v.toFixed(2)}%` : `${displayCurrency} ${(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}`} />
-                      <Legend />
-                      <Scatter data={valueVsRateScatter} name="Products" fill="#06B6D4" />
-                    </ScatterChart>
-                  </ResponsiveContainer>
-                </Card>
-
-                {/* B2: Waterfall (approximate) */}
-                <Card className="shadow-lg p-4 bg-black/40 backdrop-blur-xl border border-white/30 text-white xl:col-span-2">
-                  <h4 className="text-lg font-semibold mb-2">Landed Cost Waterfall & Split ({displayCurrency})</h4>
-                  <ResponsiveContainer width="100%" height={340}>
-                    <BarChart data={waterfallData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip formatter={(v: number, n: string) => `${displayCurrency} ${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}${n === 'tariffAmount' || n === 'change' ? ' (Tariff)' : ''}`} />
-                      <Legend />
-                      {/* Step bars */}
-                      <Bar dataKey="base" stackId="wf" fill="transparent" isAnimationActive={false} />
-                      <Bar dataKey="change" stackId="wf" name="Step Change" fill="#6366F1" />
-                      {/* Final split stacked bar */}
-                      <Bar dataKey="goodsValue" stackId="totalSplit" name="Import Value Portion" fill="#22C55E" />
-                      <Bar dataKey="tariffAmount" stackId="totalSplit" name="Tariff Portion" fill="#EF4444" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </Card>
-
-                {/* Total Cost Composition Pie (route + product, multi-color) */}
-                <Card className="shadow-lg p-4 bg-black/40 backdrop-blur-xl border border-white/30 text-white xl:col-span-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-lg font-semibold">Total Cost Composition ({displayCurrency})</h4>
-                  </div>
-                  {pieData.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No successful products to summarize yet.</p>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={320}>
-                      <PieChart>
-                        <Pie
-                          data={pieData}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={110}
-                          paddingAngle={2}
-                          label={(entry) => `${entry.name}: ${displayCurrency} ${entry.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
-                        >
-                          {pieData.map((entry, index) => {
-                            const palette = [
-                              '#22C55E', '#EF4444', '#6366F1', '#F59E0B', '#06B6D4',
-                              '#8B5CF6', '#10B981', '#F97316', '#EC4899', '#3B82F6',
-                              '#84CC16', '#D946EF', '#16A34A', '#DC2626', '#1D4ED8'
-                            ]
-                            // Differentiate tariff slices by darkening color or using next palette item
-                            const baseColor = palette[index % palette.length]
-                            const isTariff = /Tariff$/i.test(entry.name)
-                            const color = isTariff ? palette[(index + 1) % palette.length] : baseColor
-                            return <Cell key={`cell-${index}`} fill={color} />
-                          })}
-                        </Pie>
-                        <Tooltip formatter={(v: number, n: string) => [`${displayCurrency} ${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, n]} />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  )}
-                  {pieData.length > 0 && (
-                    <p className="text-xs mt-2 text-muted-foreground">
-                      Pie total equals Overall Total Cost: {displayCurrency} {totals.cost.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                    </p>
-                  )}
-                </Card>
-              </div>
-            )}
-          </motion.div>
-        )}
+          </div>
+        </div>
       </div>
-    </motion.section>
+    </div>
+  )
+}
+
+export default function AboutPage() {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const [newsArticles, setNewsArticles] = useState<Array<{
+    title: string
+    description: string
+    url: string
+    publishedAt: string
+    source: string
+  }>>([])
+  const [loadingNews, setLoadingNews] = useState(true)
+
+  useEffect(() => {
+    const fetchNews = async () => {
+      try {
+        const response = await fetch('/api/external/news')
+        if (response.ok) {
+          const data = await response.json()
+          setNewsArticles(data.articles || [])
+        }
+      } catch (error) {
+        console.error('Error fetching news:', error)
+      } finally {
+        setLoadingNews(false)
+      }
+    }
+
+    fetchNews()
+  }, [])
+
+  const indicators = [
+    {
+      code: "HSP_0070",
+      icon: TrendingDown,
+      title: "Lowest Preferential Tariff",
+      description: "Simple average ad valorem tariff at HS 6-digit level",
+      details:
+        "Measures the lowest tariff rate applied to imports from preferential trading partners. This indicator helps identify the most favorable market access conditions available through trade agreements.",
+      color: "bg-blue-500",
+    },
+    {
+      code: "TP_A_0160",
+      icon: Percent,
+      title: "Simple Average MFN Applied Tariff",
+      description: "Agricultural products",
+      details:
+        "The arithmetic mean of applied Most Favored Nation (MFN) tariff rates for agricultural products. This represents the standard tariff rate applied to WTO members without preferential agreements.",
+      color: "bg-green-500",
+    },
+    {
+      code: "TP_A_0170",
+      icon: Scale,
+      title: "Trade-Weighted MFN Applied Tariff",
+      description: "Agricultural products",
+      details:
+        "Weighted average of applied MFN tariffs, where weights are based on import values. This provides a more accurate picture of the actual tariff burden on agricultural trade.",
+      color: "bg-amber-500",
+    },
+    {
+      code: "TP_B_0180",
+      icon: Lock,
+      title: "Simple Average Bound Tariff",
+      description: "Agricultural products",
+      details:
+        "The average of maximum tariff rates that WTO members have committed not to exceed. Bound tariffs provide predictability and stability in international trade relations.",
+      color: "bg-purple-500",
+    },
+    {
+      code: "TP_B_0190",
+      icon: CheckCircle,
+      title: "Percentage of Bound Tariff Lines",
+      description: "Agricultural products",
+      details:
+        "The proportion of agricultural tariff lines that have binding commitments. Higher percentages indicate greater trade policy predictability and market access security.",
+      color: "bg-rose-500",
+    },
+  ]
+
+  const reasons = [
+    {
+      icon: Shield,
+      title: "Food Security",
+      description:
+        "Tariffs help protect domestic agricultural production, ensuring stable food supplies and reducing dependency on imports during global crises.",
+    },
+    {
+      icon: Users,
+      title: "Farmer Protection",
+      description:
+        "Agricultural tariffs shield local farmers from unfair competition and price volatility in international markets, supporting rural livelihoods.",
+    },
+    {
+      icon: BarChart3,
+      title: "Market Transparency",
+      description:
+        "Standardized tariff data enables businesses, policymakers, and researchers to analyze trade patterns and make evidence-based decisions.",
+    },
+    {
+      icon: Leaf,
+      title: "Sustainable Development",
+      description:
+        "Well-designed tariff policies can promote sustainable agricultural practices and support developing countries' economic growth.",
+    },
+  ]
+
+  const formatDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString)
+      const now = new Date()
+      const diffTime = Math.abs(now.getTime() - date.getTime())
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+
+      if (diffDays === 0) return 'Today'
+      if (diffDays === 1) return 'Yesterday'
+      if (diffDays < 7) return `${diffDays} days ago`
+
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    } catch {
+      return 'Recent'
+    }
+  }
+
+  const truncateDescription = (text: string, maxLength: number = 200): string => {
+    if (text.length <= maxLength) return text
+    return text.substring(0, maxLength).trim() + '...'
+  }
+
+  return (
+    <main className="relative min-h-screen">
+      <section className="py-20 px-4">
+        <div className="max-w-7xl mx-auto">
+          {/* Hero Content */}
+          <div className="text-center mb-16">
+            <p className="text-sm font-semibold tracking-[0.3em] text-white/80 mb-6">ABOUT</p>
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 text-balance leading-tight text-white">
+              AgriTariff
+            </h1>
+            <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
+              Calculate tariffs with confidence and clarity.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {tariffFeatures.map((feature) => (
+              <div key={feature.id} className="relative">
+                <div className="relative group">
+                  <div className="relative overflow-hidden rounded-3xl bg-black/60 aspect-[3/4] mb-6 border border-white/30">
+                    <img
+                      src={feature.image || "/placeholder.svg"}
+                      alt={feature.title}
+                      className="w-full h-full object-cover opacity-70"
+                    />
+                  </div>
+
+                  <div className="bg-black/40 backdrop-blur-xl border border-white/30 rounded-2xl p-6">
+                    <div className="flex items-start gap-4">
+                      <span className="text-4xl font-bold text-white">{feature.number}</span>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold text-white mb-2">{feature.title}</h3>
+                        <p className="text-sm text-white/90 leading-relaxed">{feature.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* What Are Tariffs Section */}
+      <section className="py-20 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-12 max-w-3xl">
+            <h2 className="text-4xl font-bold mb-4 text-white">What Are Tariffs?</h2>
+            <p className="text-lg text-white/90 leading-relaxed">
+              Tariffs are taxes imposed by governments on imported goods. In agricultural trade, they serve as crucial
+              policy instruments that affect food security, farmer livelihoods, and international trade relationships.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            <Card className="bg-black/40 backdrop-blur-xl border border-white/30 hover:border-cyan-400/50 transition-colors">
+              <CardContent className="pt-6">
+                <div className="w-12 h-12 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center mb-4">
+                  <BookOpen className="w-6 h-6 text-cyan-300" />
+                </div>
+                <h3 className="text-xl font-semibold mb-3 text-white">Historical Context</h3>
+                <p className="text-white/90 leading-relaxed">
+                  Agricultural tariffs have evolved since the GATT Uruguay Round (1986-1994), which transformed
+                  non-tariff barriers into transparent tariff measures.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-black/40 backdrop-blur-xl border border-white/30 hover:border-cyan-400/50 transition-colors">
+              <CardContent className="pt-6">
+                <div className="w-12 h-12 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center mb-4">
+                  <Globe className="w-6 h-6 text-cyan-300" />
+                </div>
+                <h3 className="text-xl font-semibold mb-3 text-white">Global Impact</h3>
+                <p className="text-white/90 leading-relaxed">
+                  Tariffs directly influence food prices, market access for farmers, and the competitiveness of
+                  agricultural products in international markets.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-black/40 backdrop-blur-xl border border-white/30 hover:border-cyan-400/50 transition-colors">
+              <CardContent className="pt-6">
+                <div className="w-12 h-12 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center mb-4">
+                  <TrendingUp className="w-6 h-6 text-cyan-300" />
+                </div>
+                <h3 className="text-xl font-semibold mb-3 text-white">Trade Dynamics</h3>
+                <p className="text-white/90 leading-relaxed">
+                  Understanding tariff structures helps stakeholders navigate complex trade agreements and make informed
+                  decisions about market entry strategies.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Why It Matters Section */}
+      <section className="py-20 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold mb-4 text-white">Why Tariffs Matter</h2>
+            <p className="text-lg text-white/90 max-w-3xl mx-auto leading-relaxed">
+              Agricultural tariffs play a critical role in shaping global food systems, economic development, and
+              international trade relationships
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            {reasons.map((reason, index) => {
+              const Icon = reason.icon
+              return (
+                <Card key={index} className="bg-black/40 backdrop-blur-xl border border-white/30 hover:border-cyan-400/50 transition-colors">
+                  <CardContent className="pt-6">
+                    <div className="flex gap-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-14 h-14 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center">
+                          <Icon className="w-7 h-7" />
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold mb-2 text-white">{reason.title}</h3>
+                        <p className="text-white/90 leading-relaxed">{reason.description}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Tariff Indicators Section */}
+      <section className="py-20 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold mb-4 text-white">Key Tariff Indicators</h2>
+            <p className="text-lg text-white/90 max-w-3xl mx-auto leading-relaxed">
+              Understanding WTO tariff indicators is essential for analyzing agricultural trade policies and market
+              access conditions across countries. Hover over each card to see detailed information.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {indicators.map((indicator, index) => {
+              const Icon = indicator.icon
+              const isHovered = hoveredIndex === index
+
+              return (
+                <Card
+                  key={index}
+                  className="bg-black/40 backdrop-blur-xl border border-white/30 hover:border-cyan-400/50 hover:shadow-xl transition-all duration-300 cursor-pointer relative overflow-hidden aspect-square flex flex-col"
+                  onMouseEnter={() => setHoveredIndex(index)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                >
+                  <div
+                    className={`absolute inset-0 p-4 flex flex-col items-center justify-center text-center transition-opacity duration-300 ${
+                      isHovered ? "opacity-0" : "opacity-100"
+                    }`}
+                  >
+                    <div
+                      className={`w-12 h-12 rounded-lg ${indicator.color} text-white flex items-center justify-center mb-3`}
+                    >
+                      <Icon className="w-6 h-6" />
+                    </div>
+                    <h3 className="font-bold text-sm mb-2 leading-tight text-white">{indicator.title}</h3>
+                    <p className="text-xs font-mono text-white/80">{indicator.code}</p>
+                  </div>
+
+                  <div
+                    className={`absolute inset-0 p-4 flex flex-col transition-opacity duration-300 ${
+                      isHovered ? "opacity-100" : "opacity-0"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <div
+                        className={`w-6 h-6 rounded ${indicator.color} text-white flex items-center justify-center flex-shrink-0`}
+                      >
+                        <Icon className="w-3 h-3" />
+                      </div>
+                      <p className="text-xs font-mono text-white/80">{indicator.code}</p>
+                    </div>
+                    <h3 className="font-bold text-xs mb-2 leading-tight text-white">{indicator.title}</h3>
+                    <p className="text-xs text-white/90 mb-2 leading-relaxed">{indicator.description}</p>
+                    <p className="text-xs text-white/90 leading-relaxed flex-1 overflow-y-auto">{indicator.details}</p>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Live Tariff Updates Section */}
+      <section className="py-20 px-4">
+        <div className="max-w-7xl mx-auto">
+          <DynamicRates />
+        </div>
+      </section>
+
+      {/* News Section */}
+      <section className="py-20 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-12">
+            <div>
+              <h2 className="text-4xl font-bold mb-2 text-white">Latest News</h2>
+              <p className="text-lg text-white/90">Stay updated on agricultural trade developments</p>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {loadingNews ? (
+              Array.from({ length: 3 }).map((_, index) => (
+                <Card key={index} className="flex flex-col bg-black/40 backdrop-blur-xl border border-white/30">
+                  <CardHeader>
+                    <div className="h-6 bg-white/10 rounded animate-pulse mb-3 w-24"></div>
+                    <div className="h-8 bg-white/10 rounded animate-pulse"></div>
+                  </CardHeader>
+                  <CardContent className="flex-1">
+                    <div className="space-y-2">
+                      <div className="h-4 bg-white/10 rounded animate-pulse"></div>
+                      <div className="h-4 bg-white/10 rounded animate-pulse"></div>
+                      <div className="h-4 bg-white/10 rounded animate-pulse w-3/4"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : newsArticles.length > 0 ? (
+              newsArticles.map((article, index) => (
+                <Card key={index} className="flex flex-col bg-black/40 backdrop-blur-xl border border-white/30 hover:border-cyan-400/50 hover:shadow-lg transition-all">
+                  <CardHeader>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">{article.source}</Badge>
+                      <div className="flex items-center gap-1 text-sm text-white/80">
+                        <Calendar className="w-4 h-4" />
+                        <span>{formatDate(article.publishedAt)}</span>
+                      </div>
+                    </div>
+                    <CardTitle className="text-xl leading-tight text-balance text-white">
+                      {article.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col">
+                    <CardDescription className="text-base text-white/90 leading-relaxed mb-4 flex-1 line-clamp-4">
+                      {truncateDescription(article.description)}
+                    </CardDescription>
+                    <Button
+                      variant="ghost"
+                      className="w-fit px-0 group text-cyan-300 hover:text-cyan-100 hover:bg-transparent"
+                      onClick={() => window.open(article.url, '_blank')}
+                    >
+                      Read more
+                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="col-span-3 text-center py-12">
+                <p className="text-white/80 text-lg">No news articles available at the moment</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    </main>
   )
 }
