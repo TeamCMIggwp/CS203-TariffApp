@@ -59,14 +59,9 @@ export default function CalculatorSection() {
     { id: '1', productCode: '100630', value: '100', tariffRate: null, tariffAmount: null, dataSource: null, status: 'idle', fromCountry: '004', toCountry: '840', year: '2024' }
   ])
 
-  const [apiResponse, setApiResponse] = useState<GeminiApiResponse | string | null>(null)
   const [isCalculatingTariff, setIsCalculatingTariff] = useState(false)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [inputError, setInputError] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
-  const [aiFinished, setAiFinished] = useState(false)
-
-  const [showAIAnalysis, setShowAIAnalysis] = useState(false)
   const [showCharts, setShowCharts] = useState(false)
   // No per-product selection needed for pie; we'll show overall composition
 
@@ -305,48 +300,6 @@ export default function CalculatorSection() {
     }
   }
 
-  const callGeminiApi = async (data: string, prompt?: string) => {
-    try {
-      console.log('   📤 Sending request to Gemini API...')
-      console.log('   📝 Data:', data)
-      console.log('   📝 Prompt:', prompt)
-      const url = `${API_BASE}/api/v1/gemini/analyses`
-      const startTime = performance.now()
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data, prompt })
-      })
-
-      const responseTime = performance.now() - startTime
-      console.log(`   ⏱️  Gemini API response time: ${responseTime.toFixed(2)}ms`)
-      console.log('   📥 Response status:', response.status)
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const result = await response.json()
-      console.log('   📊 Gemini API result:', result)
-
-      if (result?.success && result?.analysis) {
-        setApiResponse(result.analysis)
-        console.log('   ✅ Analysis set successfully')
-      } else {
-        setApiResponse("No analysis data returned from API.")
-        console.log('   ⚠️  No analysis data in response')
-      }
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Unknown error occurred"
-      setApiError(errorMsg)
-      console.error('   ❌ Gemini API Error:', errorMsg)
-      if (err instanceof Error && err.stack) {
-        console.error('   ❌ Stack:', err.stack)
-      }
-    }
-  }
-
   const queryTariffForProduct = async (
     productCode: string,
     importerCode: string,
@@ -534,11 +487,8 @@ export default function CalculatorSection() {
 
     setInputError(null)
     setApiError(null)
-    setApiResponse(null)
     setIsCalculatingTariff(true)
-    setIsAnalyzing(true)
-    setAiFinished(false)
-    setShowAIAnalysis(false)
+    setCalculationFinished(false)
     setShowCharts(false)
 
     // Reset all products to loading state
@@ -602,33 +552,8 @@ export default function CalculatorSection() {
 
       setProducts(updatedProducts)
       setIsCalculatingTariff(false)
-      setAiFinished(true)
+      setCalculationFinished(true)
       console.log('   ✅ Tariff results displayed to user')
-
-      // STEP: Start AI analysis for FIRST PRODUCT ONLY (non-blocking)
-      const firstProduct = updatedProducts[0]
-      if (firstProduct && firstProduct.tariffRate !== null) {
-        console.log('\n🤖 Starting Gemini AI analysis for FIRST PRODUCT...')
-        const startAi = performance.now()
-        const productName = agriculturalProducts.find(p => p.hs_code === firstProduct.productCode)?.name || firstProduct.productCode
-        const apiData = `Trade analysis: Export from ${getCountryName(firstProduct.fromCountry)} (${firstProduct.fromCountry}) to ${getCountryName(firstProduct.toCountry)} (${firstProduct.toCountry}). Product: ${productName} (${firstProduct.productCode}), Value: $${firstProduct.value}, Year: ${firstProduct.year}. Tariff Rate: ${firstProduct.tariffRate}%. Data source: ${firstProduct.dataSource === 'database' ? 'Internal Database' : 'WTO API'}`
-        const prompt = "Analyze this agricultural trade data and provide insights on tariff implications, trade relationships, and economic factors. Note: 000 represents 'World' in country codes."
-
-        // Call AI without await - let it run in background
-        callGeminiApi(apiData, prompt).then(() => {
-          const aiTime = performance.now() - startAi
-          console.log(`   ✅ Gemini AI analysis completed in ${aiTime.toFixed(2)}ms`)
-          console.log('   ✅ AI analysis ready for display')
-        }).catch((err) => {
-          console.error('   ❌ Gemini AI analysis failed:', err)
-        }).finally(() => {
-          setIsAnalyzing(false)
-        })
-
-        console.log('   🚀 AI analysis started (running in background)')
-      } else {
-        setIsAnalyzing(false)
-      }
 
       console.log('\n═══════════════════════════════════════════')
       console.log('✅ TARIFF CALCULATION COMPLETE')
@@ -637,13 +562,12 @@ export default function CalculatorSection() {
     } catch (err) {
       console.error('\n❌❌❌ ERROR in calculateTariff:', err)
       setApiError(err instanceof Error ? err.message : "Unknown error occurred")
-      setAiFinished(true)
+      setCalculationFinished(true)
       console.error('   Stack trace:', err instanceof Error ? err.stack : 'N/A')
     } finally {
       setIsCalculatingTariff(false)
     }
   }
-
 
   const getCountryName = (code: string) => {
     const country = countries.find(c => c.code === code)
@@ -932,10 +856,10 @@ export default function CalculatorSection() {
 
             <Button
               onClick={calculateTariff}
-              disabled={!fromCountry || !toCountry || isCalculatingTariff || isAnalyzing}
+              disabled={!fromCountry || !toCountry || isCalculatingTariff}
               className="w-full py-4"
             >
-              {isCalculatingTariff ? "Calculating..." : isAnalyzing ? "Analyzing..." : "Calculate Tariff"}
+              {isCalculatingTariff ? "Calculating..." : "Calculate Tariff"}
             </Button>
 
             {inputError && <div className="bg-red-600 text-white p-4 rounded-lg">{inputError}</div>}
