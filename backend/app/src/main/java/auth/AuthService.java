@@ -798,18 +798,25 @@ public class AuthService {
             return Map.of("updated", 0, "message", "Missing token or password");
         }
         try {
-            // First attempt token_hash in current schema
+            // Try token_hash lookups first (default schema then accounts), and gracefully
+            // fall back on SQL grammar issues (missing table/column) as well as empty results.
             String tokenHash = sha256Hex(token);
-            java.util.Map<String, Object> row;
+            java.util.Map<String, Object> row = null;
             try {
+                // Default schema token_hash
                 row = jdbc.queryForMap(
                     "SELECT user_id, expires_at, used_at FROM password_reset_tokens WHERE token_hash = ?",
                     tokenHash);
-            } catch (EmptyResultDataAccessException notHere) {
-                // Try accounts schema with token_hash
-                row = jdbc.queryForMap(
-                    "SELECT user_id, expires_at, used_at FROM accounts.password_reset_tokens WHERE token_hash = ?",
-                    tokenHash);
+            } catch (EmptyResultDataAccessException | BadSqlGrammarException notHere) {
+                try {
+                    // accounts schema token_hash
+                    row = jdbc.queryForMap(
+                        "SELECT user_id, expires_at, used_at FROM accounts.password_reset_tokens WHERE token_hash = ?",
+                        tokenHash);
+                } catch (EmptyResultDataAccessException | BadSqlGrammarException notHereEither) {
+                    // Will try legacy plain-token variant below via outer catch
+                    throw new EmptyResultDataAccessException(1);
+                }
             }
             java.sql.Timestamp expiresAt = (java.sql.Timestamp) row.get("expires_at");
             java.sql.Timestamp usedAt = (java.sql.Timestamp) row.get("used_at");
