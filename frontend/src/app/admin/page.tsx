@@ -71,8 +71,8 @@ export default function AdminPage() {
         credentials: "include",
         body: JSON.stringify({
           // Backend expects: reporter (importer), partner (exporter), product, year, rate, unit
-          reporter: toCountryIso,
-          partner: fromCountryIso,
+          reporter: fromCountryIso,
+          partner: toCountryIso,
           product: hsCode,
           year: String(year),
           rate: rateValue,
@@ -89,8 +89,8 @@ export default function AdminPage() {
           },
           credentials: "include",
           body: JSON.stringify({
-            reporter: toCountryIso,
-            partner: fromCountryIso,
+            reporter: fromCountryIso,
+            partner: toCountryIso,
             product: hsCode,
             year: String(year),
             rate: rateValue,
@@ -154,8 +154,8 @@ export default function AdminPage() {
       setDeleteSuccessMessage("");
 
       const params = new URLSearchParams({
-        reporter: toCountry,
-        partner: fromCountry,
+        reporter: fromCountry,
+        partner: toCountry,
         product: String(hsCode),
         year: year
       });
