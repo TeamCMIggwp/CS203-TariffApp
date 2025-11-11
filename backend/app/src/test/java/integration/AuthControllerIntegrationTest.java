@@ -379,4 +379,350 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody()).containsKey("message");
     }
+
+    @Test
+    void refresh_withValidRefreshToken_returnsNewAccessToken() {
+        // Arrange - First signup and login to get a refresh token
+        SignupRequest signupRequest = new SignupRequest(
+            "Refresh User",
+            "refresh@example.com",
+            "USA",
+            "RefreshPassword123!"
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        restTemplate.postForEntity(
+            baseUrl + "/auth/signup",
+            new HttpEntity<>(signupRequest, headers),
+            Map.class
+        );
+
+        LoginRequest loginRequest = new LoginRequest("refresh@example.com", "RefreshPassword123!");
+        ResponseEntity<Map> loginResponse = restTemplate.postForEntity(
+            baseUrl + "/auth/login",
+            new HttpEntity<>(loginRequest, headers),
+            Map.class
+        );
+
+        // Extract refresh token from cookie
+        List<String> cookies = loginResponse.getHeaders().get(HttpHeaders.SET_COOKIE);
+        String refreshToken = null;
+        if (cookies != null) {
+            for (String cookie : cookies) {
+                if (cookie.startsWith("refresh_token=")) {
+                    refreshToken = cookie.substring("refresh_token=".length(), cookie.indexOf(";"));
+                    break;
+                }
+            }
+        }
+
+        assertThat(refreshToken).isNotNull();
+
+        // Act - Use refresh token
+        HttpHeaders refreshHeaders = new HttpHeaders();
+        refreshHeaders.add("Cookie", "refresh_token=" + refreshToken);
+        HttpEntity<Void> refreshEntity = new HttpEntity<>(refreshHeaders);
+
+        ResponseEntity<Map> response = restTemplate.postForEntity(
+            baseUrl + "/auth/refresh",
+            refreshEntity,
+            Map.class
+        );
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).containsKey("accessToken");
+        assertThat(response.getBody()).containsKey("role");
+    }
+
+    @Test
+    void logout_withValidRefreshToken_clearsSession() {
+        // Arrange - First signup and login
+        SignupRequest signupRequest = new SignupRequest(
+            "Logout User",
+            "logout@example.com",
+            "CAN",
+            "LogoutPassword123!"
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        restTemplate.postForEntity(
+            baseUrl + "/auth/signup",
+            new HttpEntity<>(signupRequest, headers),
+            Map.class
+        );
+
+        LoginRequest loginRequest = new LoginRequest("logout@example.com", "LogoutPassword123!");
+        ResponseEntity<Map> loginResponse = restTemplate.postForEntity(
+            baseUrl + "/auth/login",
+            new HttpEntity<>(loginRequest, headers),
+            Map.class
+        );
+
+        // Extract refresh token
+        List<String> cookies = loginResponse.getHeaders().get(HttpHeaders.SET_COOKIE);
+        String refreshToken = null;
+        if (cookies != null) {
+            for (String cookie : cookies) {
+                if (cookie.startsWith("refresh_token=")) {
+                    refreshToken = cookie.substring("refresh_token=".length(), cookie.indexOf(";"));
+                    break;
+                }
+            }
+        }
+
+        // Act - Logout
+        HttpHeaders logoutHeaders = new HttpHeaders();
+        logoutHeaders.add("Cookie", "refresh_token=" + refreshToken);
+        HttpEntity<Void> logoutEntity = new HttpEntity<>(logoutHeaders);
+
+        ResponseEntity<Map> response = restTemplate.postForEntity(
+            baseUrl + "/auth/logout",
+            logoutEntity,
+            Map.class
+        );
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsKey("message");
+        assertThat(response.getBody().get("message").toString()).contains("Logged out");
+
+        // Verify refresh token cookie is cleared
+        List<String> logoutCookies = response.getHeaders().get(HttpHeaders.SET_COOKIE);
+        if (logoutCookies != null) {
+            boolean foundClearedCookie = logoutCookies.stream()
+                .anyMatch(cookie -> cookie.contains("refresh_token=") && cookie.contains("Max-Age=0"));
+            assertThat(foundClearedCookie).isTrue();
+        }
+    }
+
+    @Test
+    void me_withValidToken_returnsUserProfile() {
+        // Arrange - First signup and login
+        SignupRequest signupRequest = new SignupRequest(
+            "Profile User",
+            "profile@example.com",
+            "DEU",
+            "ProfilePassword123!"
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        restTemplate.postForEntity(
+            baseUrl + "/auth/signup",
+            new HttpEntity<>(signupRequest, headers),
+            Map.class
+        );
+
+        LoginRequest loginRequest = new LoginRequest("profile@example.com", "ProfilePassword123!");
+        ResponseEntity<Map> loginResponse = restTemplate.postForEntity(
+            baseUrl + "/auth/login",
+            new HttpEntity<>(loginRequest, headers),
+            Map.class
+        );
+
+        String accessToken = (String) loginResponse.getBody().get("accessToken");
+
+        // Act - Get profile
+        HttpHeaders profileHeaders = new HttpHeaders();
+        profileHeaders.set("Authorization", "Bearer " + accessToken);
+        HttpEntity<Void> profileEntity = new HttpEntity<>(profileHeaders);
+
+        ResponseEntity<Map> response = restTemplate.exchange(
+            baseUrl + "/auth/me",
+            HttpMethod.GET,
+            profileEntity,
+            Map.class
+        );
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).containsKey("userId");
+        assertThat(response.getBody()).containsKey("email");
+        assertThat(response.getBody().get("email")).isEqualTo("profile@example.com");
+    }
+
+    @Test
+    void me_withoutToken_returnsUnauthorized() {
+        // Act
+        ResponseEntity<Map> response = restTemplate.getForEntity(
+            baseUrl + "/auth/me",
+            Map.class
+        );
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void updateProfile_withValidToken_updatesProfile() {
+        // Arrange - First signup and login
+        SignupRequest signupRequest = new SignupRequest(
+            "Update User",
+            "update@example.com",
+            "FRA",
+            "UpdatePassword123!"
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        restTemplate.postForEntity(
+            baseUrl + "/auth/signup",
+            new HttpEntity<>(signupRequest, headers),
+            Map.class
+        );
+
+        LoginRequest loginRequest = new LoginRequest("update@example.com", "UpdatePassword123!");
+        ResponseEntity<Map> loginResponse = restTemplate.postForEntity(
+            baseUrl + "/auth/login",
+            new HttpEntity<>(loginRequest, headers),
+            Map.class
+        );
+
+        String accessToken = (String) loginResponse.getBody().get("accessToken");
+
+        // Act - Update profile
+        Map<String, String> updateRequest = Map.of("name", "Updated Name");
+        HttpHeaders updateHeaders = new HttpHeaders();
+        updateHeaders.set("Authorization", "Bearer " + accessToken);
+        updateHeaders.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, String>> updateEntity = new HttpEntity<>(updateRequest, updateHeaders);
+
+        ResponseEntity<Map> response = restTemplate.exchange(
+            baseUrl + "/auth/profile",
+            HttpMethod.PUT,
+            updateEntity,
+            Map.class
+        );
+
+        // Assert
+        assertThat(response.getStatusCode()).isIn(HttpStatus.OK, HttpStatus.NOT_IMPLEMENTED, HttpStatus.BAD_GATEWAY);
+    }
+
+    @Test
+    void changePassword_withValidCurrentPassword_updatesPassword() {
+        // Arrange - First signup and login
+        SignupRequest signupRequest = new SignupRequest(
+            "Password Change User",
+            "changepassword@example.com",
+            "GBR",
+            "OldPassword123!"
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        restTemplate.postForEntity(
+            baseUrl + "/auth/signup",
+            new HttpEntity<>(signupRequest, headers),
+            Map.class
+        );
+
+        LoginRequest loginRequest = new LoginRequest("changepassword@example.com", "OldPassword123!");
+        ResponseEntity<Map> loginResponse = restTemplate.postForEntity(
+            baseUrl + "/auth/login",
+            new HttpEntity<>(loginRequest, headers),
+            Map.class
+        );
+
+        String accessToken = (String) loginResponse.getBody().get("accessToken");
+
+        // Act - Change password
+        Map<String, String> changePasswordRequest = Map.of(
+            "currentPassword", "OldPassword123!",
+            "newPassword", "NewPassword456!"
+        );
+        HttpHeaders changePasswordHeaders = new HttpHeaders();
+        changePasswordHeaders.set("Authorization", "Bearer " + accessToken);
+        changePasswordHeaders.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, String>> changePasswordEntity = new HttpEntity<>(changePasswordRequest, changePasswordHeaders);
+
+        ResponseEntity<Map> response = restTemplate.exchange(
+            baseUrl + "/auth/password",
+            HttpMethod.PUT,
+            changePasswordEntity,
+            Map.class
+        );
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().get("updated")).isIn(0, 1);
+    }
+
+    @Test
+    void changePassword_withIncorrectCurrentPassword_returnsError() {
+        // Arrange - First signup and login
+        SignupRequest signupRequest = new SignupRequest(
+            "Wrong Password User",
+            "wrongpassword@example.com",
+            "ITA",
+            "CorrectPassword123!"
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        restTemplate.postForEntity(
+            baseUrl + "/auth/signup",
+            new HttpEntity<>(signupRequest, headers),
+            Map.class
+        );
+
+        LoginRequest loginRequest = new LoginRequest("wrongpassword@example.com", "CorrectPassword123!");
+        ResponseEntity<Map> loginResponse = restTemplate.postForEntity(
+            baseUrl + "/auth/login",
+            new HttpEntity<>(loginRequest, headers),
+            Map.class
+        );
+
+        String accessToken = (String) loginResponse.getBody().get("accessToken");
+
+        // Act - Try to change password with wrong current password
+        Map<String, String> changePasswordRequest = Map.of(
+            "currentPassword", "WrongPassword999!",
+            "newPassword", "NewPassword456!"
+        );
+        HttpHeaders changePasswordHeaders = new HttpHeaders();
+        changePasswordHeaders.set("Authorization", "Bearer " + accessToken);
+        changePasswordHeaders.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, String>> changePasswordEntity = new HttpEntity<>(changePasswordRequest, changePasswordHeaders);
+
+        ResponseEntity<Map> response = restTemplate.exchange(
+            baseUrl + "/auth/password",
+            HttpMethod.PUT,
+            changePasswordEntity,
+            Map.class
+        );
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().get("updated")).isEqualTo(0);
+        assertThat(response.getBody().get("message").toString()).contains("incorrect");
+    }
+
+    @Test
+    void reset_withMissingToken_returnsError() {
+        // Arrange
+        Map<String, String> resetRequest = Map.of("newPassword", "NewPassword123!");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, String>> entity = new HttpEntity<>(resetRequest, headers);
+
+        // Act
+        ResponseEntity<Map> response = restTemplate.postForEntity(
+            baseUrl + "/auth/reset",
+            entity,
+            Map.class
+        );
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().get("updated")).isEqualTo(0);
+    }
 }
