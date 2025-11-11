@@ -477,7 +477,7 @@ export default function AboutPage() {
   }
 
   return (
-    <main className="relative min-h-screen bg-white/45 backdrop-blur-lg">
+    <main className="relative min-h-screen bg-white/5 backdrop-blur-lg">
       <section className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
           {/* Hero Content */}
