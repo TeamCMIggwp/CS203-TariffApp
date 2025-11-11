@@ -427,14 +427,14 @@ export default function CalculatorSection() {
                   if (parsedPercentage !== null) {
                     console.log('   ✅ ✅ SUCCESS! Found tariff in WTO API:', parsedPercentage, '%')
 
-                    //Save to database if found in WTO API (commented out for now)
+                    // Save to database if found in WTO API
                     await saveTariffToDatabase(
-                      toCountry,     // reporter (importer)
-                      fromCountry,   // partner (exporter)
-                      productInt,    // product code
-                      year,          // year
+                      importerCode,     // reporter (importer)
+                      exporterCode,     // partner (exporter)
+                      productInt,       // product code
+                      yearVal,          // year
                       parsedPercentage, // rate
-                      "percent"      // unit
+                      "percent"         // unit
                     )
 
                     return { rate: parsedPercentage, source: 'wto' }
