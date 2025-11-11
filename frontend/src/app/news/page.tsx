@@ -928,6 +928,7 @@ Return ONLY valid JSON (no markdown, no explanation):
           remarks: null,
           isHidden: true,
           timestamp: new Date().toISOString()
+
         }]);
 
         alert('Source hidden successfully! It will no longer appear in search results.');
@@ -1376,11 +1377,11 @@ Return ONLY valid JSON (no markdown, no explanation):
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-cyan-500/30 hover:bg-cyan-500/40 disabled:bg-gray-500/30 text-cyan-100 font-bold px-8 py-3 rounded-xl border-2 border-cyan-400/40 hover:border-cyan-300 disabled:border-gray-400/40 transition-all duration-200 flex items-center gap-2 disabled:cursor-not-allowed"
+                className="bg-black hover:bg-neutral-800 disabled:bg-gray-500/30 text-white font-bold px-8 py-3 rounded-lg border-2 border-white/30 hover:border-white/50 disabled:border-gray-400/40 transition-all duration-200 flex items-center gap-2 disabled:cursor-not-allowed shadow-md"
               >
                 {loading ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-cyan-300/30 border-t-cyan-300 rounded-full animate-spin"></div>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                     Searching...
                   </>
                 ) : (
@@ -1395,7 +1396,7 @@ Return ONLY valid JSON (no markdown, no explanation):
             {/* Filters Row */}
             <div className="flex gap-4 justify-center">
               <div className="flex items-center gap-2 bg-black/50 px-4 py-2 rounded-lg border border-white/20">
-                <IconListNumbers className="w-5 h-5 text-cyan-300" />
+                <IconListNumbers className="w-5 h-5 text-white" />
                 <label className="text-white/90 text-sm font-medium">Max Results:</label>
                 <input
                   type="number"
@@ -1408,7 +1409,7 @@ Return ONLY valid JSON (no markdown, no explanation):
               </div>
 
               <div className="flex items-center gap-2 bg-black/50 px-4 py-2 rounded-lg border border-white/20">
-                <IconCalendar className="w-5 h-5 text-cyan-300" />
+                <IconCalendar className="w-5 h-5 text-white" />
                 <label className="text-white/90 text-sm font-medium">From Year:</label>
                 <input
                   type="number"
