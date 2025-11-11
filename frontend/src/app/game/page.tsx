@@ -63,42 +63,46 @@ export default function GamePage() {
   const winSoundRef = useRef<HTMLAudioElement | null>(null)
   const loseSoundRef = useRef<HTMLAudioElement | null>(null)
   const [muted, setMuted] = useState(false)
+  const [leaderboard, setLeaderboard] = useState<{ id: number; name: string; score: number }[]>([])
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(true)
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null)
+
 
   type Question = {
-  id: string
-  questionText: string
-  options: string[]
-  answer: string
-}
-
-useEffect(() => {
-  backgroundMusicRef.current = new Audio("/sounds/background.mp3")
-  backgroundMusicRef.current.loop = true
-  backgroundMusicRef.current.volume = 0.5
-
-  winSoundRef.current = new Audio("/sounds/win.mp3")
-  loseSoundRef.current = new Audio("/sounds/lose.mp3")
-}, [])
-
-useEffect(() => {
-  return () => {
-    backgroundMusicRef.current?.pause()
-    backgroundMusicRef.current = null
+    id: string
+    questionText: string
+    options: string[]
+    answer: string
   }
-}, [])
 
-useEffect(() => {
-  const allSounds = [
-    backgroundMusicRef.current,
-    winSoundRef.current,
-    loseSoundRef.current,
-  ]
-  allSounds.forEach((sound) => {
-    if (sound) sound.muted = muted
-  })
-}, [muted])
+  useEffect(() => {
+    backgroundMusicRef.current = new Audio("/sounds/background.mp3")
+    backgroundMusicRef.current.loop = true
+    backgroundMusicRef.current.volume = 0.5
 
-const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
+    winSoundRef.current = new Audio("/sounds/win.mp3")
+    loseSoundRef.current = new Audio("/sounds/lose.mp3")
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      backgroundMusicRef.current?.pause()
+      backgroundMusicRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    const allSounds = [
+      backgroundMusicRef.current,
+      winSoundRef.current,
+      loseSoundRef.current,
+    ]
+    allSounds.forEach((sound) => {
+      if (sound) sound.muted = muted
+    })
+  }, [muted])
+
+  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
 
 
   // Game state refs
@@ -419,21 +423,21 @@ const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
   }
 
   const pauseGameForQuiz = () => {
-  if (animationRef.current) {
-    cancelAnimationFrame(animationRef.current)
-  }
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current)
+    }
 
-  const rawQuestion = getRandomQuestion()
-  const formattedQuestion: Question = {
-    id: crypto.randomUUID(),          // unique ID
-    questionText: rawQuestion.question,
-    options: rawQuestion.options,
-    answer: rawQuestion.correctAnswer,
-  }
+    const rawQuestion = getRandomQuestion()
+    const formattedQuestion: Question = {
+      id: crypto.randomUUID(),          // unique ID
+      questionText: rawQuestion.question,
+      options: rawQuestion.options,
+      answer: rawQuestion.correctAnswer,
+    }
 
-  setCurrentQuestion(formattedQuestion)
-  setShowQuiz(true)
-}
+    setCurrentQuestion(formattedQuestion)
+    setShowQuiz(true)
+  }
 
   const handleQuizAnswer = (correct: boolean) => {
     setShowQuiz(false)
@@ -641,6 +645,48 @@ const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
     })
   }
 
+  useEffect(() => {
+  const fetchLeaderboard = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/leaderboard`)
+      if (!res.ok) {
+        throw new Error(`Failed to load leaderboard (${res.status})`)
+      }
+
+      const data = await res.json()
+      setLeaderboard(Array.isArray(data) ? data : [])
+    } catch (err) {
+      if (err instanceof Error) {
+        setLeaderboardError(err.message || "Failed to load leaderboard")
+      } else {
+        setLeaderboardError("Failed to load leaderboard")
+      }
+    } finally {
+      setLoadingLeaderboard(false)
+    }
+  }
+
+  fetchLeaderboard()
+}, [])
+
+  const loadLeaderboard = async () => {
+  try {
+    setLoadingLeaderboard(true)
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/leaderboard`)
+    const data = await res.json()
+    setLeaderboard(data || [])
+  } catch (err) {
+    console.error("Failed to load leaderboard", err)
+  } finally {
+    setLoadingLeaderboard(false)
+  }
+}
+
+useEffect(() => {
+  loadLeaderboard()
+}, [])
+
+
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center p-4 pb-25 relative overflow-hidden"
@@ -693,26 +739,68 @@ const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
         </div>
       </div>
 
+      {/* Floating Leaderboard on the left, does NOT move main card */}
+      <div className="hidden md:block absolute left-4 top-1/2 -translate-y-1/2">
+        <Card className="w-64 p-4 bg-black/40 text-white border border-white/10 backdrop-blur-sm">
+          <h2 className="text-lg font-semibold mb-2 text-center">🏆 Leaderboard</h2>
+
+          {loadingLeaderboard && (
+            <p className="text-xs text-center text-white/70">Loading...</p>
+          )}
+
+          {leaderboardError && (
+            <p className="text-xs text-center text-red-400">
+              {leaderboardError}
+            </p>
+          )}
+
+          {!loadingLeaderboard && !leaderboardError && (
+            <div className="space-y-1">
+              {leaderboard.length === 0 && (
+                <p className="text-xs text-center text-white/60">
+                  No scores yet. Be the first!
+                </p>
+              )}
+
+              {leaderboard.slice(0, 10).map((entry, index) => (
+                <div
+                  key={entry.id ?? `${entry.name}-${index}`}
+                  className="flex justify-between text-xs py-1 px-2 rounded-md bg-white/5"
+                >
+                  <span className="font-medium">
+                    {index + 1}. {entry.name}
+                  </span>
+                  <span className="font-semibold text-emerald-300">
+                    {entry.score}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+
       {showQuiz && currentQuestion && (
-      <QuizModal
-        question={{
-          question: currentQuestion.questionText,
-          type: "multiple-choice",          // or whatever type is appropriate
-          correctAnswer: currentQuestion.answer,
-          options: currentQuestion.options,
-        }}
-        onAnswer={handleQuizAnswer}
-      />
-    )}
+        <QuizModal
+          question={{
+            question: currentQuestion.questionText,
+            type: "multiple-choice",          // or whatever type is appropriate
+            correctAnswer: currentQuestion.answer,
+            options: currentQuestion.options,
+          }}
+          onAnswer={handleQuizAnswer}
+        />
+      )}
 
       {gameOver && (
-      <GameOverModal
-        score={score}
-        won={lives > 0}
-        onRestart={startGame}
-        onClose={() => setGameOver(false)}
-      />
-    )}
+        <GameOverModal
+          score={score}
+          won={lives > 0}
+          onRestart={startGame}
+          onClose={() => setGameOver(false)}
+          onScoreUploaded={loadLeaderboard}  // 👈 key line
+        />
+      )}
     </div>
   )
 }
