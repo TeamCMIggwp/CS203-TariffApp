@@ -454,9 +454,9 @@ class AuthServiceTest {
         String email = "newuser@example.com";
         when(jdbcTemplate.queryForObject(anyString(), eq(String.class), eq(email)))
                 .thenThrow(new EmptyResultDataAccessException(1));
-        when(jdbcTemplate.update(anyString(), anyString(), anyString()))
+        lenient().when(jdbcTemplate.update(anyString(), anyString(), anyString()))
                 .thenReturn(1);
-        when(jdbcTemplate.update(anyString(), anyString(), anyString(), anyString()))
+        lenient().when(jdbcTemplate.update(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(1);
         doNothing().when(jdbcTemplate).execute(anyString());
 
