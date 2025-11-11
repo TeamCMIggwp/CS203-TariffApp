@@ -104,7 +104,7 @@ class LeaderboardServiceTest {
         LeaderboardEntryEntity savedEntity = new LeaderboardEntryEntity(1L, "NewPlayer", 800);
 
         when(repository.update(anyString(), anyInt())).thenReturn(0);
-        doNothing().when(repository).create(anyString(), anyInt());
+        when(repository.create(anyString(), anyInt())).thenReturn(1);
         when(repository.findByName("NewPlayer")).thenReturn(Optional.of(savedEntity));
 
         // Act
@@ -148,7 +148,7 @@ class LeaderboardServiceTest {
         LeaderboardRequest request = new LeaderboardRequest("FailPlayer", 500);
 
         when(repository.update(anyString(), anyInt())).thenReturn(0);
-        doNothing().when(repository).create(anyString(), anyInt());
+        when(repository.create(anyString(), anyInt())).thenReturn(1);
         when(repository.findByName("FailPlayer")).thenReturn(Optional.empty());
 
         // Act & Assert
@@ -168,7 +168,7 @@ class LeaderboardServiceTest {
         LeaderboardEntryEntity savedEntity = new LeaderboardEntryEntity(2L, "ZeroPlayer", 0);
 
         when(repository.update(anyString(), anyInt())).thenReturn(0);
-        doNothing().when(repository).create(anyString(), anyInt());
+        when(repository.create(anyString(), anyInt())).thenReturn(1);
         when(repository.findByName("ZeroPlayer")).thenReturn(Optional.of(savedEntity));
 
         // Act
@@ -187,7 +187,7 @@ class LeaderboardServiceTest {
         LeaderboardEntryEntity savedEntity = new LeaderboardEntryEntity(3L, "NegativePlayer", -100);
 
         when(repository.update(anyString(), anyInt())).thenReturn(0);
-        doNothing().when(repository).create(anyString(), anyInt());
+        when(repository.create(anyString(), anyInt())).thenReturn(1);
         when(repository.findByName("NegativePlayer")).thenReturn(Optional.of(savedEntity));
 
         // Act
@@ -206,7 +206,7 @@ class LeaderboardServiceTest {
         LeaderboardEntryEntity savedEntity = new LeaderboardEntryEntity(4L, "HighScorer", 999999);
 
         when(repository.update(anyString(), anyInt())).thenReturn(0);
-        doNothing().when(repository).create(anyString(), anyInt());
+        when(repository.create(anyString(), anyInt())).thenReturn(1);
         when(repository.findByName("HighScorer")).thenReturn(Optional.of(savedEntity));
 
         // Act
