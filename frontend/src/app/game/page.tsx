@@ -648,7 +648,7 @@ export default function GamePage() {
   useEffect(() => {
   const fetchLeaderboard = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/leaderboard`)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/leaderboard`)
       if (!res.ok) {
         throw new Error(`Failed to load leaderboard (${res.status})`)
       }
@@ -672,7 +672,7 @@ export default function GamePage() {
   const loadLeaderboard = async () => {
   try {
     setLoadingLeaderboard(true)
-    const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/leaderboard`)
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/leaderboard`)
     const data = await res.json()
     setLeaderboard(data || [])
   } catch (err) {
