@@ -1,15 +1,16 @@
-package leaderboard;
+package database.leaderboard;
 
-import leaderboard.dto.LeaderboardRequest;
-import leaderboard.dto.LeaderboardResponse;
-import leaderboard.entity.LeaderboardEntryEntity;
-import leaderboard.repository.LeaderboardRepository;
-import leaderboard.service.LeaderboardService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import database.leaderboard.dto.LeaderboardRequest;
+import database.leaderboard.dto.LeaderboardResponse;
+import database.leaderboard.entity.LeaderboardEntryEntity;
+import database.leaderboard.repository.LeaderboardRepository;
+import database.leaderboard.service.LeaderboardService;
 
 import java.util.Arrays;
 import java.util.Collections;

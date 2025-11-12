@@ -1,8 +1,8 @@
-package leaderboard.controller;
+package database.leaderboard.controller;
 
-import leaderboard.dto.LeaderboardRequest;
-import leaderboard.dto.LeaderboardResponse;
-import leaderboard.service.LeaderboardService;
+import database.leaderboard.dto.LeaderboardRequest;
+import database.leaderboard.dto.LeaderboardResponse;
+import database.leaderboard.service.LeaderboardService;
 
 import org.springframework.web.bind.annotation.*;
 

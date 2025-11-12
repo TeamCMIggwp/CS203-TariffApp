@@ -1,28 +1,16 @@
-package leaderboard.entity;
+package database.leaderboard.dto;
 
-public class LeaderboardEntryEntity {
+public class LeaderboardRequest {
 
-    private Long id;
     private String name;
     private Integer score;
 
-    public LeaderboardEntryEntity() {
+    public LeaderboardRequest() {
     }
 
-    public LeaderboardEntryEntity(Long id, String name, Integer score) {
-        this.id = id;
+    public LeaderboardRequest(String name, Integer score) {
         this.name = name;
         this.score = score;
-    }
-
-    // Getters & setters
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
     }
 
     public String getName() {

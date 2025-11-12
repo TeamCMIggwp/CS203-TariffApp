@@ -1,4 +1,4 @@
-package leaderboard.dto;
+package database.leaderboard.dto;
 
 public class LeaderboardResponse {
 

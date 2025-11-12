@@ -22,8 +22,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
                                             "auth", 
                                             "config",
                                             "scraper",
-                                            "exchangerate",
-                                            "leaderboard"
+                                            "exchangerate"
                                         })
 public class AppApplication implements WebMvcConfigurer {
 

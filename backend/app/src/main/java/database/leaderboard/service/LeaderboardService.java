@@ -1,9 +1,9 @@
-package leaderboard.service;
+package database.leaderboard.service;
 
-import leaderboard.dto.LeaderboardRequest;
-import leaderboard.dto.LeaderboardResponse;
-import leaderboard.entity.LeaderboardEntryEntity;
-import leaderboard.repository.LeaderboardRepository;
+import database.leaderboard.dto.LeaderboardRequest;
+import database.leaderboard.dto.LeaderboardResponse;
+import database.leaderboard.entity.LeaderboardEntryEntity;
+import database.leaderboard.repository.LeaderboardRepository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

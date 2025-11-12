@@ -1,6 +1,6 @@
-package leaderboard.repository;
+package database.leaderboard.repository;
 
-import leaderboard.entity.LeaderboardEntryEntity;
+import database.leaderboard.entity.LeaderboardEntryEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
