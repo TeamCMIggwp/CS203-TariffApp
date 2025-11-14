@@ -1,33 +1,39 @@
 package web;
 
-import java.util.Arrays;
+import java.util.*;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.beans.factory.annotation.*;
+import org.springframework.boot.*;
+import org.springframework.boot.autoconfigure.*;
+import org.springframework.context.annotation.*;
+import org.springframework.web.cors.*;
+import org.springframework.web.servlet.config.annotation.*;
 
-@SpringBootApplication(scanBasePackages = {"web",
-                                            "geminianalysis",
-                                            "wits",
-                                            "wto", 
-                                            "tariffcalculator", 
-                                            "database", 
-                                            "auth", 
-                                            "config",
-                                            "scraper",
-                                            "exchangerate"
-                                        })
+@SpringBootApplication(scanBasePackages = {
+        "web",
+        "geminianalysis",
+        "wits",
+        "wto",
+        "tariffcalculator",
+        "database",
+        "auth",
+        "config",
+        "scraper",
+        "exchangerate"
+})
 public class AppApplication implements WebMvcConfigurer {
 
+    private static final String[] ALLOWED_METHODS = { "GET", "POST", "PUT", "DELETE", "OPTIONS" };
+    private static final String[] ALLOWED_ORIGIN_PATTERNS = { "*" };
+    private static final String[] ALLOWED_HEADERS = { "*" };
+    private static final long CORS_MAX_AGE_SECONDS = 3600L;
+
+    private final ApiCallLogger apiCallLogger;
+
     @Autowired
-    private ApiCallLogger apiCallLogger;
+    public AppApplication(ApiCallLogger apiCallLogger) {
+        this.apiCallLogger = apiCallLogger;
+    }
 
     public static void main(String[] args) {
         SpringApplication.run(AppApplication.class, args);
@@ -47,11 +53,11 @@ public class AppApplication implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOriginPatterns("*")
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("*")
+                .allowedOriginPatterns(ALLOWED_ORIGIN_PATTERNS)
+                .allowedMethods(ALLOWED_METHODS)
+                .allowedHeaders(ALLOWED_HEADERS)
                 .allowCredentials(true)
-                .maxAge(3600);
+                .maxAge(CORS_MAX_AGE_SECONDS);
     }
 
     /**
@@ -60,11 +66,11 @@ public class AppApplication implements WebMvcConfigurer {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowedOriginPatterns(Arrays.asList(ALLOWED_ORIGIN_PATTERNS));
+        configuration.setAllowedMethods(Arrays.asList(ALLOWED_METHODS));
+        configuration.setAllowedHeaders(Arrays.asList(ALLOWED_HEADERS));
         configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
+        configuration.setMaxAge(CORS_MAX_AGE_SECONDS);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

@@ -1,18 +1,17 @@
 package web;
 
-import java.util.List;
+import java.util.*;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
+import org.springframework.beans.factory.annotation.*;
+import org.springframework.boot.web.servlet.*;
+import org.springframework.context.annotation.*;
+import org.springframework.core.*;
+import org.springframework.web.cors.*;
+import org.springframework.web.filter.*;
 
 @Configuration
 public class CorsConfig {
+
     @Value("${app.cors.allowedOrigin:http://localhost:3000}")
     private String allowedOrigin;
 
@@ -27,14 +26,15 @@ public class CorsConfig {
                 "http://localhost:5173",
                 "http://127.0.0.1:3000",
                 "http://127.0.0.1:5173",
-                "https://teamcmiggwp.duckdns.org", // Legacy backend domain
-                "http://teamcmiggwp.duckdns.org", // HTTP version too
-                "https://*.amplifyapp.com", // Amplify preview/prod domains
+                "https://teamcmiggwp.duckdns.org",  // Legacy backend domain
+                "http://teamcmiggwp.duckdns.org",  // HTTP version too
+                "https://*.amplifyapp.com",        // Amplify preview/prod domains
                 // New custom frontend domains
                 "https://www.teamcmiggwpholidaymood.fun",
                 "https://teamcmiggwpholidaymood.fun",
                 "http://www.teamcmiggwpholidaymood.fun",
-                "http://teamcmiggwpholidaymood.fun"));
+                "http://teamcmiggwpholidaymood.fun"
+        ));
 
         config.setAllowCredentials(true);
         config.addAllowedMethod("*");
