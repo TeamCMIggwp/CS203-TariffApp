@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 @Service
 public class UserHiddenSourcesService {
     private static final Logger logger = LoggerFactory.getLogger(UserHiddenSourcesService.class);
+    private static final int NO_ROWS_AFFECTED = 0;
 
     @Autowired
     private UserHiddenSourcesRepository repository;
@@ -40,7 +41,7 @@ public class UserHiddenSourcesService {
 
         int rowsDeleted = repository.unhideSource(userId, newsLink);
 
-        if (rowsDeleted == 0) {
+        if (rowsDeleted == NO_ROWS_AFFECTED) {
             logger.warn("No hidden source found for user: userId={}, newsLink={}", userId, newsLink);
         }
     }
@@ -64,7 +65,7 @@ public class UserHiddenSourcesService {
         List<UserHiddenSourcesEntity> entities = repository.getAllHiddenSourcesByUser(userId);
 
         return entities.stream()
-                .map(entity -> new HiddenSourceResponse(entity.getNewsLink(), entity.getHiddenAt()))
+                .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
@@ -73,5 +74,12 @@ public class UserHiddenSourcesService {
      */
     public boolean isSourceHiddenByUser(String userId, String newsLink) {
         return repository.isHiddenByUser(userId, newsLink);
+    }
+
+    /**
+     * Map UserHiddenSourcesEntity to HiddenSourceResponse
+     */
+    private HiddenSourceResponse mapToResponse(UserHiddenSourcesEntity entity) {
+        return new HiddenSourceResponse(entity.getNewsLink(), entity.getHiddenAt());
     }
 }

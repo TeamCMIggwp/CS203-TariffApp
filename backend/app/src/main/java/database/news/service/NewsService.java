@@ -20,7 +20,8 @@ import java.util.stream.Collectors;
 @Service
 public class NewsService {
     private static final Logger logger = LoggerFactory.getLogger(NewsService.class);
-    
+    private static final int NO_ROWS_AFFECTED = 0;
+
     @Autowired
     private NewsRepository repository;
     
@@ -59,7 +60,7 @@ public class NewsService {
         // Update news
         int rowsUpdated = repository.updateRemarks(newsLink, request.getRemarks());
 
-        if (rowsUpdated == 0) {
+        if (rowsUpdated == NO_ROWS_AFFECTED) {
             throw new NewsNotFoundException(newsLink);
         }
 
@@ -94,7 +95,7 @@ public class NewsService {
         List<NewsEntity> entities = repository.getAllNews();
 
         return entities.stream()
-                .map(entity -> new NewsResponse(entity.getNewsLink(), entity.getRemarks(), entity.isHidden()))
+                .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
@@ -107,7 +108,7 @@ public class NewsService {
         List<NewsEntity> entities = repository.getAllVisibleNews();
 
         return entities.stream()
-                .map(entity -> new NewsResponse(entity.getNewsLink(), entity.getRemarks(), entity.isHidden()))
+                .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
     
@@ -124,8 +125,8 @@ public class NewsService {
         }
         
         int rowsDeleted = repository.delete(newsLink);
-        
-        if (rowsDeleted == 0) {
+
+        if (rowsDeleted == NO_ROWS_AFFECTED) {
             throw new NewsNotFoundException(newsLink);
         }
         
@@ -153,7 +154,7 @@ public class NewsService {
 
         int rowsUpdated = repository.hideSource(newsLink);
 
-        if (rowsUpdated == 0) {
+        if (rowsUpdated == NO_ROWS_AFFECTED) {
             throw new NewsNotFoundException(newsLink);
         }
 
@@ -175,13 +176,20 @@ public class NewsService {
 
         int rowsUpdated = repository.unhideSource(newsLink);
 
-        if (rowsUpdated == 0) {
+        if (rowsUpdated == NO_ROWS_AFFECTED) {
             throw new NewsNotFoundException(newsLink);
         }
 
         logger.info("Successfully unhidden news source");
 
         NewsEntity entity = repository.getNews(newsLink);
+        return new NewsResponse(entity.getNewsLink(), entity.getRemarks(), entity.isHidden());
+    }
+
+    /**
+     * Map NewsEntity to NewsResponse
+     */
+    private NewsResponse mapToResponse(NewsEntity entity) {
         return new NewsResponse(entity.getNewsLink(), entity.getRemarks(), entity.isHidden());
     }
 }

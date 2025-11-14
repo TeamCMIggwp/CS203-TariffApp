@@ -31,6 +31,7 @@ import java.util.List;
 @Validated
 public class NewsController {
     private static final Logger logger = LoggerFactory.getLogger(NewsController.class);
+    private static final int HTTP_CREATED = 201;
 
     @Autowired
     private NewsService newsService;
@@ -73,8 +74,8 @@ public class NewsController {
         logger.info("POST /api/v1/database/news - Creating news: {}", request);
         
         NewsResponse response = newsService.createNews(request);
-        
-        return ResponseEntity.status(201).body(response);
+
+        return ResponseEntity.status(HTTP_CREATED).body(response);
     }
 
     @Operation(

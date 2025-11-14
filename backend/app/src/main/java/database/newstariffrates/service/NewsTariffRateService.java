@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class NewsTariffRateService {
 
     private static final Logger logger = LoggerFactory.getLogger(NewsTariffRateService.class);
+    private static final boolean DEFAULT_IN_EFFECT = true;
 
     @Autowired
     private NewsTariffRateRepository repository;
@@ -44,7 +45,7 @@ public class NewsTariffRateService {
         entity.setYear(request.getYear());
         entity.setRate(request.getRate());
         entity.setUnit(request.getUnit());
-        entity.setInEffect(true); // Default to active
+        entity.setInEffect(DEFAULT_IN_EFFECT);
 
         // Save to database
         NewsTariffRate saved = repository.save(entity);

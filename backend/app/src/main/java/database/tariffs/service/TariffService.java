@@ -20,7 +20,8 @@ import java.util.stream.Collectors;
 @Service
 public class TariffService {
     private static final Logger logger = LoggerFactory.getLogger(TariffService.class);
-    
+    private static final int NO_ROWS_AFFECTED = 0;
+
     @Autowired
     private TariffRateRepository repository;
     
@@ -83,8 +84,8 @@ public class TariffService {
             reporter, partner, product, year,
             request.getRate(), request.getUnit()
         );
-        
-        if (rowsUpdated == 0) {
+
+        if (rowsUpdated == NO_ROWS_AFFECTED) {
             throw new TariffNotFoundException(reporter, partner, product, year);
         }
         
@@ -129,14 +130,7 @@ public class TariffService {
         List<TariffRateEntity> entities = repository.getAllTariffs();
         
         return entities.stream()
-                .map(entity -> new TariffResponse(
-                    entity.getCountryIsoNumeric(),
-                    entity.getPartnerIsoNumeric(),
-                    entity.getProductHsCode(),
-                    entity.getYear(),
-                    entity.getRate(),
-                    entity.getUnit()
-                ))
+                .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
     
@@ -155,11 +149,25 @@ public class TariffService {
         }
         
         int rowsDeleted = repository.delete(reporter, partner, product, year);
-        
-        if (rowsDeleted == 0) {
+
+        if (rowsDeleted == NO_ROWS_AFFECTED) {
             throw new TariffNotFoundException(reporter, partner, product, year);
         }
         
         logger.info("Successfully deleted tariff");
+    }
+
+    /**
+     * Map TariffRateEntity to TariffResponse
+     */
+    private TariffResponse mapToResponse(TariffRateEntity entity) {
+        return new TariffResponse(
+            entity.getCountryIsoNumeric(),
+            entity.getPartnerIsoNumeric(),
+            entity.getProductHsCode(),
+            entity.getYear(),
+            entity.getRate(),
+            entity.getUnit()
+        );
     }
 }

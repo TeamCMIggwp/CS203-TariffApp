@@ -40,6 +40,7 @@ import jakarta.validation.constraints.Pattern;
 @Validated
 public class TariffController {
     private static final Logger logger = LoggerFactory.getLogger(TariffController.class);
+    private static final int HTTP_CREATED = 201;
 
     @Autowired
     private TariffService tariffService;
@@ -83,7 +84,7 @@ public class TariffController {
 
         TariffResponse response = tariffService.createTariff(request);
 
-        return ResponseEntity.status(201).body(response);
+        return ResponseEntity.status(HTTP_CREATED).body(response);
     }
 
     @Operation(

@@ -18,13 +18,23 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 @Service
 public class WitsApiService {
     private static final Logger logger = LoggerFactory.getLogger(WitsApiService.class);
-    
+    private static final String WITS_BASE_URL = "https://wits.worldbank.org/API/V1/SDMX/V21";
+    private static final String PATH_FORMAT = "/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/reported?format=JSON";
+    private static final int HTTP_NO_CONTENT = 204;
+    private static final int OBSERVATION_VALUE_INDEX = 0;
+    private static final int ATTRIBUTE_OFFSET = 1;
+
+    // Attribute IDs
+    private static final String ATTR_MIN_RATE = "MIN_RATE";
+    private static final String ATTR_MAX_RATE = "MAX_RATE";
+    private static final String ATTR_AVG_RATE = "AVG_RATE";
+
     private final WebClient webClient;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public WitsApiService() {
         this.webClient = WebClient.builder()
-                .baseUrl("https://wits.worldbank.org/API/V1/SDMX/V21")
+                .baseUrl(WITS_BASE_URL)
                 .build();
     }
 
@@ -38,10 +48,7 @@ public class WitsApiService {
             logger.info("Fetching WITS data: reporter={}, partner={}, product={}, year={}",
                     reporter, partner, product, year);
             
-            String path = String.format(
-                "/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/reported?format=JSON",
-                reporter, partner, product, year
-            );
+            String path = String.format(PATH_FORMAT, reporter, partner, product, year);
 
             // Fetch data with proper error handling
             String body = webClient.get()
@@ -50,7 +57,7 @@ public class WitsApiService {
                     if (resp.statusCode().is2xxSuccessful()) {
                         return resp.bodyToMono(String.class).defaultIfEmpty("");
                     }
-                    if (resp.statusCode().value() == 204 || resp.statusCode().is4xxClientError()) {
+                    if (resp.statusCode().value() == HTTP_NO_CONTENT || resp.statusCode().is4xxClientError()) {
                         // WITS uses 204/404 when there's no data
                         return Mono.just("");
                     }
@@ -70,9 +77,9 @@ public class WitsApiService {
             }
 
             // Extract all rates
-            String minRate = extractObservationAttribute(body, "MIN_RATE");
-            String maxRate = extractObservationAttribute(body, "MAX_RATE");
-            String avgRate = extractObservationAttribute(body, "AVG_RATE");
+            String minRate = extractObservationAttribute(body, ATTR_MIN_RATE);
+            String maxRate = extractObservationAttribute(body, ATTR_MAX_RATE);
+            String avgRate = extractObservationAttribute(body, ATTR_AVG_RATE);
             
             // If no rates extracted, data is not available
             if (minRate == null && maxRate == null && avgRate == null) {
@@ -108,10 +115,7 @@ public class WitsApiService {
             logger.info("Fetching raw WITS data: reporter={}, partner={}, product={}, year={}",
                     reporter, partner, product, year);
             
-            String path = String.format(
-                "/datasource/TRN/reporter/%s/partner/%s/product/%s/year/%s/datatype/reported?format=JSON",
-                reporter, partner, product, year
-            );
+            String path = String.format(PATH_FORMAT, reporter, partner, product, year);
 
             String body = webClient.get()
                 .uri(path)
@@ -178,7 +182,7 @@ public class WitsApiService {
             if (!obsArray.isArray() || obsArray.size() == 0) return null;
 
             // 3) Observation array layout: [value, attr0, attr1, ...]
-            int obsPos = attrIdx + 1; // +1 because index 0 is the measure
+            int obsPos = attrIdx + ATTRIBUTE_OFFSET;
             if (obsPos >= obsArray.size()) return null;
 
             JsonNode attrIndexNode = obsArray.get(obsPos);

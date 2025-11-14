@@ -27,6 +27,8 @@ import org.springframework.web.bind.annotation.*;
 public class NewsTariffRateController {
 
     private static final Logger logger = LoggerFactory.getLogger(NewsTariffRateController.class);
+    private static final int HTTP_CREATED = 201;
+    private static final int HTTP_NOT_FOUND = 404;
 
     @Autowired
     private NewsTariffRateService service;
@@ -62,7 +64,7 @@ public class NewsTariffRateController {
 
         try {
             NewsTariffRateResponse response = service.createTariffRate(request);
-            return ResponseEntity.status(201).body(response);
+            return ResponseEntity.status(HTTP_CREATED).body(response);
         } catch (DataIntegrityViolationException e) {
             logger.warn("Duplicate tariff rate for news: {}", request.getNewsLink());
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -102,7 +104,7 @@ public class NewsTariffRateController {
             NewsTariffRateResponse response = service.getTariffRateByNewsLink(newsLink);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(404).body(e.getMessage());
+            return ResponseEntity.status(HTTP_NOT_FOUND).body(e.getMessage());
         }
     }
 
