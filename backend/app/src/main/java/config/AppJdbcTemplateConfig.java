@@ -1,13 +1,12 @@
 package config;
 
-import javax.sql.DataSource;
+import javax.sql.*;
 
-import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.*;
+import org.springframework.boot.autoconfigure.jdbc.*;
+import org.springframework.boot.context.properties.*;
+import org.springframework.context.annotation.*;
+import org.springframework.jdbc.core.*;
 
 /**
  * Exposes a JdbcTemplate bound to the primary application DataSource (spring.datasource),
@@ -32,7 +31,7 @@ public class AppJdbcTemplateConfig {
     }
 
     @Bean(name = "appJdbcTemplate")
-    public JdbcTemplate appJdbcTemplate(@org.springframework.beans.factory.annotation.Qualifier("dataSource") DataSource dataSource) {
+    public JdbcTemplate appJdbcTemplate(@Qualifier("dataSource") DataSource dataSource) {
         // The auto-configured primary DataSource from spring.datasource.*
         return new JdbcTemplate(dataSource);
     }

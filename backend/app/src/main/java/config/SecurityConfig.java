@@ -1,119 +1,132 @@
 package config;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
+import java.nio.charset.*;
+import java.time.*;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.util.StringUtils;
-
-import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.*;
+import org.springframework.context.annotation.*;
+import org.springframework.http.*;
+import org.springframework.security.config.annotation.method.configuration.*;
+import org.springframework.security.config.annotation.web.builders.*;
+import org.springframework.security.config.http.*;
+import org.springframework.security.web.*;
+import org.springframework.security.web.authentication.*;
+import org.springframework.util.*;
 
 @Configuration
 @EnableMethodSecurity // optional, enables @PreAuthorize if needed later
 public class SecurityConfig {
 
-	private final JwtAuthenticationFilter jwtFilter;
+    private final JwtAuthenticationFilter jwtFilter;
 
-	public SecurityConfig(JwtAuthenticationFilter jwtFilter) {
-		this.jwtFilter = jwtFilter;
-	}
+    public SecurityConfig(JwtAuthenticationFilter jwtFilter) {
+        this.jwtFilter = jwtFilter;
+    }
 
-	@Bean
-	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-		http
-			// CORS is handled by web.CorsConfig; don't configure here to avoid duplicate beans
-			.csrf(csrf -> csrf.disable())
-			.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-			.exceptionHandling(eh -> eh
-				.authenticationEntryPoint((request, response, authException) ->
-					writeJson(response, 401, "Unauthorized", authException != null ? authException.getMessage() : null, request.getRequestURI()))
-				.accessDeniedHandler((request, response, accessDeniedException) ->
-					writeJson(response, 403, "Forbidden", accessDeniedException != null ? accessDeniedException.getMessage() : null, request.getRequestURI()))
-			)
-			.authorizeHttpRequests(auth -> auth
-				// Health + Swagger OPEN
-				.requestMatchers("/actuator/health").permitAll()
-				.requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-				.requestMatchers("/hello").permitAll()
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                // CORS is handled by web.CorsConfig; don't configure here to avoid duplicate beans
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(eh -> eh
+                        .authenticationEntryPoint((request, response, authException) ->
+                                writeJson(
+                                        response,
+                                        HttpStatus.UNAUTHORIZED.value(),
+                                        "Unauthorized",
+                                        authException != null ? authException.getMessage() : null,
+                                        request.getRequestURI()
+                                ))
+                        .accessDeniedHandler((request, response, accessDeniedException) ->
+                                writeJson(
+                                        response,
+                                        HttpStatus.FORBIDDEN.value(),
+                                        "Forbidden",
+                                        accessDeniedException != null ? accessDeniedException.getMessage() : null,
+                                        request.getRequestURI()
+                                ))
+                )
+                .authorizeHttpRequests(auth -> auth
+                        // Health + Swagger OPEN
+                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/hello").permitAll()
 
-				// JaCoCo coverage reports OPEN
-				.requestMatchers("/jacoco/**").permitAll()
+                        // JaCoCo coverage reports OPEN
+                        .requestMatchers("/jacoco/**").permitAll()
 
-				// Auth endpoints open (login/signup/refresh/logout/me handled in controller)
-				.requestMatchers("/auth/**").permitAll()
+                        // Auth endpoints open (login/signup/refresh/logout/me handled in controller)
+                        .requestMatchers("/auth/**").permitAll()
 
-				// Tariffs: GET and POST open; PUT/DELETE admin-only
-				.requestMatchers(HttpMethod.GET, "/api/v1/tariffs/**").permitAll()
-				.requestMatchers(HttpMethod.POST, "/api/v1/tariffs/**").permitAll()
-				.requestMatchers(HttpMethod.PUT, "/api/v1/tariffs/**").hasRole("ADMIN")
-				.requestMatchers(HttpMethod.DELETE, "/api/v1/tariffs/**").hasRole("ADMIN")
+                        // Tariffs: GET and POST open; PUT/DELETE admin-only
+                        .requestMatchers(HttpMethod.GET, "/api/v1/tariffs/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/tariffs/**").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/tariffs/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/tariffs/**").hasRole("ADMIN")
 
-				// Admin News Management (Shared database operations for all admins)
-				.requestMatchers(HttpMethod.GET, "/api/v1/admin/news/all").permitAll() // Anyone can see all news in DB
-				.requestMatchers(HttpMethod.GET, "/api/v1/admin/news").permitAll() // Anyone can check if specific news exists
-				.requestMatchers(HttpMethod.POST, "/api/v1/admin/news").hasRole("ADMIN") // Only admin can add to DB
-				.requestMatchers(HttpMethod.PUT, "/api/v1/admin/news/visibility").hasRole("ADMIN") // Only admin can hide globally (for all admins)
-				.requestMatchers(HttpMethod.PUT, "/api/v1/admin/news").hasRole("ADMIN") // Only admin can update remarks
-				.requestMatchers(HttpMethod.DELETE, "/api/v1/admin/news").hasRole("ADMIN") // Only admin can delete from DB
+                        // Admin News Management (Shared database operations for all admins)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/news/all").permitAll() // Anyone can see all news in DB
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/news").permitAll() // Anyone can check if specific news exists
+                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/news").hasRole("ADMIN") // Only admin can add to DB
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/admin/news/visibility").hasRole("ADMIN") // Only admin can hide globally (for all admins)
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/admin/news").hasRole("ADMIN") // Only admin can update remarks
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/news").hasRole("ADMIN") // Only admin can delete from DB
 
-				// WITS and WTO data open
-				.requestMatchers(HttpMethod.GET, "/api/v1/wits/**").permitAll()
-				.requestMatchers(HttpMethod.GET, "/api/v1/indicators/**").permitAll()
+                        // WITS and WTO data open
+                        .requestMatchers(HttpMethod.GET, "/api/v1/wits/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/indicators/**").permitAll()
 
-				// Exchange rates open
-				.requestMatchers(HttpMethod.GET, "/api/v1/exchange").permitAll()
+                        // Exchange rates open
+                        .requestMatchers(HttpMethod.GET, "/api/v1/exchange").permitAll()
 
-				// Gemini endpoints (health + analyses) open as before
-				.requestMatchers(HttpMethod.GET, "/api/v1/gemini/health").permitAll()
-				.requestMatchers(HttpMethod.POST, "/api/v1/gemini/analyses").permitAll()
+                        // Gemini endpoints (health + analyses) open as before
+                        .requestMatchers(HttpMethod.GET, "/api/v1/gemini/health").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/gemini/analyses").permitAll()
 
-				// Scraping Jobs
-				.requestMatchers(HttpMethod.GET, "/api/v1/scrape").permitAll()
+                        // Scraping Jobs
+                        .requestMatchers(HttpMethod.GET, "/api/v1/scrape").permitAll()
 
-				// User Hidden News (Personal hidden list - each user has their own)
-				.requestMatchers(HttpMethod.POST, "/api/v1/user/hidden-news").authenticated()
-				.requestMatchers(HttpMethod.GET, "/api/v1/user/hidden-news").authenticated()
-				.requestMatchers(HttpMethod.DELETE, "/api/v1/user/hidden-news").authenticated()
+                        // User Hidden News (Personal hidden list - each user has their own)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/user/hidden-news").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/user/hidden-news").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/user/hidden-news").authenticated()
 
-				// Admin News Tariff Rates - POST requires admin authentication, GET is open
-				.requestMatchers(HttpMethod.POST, "/api/v1/admin/news/rates").hasRole("ADMIN")
-				.requestMatchers(HttpMethod.GET, "/api/v1/admin/news/rates/**").permitAll()
+                        // Admin News Tariff Rates - POST requires admin authentication, GET is open
+                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/news/rates").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/news/rates/**").permitAll()
 
-				.requestMatchers(HttpMethod.GET, "/leaderboard").permitAll()
-				.requestMatchers(HttpMethod.PUT, "/leaderboard").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/leaderboard").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/leaderboard").permitAll()
 
+                        // Everything else requires authentication
+                        .anyRequest().authenticated()
+                )
+                // Add our JWT filter
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
-				// Everything else requires authentication
-				.anyRequest().authenticated()
-			)
-			// Add our JWT filter
-			.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
+    }
 
-		return http.build();
-	}
-
-	private static void writeJson(HttpServletResponse res, int status, String error, String detail, String path) {
-		try {
-			res.setStatus(status);
-			res.setCharacterEncoding(StandardCharsets.UTF_8.name());
-			res.setContentType("application/json");
-			String safeDetail = StringUtils.hasText(detail) ? detail.replace("\"", "\\\"") : null;
-			String body = "{"
-				+ "\"timestamp\":\"" + Instant.now().toString() + "\"," 
-				+ "\"status\":" + status + ","
-				+ "\"error\":\"" + (error != null ? error : "") + "\"," 
-				+ (safeDetail != null ? "\"message\":\"" + safeDetail + "\"," : "")
-				+ "\"path\":\"" + (path != null ? path : "") + "\"}";
-			res.getOutputStream().write(body.getBytes(StandardCharsets.UTF_8));
-		} catch (Exception ignore) {
-			// As a last resort, let default error handling proceed
-		} 
-	}
+    private static void writeJson(HttpServletResponse res,
+                                  int status,
+                                  String error,
+                                  String detail,
+                                  String path) {
+        try {
+            res.setStatus(status);
+            res.setCharacterEncoding(StandardCharsets.UTF_8.name());
+            res.setContentType("application/json");
+            String safeDetail = StringUtils.hasText(detail) ? detail.replace("\"", "\\\"") : null;
+            String body = "{"
+                    + "\"timestamp\":\"" + Instant.now().toString() + "\","
+                    + "\"status\":" + status + ","
+                    + "\"error\":\"" + (error != null ? error : "") + "\","
+                    + (safeDetail != null ? "\"message\":\"" + safeDetail + "\"," : "")
+                    + "\"path\":\"" + (path != null ? path : "") + "\"}";
+            res.getOutputStream().write(body.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception ignore) {
+            // As a last resort, let default error handling proceed
+        }
+    }
 }
