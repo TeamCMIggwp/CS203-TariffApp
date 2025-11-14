@@ -4,7 +4,6 @@ import jakarta.validation.constraints.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -58,46 +57,10 @@ public class ScraperController {
             Integer minYear) {
         
         log.info("Executing scrape for query: {}", query);
-        
-        // Create request object from query parameters
+
         ScrapeRequest request = new ScrapeRequest(query, maxResults, minYear);
-        
         ScrapeResponse response = scraperService.executeScrapeJob(request);
-        
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(response);
-    }
-    
-    /**
-     * Health check endpoint
-     * 
-     * GET /api/v1/scrape/health
-     */
-    @GetMapping("/health")
-    public ResponseEntity<HealthResponse> health() {
-        HealthResponse health = new HealthResponse("OK", "Scraper service is running");
-        return ResponseEntity.ok(health);
-    }
-    
-    /**
-     * Simple health response DTO
-     */
-    public static class HealthResponse {
-        private String status;
-        private String message;
-        
-        public HealthResponse(String status, String message) {
-            this.status = status;
-            this.message = message;
-        }
-        
-        public String getStatus() {
-            return status;
-        }
-        
-        public String getMessage() {
-            return message;
-        }
+
+        return ResponseEntity.ok(response);
     }
 }

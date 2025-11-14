@@ -15,6 +15,8 @@ import scraper.model.ScrapedData;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Main service that orchestrates the scraping process
@@ -22,9 +24,10 @@ import java.util.List;
  */
 @Service
 public class ScraperService {
-    
+
     private static final Logger log = LoggerFactory.getLogger(ScraperService.class);
     private static final long DELAY_BETWEEN_SCRAPES_MS = 2000;
+    private static final Pattern YEAR_PATTERN = Pattern.compile("\\b(20\\d{2})\\b");
     
     @Autowired
     private SearchService searchService;
@@ -154,21 +157,30 @@ public class ScraperService {
         if (publishDate == null || publishDate.isEmpty()) {
             return true; // Include if no date available
         }
-        
-        // Extract year from date string
-        java.util.regex.Pattern yearPattern = java.util.regex.Pattern.compile("\\b(20\\d{2})\\b");
-        java.util.regex.Matcher matcher = yearPattern.matcher(publishDate);
-        
+
+        Integer year = extractYear(publishDate);
+        return year == null || year >= minYear;
+    }
+
+    /**
+     * Extract year from date string
+     */
+    private Integer extractYear(String dateString) {
+        if (dateString == null || dateString.isEmpty()) {
+            return null;
+        }
+
+        Matcher matcher = YEAR_PATTERN.matcher(dateString);
+
         if (matcher.find()) {
             try {
-                int year = Integer.parseInt(matcher.group(1));
-                return year >= minYear;
+                return Integer.parseInt(matcher.group(1));
             } catch (NumberFormatException e) {
-                return true;
+                return null;
             }
         }
-        
-        return true;
+
+        return null;
     }
     
     /**

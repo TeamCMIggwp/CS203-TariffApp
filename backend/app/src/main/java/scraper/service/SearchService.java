@@ -21,18 +21,20 @@ import java.util.*;
  */
 @Service
 public class SearchService {
-    
+
     private static final Logger log = LoggerFactory.getLogger(SearchService.class);
-    
+    private static final int MAX_RESULTS_PER_QUERY = 10;
+    private static final String GOOGLE_SEARCH_API_URL = "https://www.googleapis.com/customsearch/v1";
+
     @Value("${google.api.key:}")
     private String googleApiKey;
-    
+
     @Value("${google.search.engine.id:}")
     private String searchEngineId;
-    
+
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
-    
+
     // Search query variations to get better results
     private static final String[] QUERY_VARIATIONS = {
         "%s tariff rate",
@@ -84,30 +86,31 @@ public class SearchService {
      */
     private List<SearchResult> executeSearch(String query, int maxResults) {
         try {
-            String url = buildSearchUrl(query, Math.min(maxResults, 10));
-            
+            String url = buildSearchUrl(query, Math.min(maxResults, MAX_RESULTS_PER_QUERY));
+
             log.debug("Executing search: {}", query);
-            
+
             String responseJson = webClient.get()
                     .uri(url)
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
-            
+
             return parseSearchResponse(responseJson);
-            
+
         } catch (Exception e) {
             log.error("Search API call failed: {}", e.getMessage());
             throw new SearchFailedException("Failed to execute search", e);
         }
     }
-    
+
     /**
      * Build Google Custom Search URL
      */
     private String buildSearchUrl(String query, int num) {
         return String.format(
-            "https://www.googleapis.com/customsearch/v1?key=%s&cx=%s&q=%s&num=%d&dateRestrict=y1",
+            "%s?key=%s&cx=%s&q=%s&num=%d&dateRestrict=y1",
+            GOOGLE_SEARCH_API_URL,
             googleApiKey,
             searchEngineId,
             URLEncoder.encode(query, StandardCharsets.UTF_8),
