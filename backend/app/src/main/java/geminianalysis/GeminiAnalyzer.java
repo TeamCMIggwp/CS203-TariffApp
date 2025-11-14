@@ -15,9 +15,25 @@ import java.util.concurrent.TimeUnit;
 public class GeminiAnalyzer {
 
     private static final Logger logger = LoggerFactory.getLogger(GeminiAnalyzer.class);
-    // Updated to use the latest stable model
     private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private static final int CONNECT_TIMEOUT_SECONDS = 30;
+    private static final int WRITE_TIMEOUT_SECONDS = 30;
+    private static final int READ_TIMEOUT_SECONDS = 60;
+    private static final String API_KEY_HEADER = "x-goog-api-key";
+    private static final String CONTENT_TYPE_HEADER = "Content-Type";
+
+    // Gemini API generation config defaults
+    private static final double DEFAULT_TEMPERATURE = 0.3;
+    private static final int DEFAULT_TOP_K = 40;
+    private static final double DEFAULT_TOP_P = 0.95;
+    private static final int DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+
+    // Response parsing constants
+    private static final String JSON_CODE_BLOCK_START = "```json";
+    private static final String CODE_BLOCK_START = "```";
+    private static final int JSON_PREFIX_LENGTH = 7; // Length of "```json"
+    private static final int CODE_PREFIX_LENGTH = 3; // Length of "```"
 
     private final OkHttpClient client;
     private final ObjectMapper objectMapper;
@@ -34,9 +50,9 @@ public class GeminiAnalyzer {
         this.apiKey = apiKey;
         this.objectMapper = new ObjectMapper();
         this.client = new OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
+                .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .writeTimeout(WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .build();
     }
 
@@ -47,12 +63,11 @@ public class GeminiAnalyzer {
         String prompt = buildAnalysisPrompt(data, analysisPrompt);
         String requestBody = buildRequestBody(prompt);
 
-        // Updated to use x-goog-api-key header instead of query parameter
         Request request = new Request.Builder()
                 .url(GEMINI_API_URL)
                 .post(RequestBody.create(requestBody, JSON))
-                .addHeader("Content-Type", "application/json")
-                .addHeader("x-goog-api-key", apiKey)
+                .addHeader(CONTENT_TYPE_HEADER, "application/json")
+                .addHeader(API_KEY_HEADER, apiKey)
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
@@ -113,7 +128,6 @@ public class GeminiAnalyzer {
                                    .replace("\r", "\\r")
                                    .replace("\t", "\\t");
 
-        // Updated request structure to match current Gemini API format
         return String.format("""
             {
                 "contents": [
@@ -126,13 +140,13 @@ public class GeminiAnalyzer {
                     }
                 ],
                 "generationConfig": {
-                    "temperature": 0.3,
-                    "topK": 40,
-                    "topP": 0.95,
-                    "maxOutputTokens": 8192
+                    "temperature": %.1f,
+                    "topK": %d,
+                    "topP": %.2f,
+                    "maxOutputTokens": %d
                 }
             }
-            """, escapedPrompt);
+            """, escapedPrompt, DEFAULT_TEMPERATURE, DEFAULT_TOP_K, DEFAULT_TOP_P, DEFAULT_MAX_OUTPUT_TOKENS);
     }
 
     /**
@@ -183,16 +197,16 @@ public class GeminiAnalyzer {
             String jsonText = text.trim();
 
             // Handle markdown code blocks
-            if (jsonText.contains("```json")) {
-                int start = jsonText.indexOf("```json") + 7;
-                int end = jsonText.indexOf("```", start);
+            if (jsonText.contains(JSON_CODE_BLOCK_START)) {
+                int start = jsonText.indexOf(JSON_CODE_BLOCK_START) + JSON_PREFIX_LENGTH;
+                int end = jsonText.indexOf(CODE_BLOCK_START, start);
                 if (end > start) {
                     jsonText = jsonText.substring(start, end).trim();
                 }
-            } else if (jsonText.contains("```")) {
+            } else if (jsonText.contains(CODE_BLOCK_START)) {
                 // Handle generic code blocks
-                int start = jsonText.indexOf("```") + 3;
-                int end = jsonText.indexOf("```", start);
+                int start = jsonText.indexOf(CODE_BLOCK_START) + CODE_PREFIX_LENGTH;
+                int end = jsonText.indexOf(CODE_BLOCK_START, start);
                 if (end > start) {
                     jsonText = jsonText.substring(start, end).trim();
                 }
