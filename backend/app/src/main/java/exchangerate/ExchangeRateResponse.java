@@ -1,8 +1,9 @@
 package exchangerate;
 
-import java.util.Map;
+import java.util.*;
 
 public class ExchangeRateResponse {
+
     private String baseCurrency;
     private Map<String, Double> conversionRates;
 
@@ -19,4 +20,3 @@ public class ExchangeRateResponse {
         return conversionRates;
     }
 }
-

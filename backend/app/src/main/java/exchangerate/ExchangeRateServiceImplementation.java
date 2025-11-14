@@ -1,11 +1,11 @@
 package exchangerate;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import java.util.*;
+import java.util.stream.*;
 
-import java.util.Map;
-import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.*;
+import org.springframework.stereotype.*;
+import org.springframework.web.client.*;
 
 @Service
 public class ExchangeRateServiceImplementation implements ExchangeRateService {
@@ -13,26 +13,47 @@ public class ExchangeRateServiceImplementation implements ExchangeRateService {
     @Value("${exchange.api.key:dummy}")
     private String apiKey;
 
+    @Value("${exchange.api.base-url:https://v6.exchangerate-api.com/v6}")
+    private String exchangeApiBaseUrl;
+
+    private static final String LATEST_PATH = "/latest/";
+
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Override
     public ExchangeRateResponse getExchangeRates(String base) {
-        String url = "https://v6.exchangerate-api.com/v6/" + apiKey + "/latest/" + base.toUpperCase();
+        String url = buildUrl(base);
 
+        @SuppressWarnings("unchecked")
         Map<String, Object> response = restTemplate.getForObject(url, Map.class);
 
-        if (response == null || !"success".equals(response.get("result"))) {
-            throw new RuntimeException("Failed to fetch exchange rates");
-        }
+        validateResponse(response);
 
-        Map<String, Object> raw = (Map<String, Object>) response.get("conversion_rates");
-        Map<String, Double> rates = raw.entrySet().stream()
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        e -> ((Number) e.getValue()).doubleValue()));
+        Map<String, Double> rates = parseRates(response);
 
         return new ExchangeRateResponse(
                 (String) response.get("base_code"),
-                rates);
+                rates
+        );
+    }
+
+    private String buildUrl(String base) {
+        return exchangeApiBaseUrl + "/" + apiKey + LATEST_PATH + base.toUpperCase();
+    }
+
+    private void validateResponse(Map<String, Object> response) {
+        if (response == null || !"success".equals(response.get("result"))) {
+            throw new RuntimeException("Failed to fetch exchange rates");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Double> parseRates(Map<String, Object> response) {
+        Map<String, Object> raw = (Map<String, Object>) response.get("conversion_rates");
+        return raw.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> ((Number) e.getValue()).doubleValue()
+                ));
     }
 }

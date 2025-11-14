@@ -1,10 +1,10 @@
 package exchangerate;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.*;
 import org.springframework.web.bind.annotation.*;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.tags.*;
 
 @RestController
 @RequestMapping("/api/v1/exchange")
@@ -20,8 +20,8 @@ public class ExchangeRateController {
 
     // Example: GET /api/v1/exchange?base=USD
     @Operation(
-        summary = "Query exchange rate",
-        description = "Query exchange rate with base country code."
+            summary = "Query exchange rate",
+            description = "Query exchange rate with base country code."
     )
     @GetMapping
     public ExchangeRateResponse getExchangeRates(@RequestParam String base) {
