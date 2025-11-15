@@ -10,15 +10,16 @@ import org.springframework.web.client.*;
 @Service
 public class ExchangeRateServiceImplementation implements ExchangeRateService {
 
+    private static final String LATEST_PATH = "/latest/";
+
     @Value("${exchange.api.key:dummy}")
     private String apiKey;
 
     @Value("${exchange.api.base-url:https://v6.exchangerate-api.com/v6}")
     private String exchangeApiBaseUrl;
 
-    private static final String LATEST_PATH = "/latest/";
-
-    private final RestTemplate restTemplate = new RestTemplate();
+    @Autowired
+    private RestTemplate restTemplate;
 
     @Override
     public ExchangeRateResponse getExchangeRates(String base) {
