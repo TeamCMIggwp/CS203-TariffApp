@@ -31,8 +31,9 @@ class ExchangeRateServiceImplementationTest {
         MockitoAnnotations.openMocks(this);
         service = new ExchangeRateServiceImplementation();
 
-        // Inject apiKey and RestTemplate (private fields) to avoid real HTTP calls
+        // Inject apiKey, base URL, and RestTemplate (private fields) to avoid real HTTP calls
         ReflectionTestUtils.setField(service, "apiKey", "testkey");
+        ReflectionTestUtils.setField(service, "exchangeApiBaseUrl", "https://v6.exchangerate-api.com/v6");
         ReflectionTestUtils.setField(service, "restTemplate", restTemplate);
     }
 
