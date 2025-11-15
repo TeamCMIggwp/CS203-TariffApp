@@ -12,7 +12,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
 
@@ -59,9 +58,6 @@ class GeminiControllerTest {
 
         // Set up error response
         errorResponse = new AnalysisResponse(false, "API error occurred");
-
-        // Set API key for health check tests
-        ReflectionTestUtils.setField(geminiController, "apiKey", "test-api-key");
     }
 
     // ========================================
