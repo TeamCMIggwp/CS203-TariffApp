@@ -39,7 +39,7 @@ export function GameOverModal({ score, won, onRestart, onClose, onScoreUploaded 
   setError(null)
 
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/leaderboard`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/leaderboard`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",

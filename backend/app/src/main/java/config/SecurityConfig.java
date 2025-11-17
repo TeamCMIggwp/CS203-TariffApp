@@ -96,8 +96,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/admin/news/rates").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/news/rates/**").permitAll()
 
-                        .requestMatchers(HttpMethod.GET, "/leaderboard").permitAll()
-                        .requestMatchers(HttpMethod.PUT, "/leaderboard").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/leaderboard").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/leaderboard").permitAll()
 
                         // Everything else requires authentication
                         .anyRequest().authenticated()
