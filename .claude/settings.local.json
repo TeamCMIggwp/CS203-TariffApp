@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(mvn test-compile:*)"
-    ],
-    "deny": [],
-    "ask": []
-  }
-}
