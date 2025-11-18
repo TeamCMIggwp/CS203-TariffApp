@@ -3,22 +3,28 @@ package database.newstariffrates.service;
 import database.newstariffrates.dto.CreateNewsTariffRateRequest;
 import database.newstariffrates.dto.NewsTariffRateResponse;
 import database.newstariffrates.entity.NewsTariffRate;
-import database.newstariffrates.repository.NewsTariffRateRepository;
+import database.newstariffrates.repository.INewsTariffRateRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service layer for NewsTariffRate operations.
+ * Depends on INewsTariffRateRepository abstraction (Dependency Inversion Principle).
+ */
 @Service
 public class NewsTariffRateService {
 
     private static final Logger logger = LoggerFactory.getLogger(NewsTariffRateService.class);
     private static final boolean DEFAULT_IN_EFFECT = true;
 
-    @Autowired
-    private NewsTariffRateRepository repository;
+    private final INewsTariffRateRepository repository;
+
+    public NewsTariffRateService(INewsTariffRateRepository repository) {
+        this.repository = repository;
+    }
 
     /**
      * Create a new tariff rate from news article

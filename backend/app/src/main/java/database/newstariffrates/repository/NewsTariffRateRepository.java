@@ -1,9 +1,9 @@
 package database.newstariffrates.repository;
 
 import database.newstariffrates.entity.NewsTariffRate;
+import database.newstariffrates.mapper.NewsTariffRateRowMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,16 +16,19 @@ import java.sql.Statement;
 import java.util.Optional;
 
 @Repository
-public class NewsTariffRateRepository {
+public class NewsTariffRateRepository implements INewsTariffRateRepository {
     private static final Logger logger = LoggerFactory.getLogger(NewsTariffRateRepository.class);
 
-    @Autowired
-    @org.springframework.beans.factory.annotation.Qualifier("appJdbcTemplate")
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate;
+    private final NewsTariffRateRowMapper rowMapper;
 
-    /**
-     * Check if a tariff rate already exists for a given news link
-     */
+    public NewsTariffRateRepository(
+            @org.springframework.beans.factory.annotation.Qualifier("appJdbcTemplate") JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.rowMapper = new NewsTariffRateRowMapper();
+    }
+
+    @Override
     public boolean existsByNewsLink(String newsLink) {
         try {
             String sql = "SELECT COUNT(*) FROM TariffRates WHERE news_link = ?";
@@ -37,30 +40,14 @@ public class NewsTariffRateRepository {
         }
     }
 
-    /**
-     * Find tariff rate by news link
-     */
+    @Override
     public Optional<NewsTariffRate> findByNewsLink(String newsLink) {
         try {
             String sql = "SELECT tariff_id, news_link, country_id, partner_country_id, product_id, " +
                         "tariff_type_id, year, rate, unit, last_updated, in_effect " +
                         "FROM TariffRates WHERE news_link = ?";
 
-            NewsTariffRate tariffRate = jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
-                NewsTariffRate tr = new NewsTariffRate();
-                tr.setTariffId(rs.getInt("tariff_id"));
-                tr.setNewsLink(rs.getString("news_link"));
-                tr.setCountryId(rs.getString("country_id"));
-                tr.setPartnerCountryId(rs.getString("partner_country_id"));
-                tr.setProductId(rs.getInt("product_id"));
-                tr.setTariffTypeId((Integer) rs.getObject("tariff_type_id"));
-                tr.setYear(rs.getInt("year"));
-                tr.setRate(rs.getDouble("rate"));
-                tr.setUnit(rs.getString("unit"));
-                tr.setLastUpdated(rs.getTimestamp("last_updated"));
-                tr.setInEffect(rs.getBoolean("in_effect"));
-                return tr;
-            }, newsLink);
+            NewsTariffRate tariffRate = jdbcTemplate.queryForObject(sql, rowMapper, newsLink);
 
             return Optional.of(tariffRate);
         } catch (EmptyResultDataAccessException e) {
@@ -71,9 +58,7 @@ public class NewsTariffRateRepository {
         }
     }
 
-    /**
-     * Save new tariff rate
-     */
+    @Override
     public NewsTariffRate save(NewsTariffRate tariffRate) {
         try {
             logger.info("Saving tariff rate for news: {}", tariffRate.getNewsLink());

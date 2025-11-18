@@ -1,6 +1,6 @@
 package database.tariffs.service;
 
-import database.tariffs.repository.TariffRateRepository;
+import database.tariffs.repository.ITariffRateRepository;
 import database.tariffs.entity.TariffRateEntity;
 import database.tariffs.dto.CreateTariffRequest;
 import database.tariffs.dto.UpdateTariffRequest;
@@ -10,20 +10,26 @@ import database.tariffs.exception.TariffNotFoundException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Service layer for Tariff operations.
+ * Depends on ITariffRateRepository abstraction (Dependency Inversion Principle).
+ */
 @Service
 public class TariffService {
     private static final Logger logger = LoggerFactory.getLogger(TariffService.class);
     private static final int NO_ROWS_AFFECTED = 0;
 
-    @Autowired
-    private TariffRateRepository repository;
+    private final ITariffRateRepository repository;
+
+    public TariffService(ITariffRateRepository repository) {
+        this.repository = repository;
+    }
     
     /**
      * Create new tariff - throws TariffAlreadyExistsException if exists

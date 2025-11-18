@@ -14,7 +14,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -30,8 +29,11 @@ public class NewsTariffRateController {
     private static final int HTTP_CREATED = 201;
     private static final int HTTP_NOT_FOUND = 404;
 
-    @Autowired
-    private NewsTariffRateService service;
+    private final NewsTariffRateService service;
+
+    public NewsTariffRateController(NewsTariffRateService service) {
+        this.service = service;
+    }
 
     @Operation(
         summary = "Create tariff rate from news article",
@@ -60,7 +62,7 @@ public class NewsTariffRateController {
     @PostMapping
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<?> createTariffRate(@Valid @RequestBody CreateNewsTariffRateRequest request) {
-        logger.info("POST /api/v1/news/rates - Creating tariff rate for news: {}", request.getNewsLink());
+        logger.info("POST /api/v1/admin/news/rates - Creating tariff rate for news: {}", request.getNewsLink());
 
         try {
             NewsTariffRateResponse response = service.createTariffRate(request);
@@ -98,7 +100,7 @@ public class NewsTariffRateController {
         @Parameter(description = "News article URL", required = true)
         @RequestParam String newsLink
     ) {
-        logger.info("GET /api/v1/news/rates - Fetching tariff rate for news: {}", newsLink);
+        logger.info("GET /api/v1/admin/news/rates - Fetching tariff rate for news: {}", newsLink);
 
         try {
             NewsTariffRateResponse response = service.getTariffRateByNewsLink(newsLink);
@@ -124,7 +126,7 @@ public class NewsTariffRateController {
         @Parameter(description = "News article URL", required = true)
         @RequestParam String newsLink
     ) {
-        logger.info("GET /api/v1/news/rates/existence - Checking existence for news: {}", newsLink);
+        logger.info("GET /api/v1/admin/news/rates/existence - Checking existence for news: {}", newsLink);
         boolean exists = service.existsByNewsLink(newsLink);
         return ResponseEntity.ok(exists);
     }

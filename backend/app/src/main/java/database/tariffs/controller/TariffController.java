@@ -4,7 +4,6 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -42,8 +41,11 @@ public class TariffController {
     private static final Logger logger = LoggerFactory.getLogger(TariffController.class);
     private static final int HTTP_CREATED = 201;
 
-    @Autowired
-    private TariffService tariffService;
+    private final TariffService tariffService;
+
+    public TariffController(TariffService tariffService) {
+        this.tariffService = tariffService;
+    }
 
     @Operation(
         summary = "Create new tariff rate",
@@ -72,15 +74,15 @@ public class TariffController {
             content = @Content(
                 mediaType = "application/json",
                 examples = @ExampleObject(
-                    value = "{\"timestamp\": \"2025-10-14T10:30:00\", \"status\": 409, \"error\": \"Conflict\", \"message\": \"Tariff already exists for: reporter=840, partner=356, product=100630, year=2020\", \"path\": \"/api/v1/database/tariffs\"}"
+                    value = "{\"timestamp\": \"2025-10-14T10:30:00\", \"status\": 409, \"error\": \"Conflict\", \"message\": \"Tariff already exists for: reporter=840, partner=356, product=100630, year=2020\", \"path\": \"/api/v1/tariffs\"}"
                 )
             )
         )
     })
     @PostMapping
     public ResponseEntity<TariffResponse> createTariff(@Valid @RequestBody CreateTariffRequest request) {
-        
-        logger.info("POST /api/v1/database/tariffs - Creating tariff: {}", request);
+
+        logger.info("POST /api/v1/tariffs - Creating tariff: {}", request);
 
         TariffResponse response = tariffService.createTariff(request);
 
@@ -106,7 +108,7 @@ public class TariffController {
             content = @Content(
                 mediaType = "application/json",
                 examples = @ExampleObject(
-                    value = "{\"timestamp\": \"2025-10-14T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"Tariff not found for: reporter=840, partner=356, product=100630, year=2020\", \"path\": \"/api/v1/database/tariffs\"}"
+                    value = "{\"timestamp\": \"2025-10-14T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"Tariff not found for: reporter=840, partner=356, product=100630, year=2020\", \"path\": \"/api/v1/tariffs\"}"
                 )
             )
         )
@@ -114,8 +116,8 @@ public class TariffController {
     @PutMapping
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<TariffResponse> updateTariff(@Valid @RequestBody UpdateTariffRequest request) {
-        
-        logger.info("PUT /api/v1/database/tariffs - Updating tariff: {}", request);
+
+        logger.info("PUT /api/v1/tariffs - Updating tariff: {}", request);
 
         TariffResponse response = tariffService.updateTariff(
                 request.getReporter(),
@@ -153,7 +155,7 @@ public class TariffController {
             content = @Content(
                 mediaType = "application/json",
                 examples = @ExampleObject(
-                    value = "{\"timestamp\": \"2025-10-14T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"Tariff not found for: reporter=840, partner=356, product=100630, year=2020\", \"path\": \"/api/v1/database/tariffs\"}"
+                    value = "{\"timestamp\": \"2025-10-14T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"Tariff not found for: reporter=840, partner=356, product=100630, year=2020\", \"path\": \"/api/v1/tariffs\"}"
                 )
             )
         )
@@ -162,17 +164,17 @@ public class TariffController {
     public ResponseEntity<TariffResponse> getTariff(
             @Parameter(description = "Reporter country ISO code (3 characters)", example = "840", required = true)
             @RequestParam @NotNull String reporter,
-            
+
             @Parameter(description = "Partner country ISO code (3 characters)", example = "356", required = true)
             @RequestParam @NotNull String partner,
-            
+
             @Parameter(description = "Product HS code", example = "100630", required = true)
             @RequestParam @NotNull Integer product,
-            
+
             @Parameter(description = "Year (4 digits)", example = "2020", required = true)
             @RequestParam @NotNull @Pattern(regexp = "\\d{4}", message = "Year must be 4 digits") String year) {
-        
-        logger.info("GET /api/v1/database/tariffs - Getting tariff: reporter={}, partner={}, product={}, year={}",
+
+        logger.info("GET /api/v1/tariffs - Getting tariff: reporter={}, partner={}, product={}, year={}",
                 reporter, partner, product, year);
         
         TariffResponse response = tariffService.getTariff(reporter, partner, product, year);
@@ -194,7 +196,7 @@ public class TariffController {
             content = @Content(
                 mediaType = "application/json",
                 examples = @ExampleObject(
-                    value = "{\"timestamp\": \"2025-10-14T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"Tariff not found for: reporter=840, partner=356, product=100630, year=2020\", \"path\": \"/api/v1/database/tariffs\"}"
+                    value = "{\"timestamp\": \"2025-10-14T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"Tariff not found for: reporter=840, partner=356, product=100630, year=2020\", \"path\": \"/api/v1/tariffs\"}"
                 )
             )
         )
@@ -204,17 +206,17 @@ public class TariffController {
     public ResponseEntity<Void> deleteTariff(
             @Parameter(description = "Reporter country ISO code (3 characters)", example = "840", required = true)
             @RequestParam @NotNull String reporter,
-            
+
             @Parameter(description = "Partner country ISO code (3 characters)", example = "356", required = true)
             @RequestParam @NotNull String partner,
-            
+
             @Parameter(description = "Product HS code", example = "100630", required = true)
             @RequestParam @NotNull Integer product,
-            
+
             @Parameter(description = "Year (4 digits)", example = "2020", required = true)
             @RequestParam @NotNull @Pattern(regexp = "\\d{4}", message = "Year must be 4 digits") String year) {
-        
-        logger.info("DELETE /api/v1/database/tariffs - Deleting tariff: reporter={}, partner={}, product={}, year={}",
+
+        logger.info("DELETE /api/v1/tariffs - Deleting tariff: reporter={}, partner={}, product={}, year={}",
                 reporter, partner, product, year);
         
         tariffService.deleteTariff(reporter, partner, product, year);
