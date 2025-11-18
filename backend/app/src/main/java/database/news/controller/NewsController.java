@@ -7,7 +7,6 @@ import database.news.service.NewsService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -33,8 +32,11 @@ public class NewsController {
     private static final Logger logger = LoggerFactory.getLogger(NewsController.class);
     private static final int HTTP_CREATED = 201;
 
-    @Autowired
-    private NewsService newsService;
+    private final NewsService newsService;
+
+    public NewsController(NewsService newsService) {
+        this.newsService = newsService;
+    }
 
     @Operation(
         summary = "Create new news article",
@@ -63,16 +65,16 @@ public class NewsController {
             content = @Content(
                 mediaType = "application/json",
                 examples = @ExampleObject(
-                    value = "{\"timestamp\": \"2025-10-18T10:30:00\", \"status\": 409, \"error\": \"Conflict\", \"message\": \"News already exists for link: https://www.usitc.gov/rice-report\", \"path\": \"/api/v1/database/news\"}"
+                    value = "{\"timestamp\": \"2025-10-18T10:30:00\", \"status\": 409, \"error\": \"Conflict\", \"message\": \"News already exists for link: https://www.usitc.gov/rice-report\", \"path\": \"/api/v1/admin/news\"}"
                 )
             )
         )
     })
     @PostMapping
     public ResponseEntity<NewsResponse> createNews(@Valid @RequestBody CreateNewsRequest request) {
-        
-        logger.info("POST /api/v1/database/news - Creating news: {}", request);
-        
+
+        logger.info("POST /api/v1/admin/news - Creating news: {}", request);
+
         NewsResponse response = newsService.createNews(request);
 
         return ResponseEntity.status(HTTP_CREATED).body(response);
@@ -97,18 +99,18 @@ public class NewsController {
             content = @Content(
                 mediaType = "application/json",
                 examples = @ExampleObject(
-                    value = "{\"timestamp\": \"2025-10-18T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"News not found for link: https://example.com\", \"path\": \"/api/v1/database/news\"}"
+                    value = "{\"timestamp\": \"2025-10-18T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"News not found for link: https://example.com\", \"path\": \"/api/v1/admin/news\"}"
                 )
             )
         )
     })
     @PutMapping
     public ResponseEntity<NewsResponse> updateNews(@Valid @RequestBody UpdateNewsRequest request) {
-        
-        logger.info("PUT /api/v1/database/news - Updating news: {}", request.getNewsLink());
-        
+
+        logger.info("PUT /api/v1/admin/news - Updating news: {}", request.getNewsLink());
+
         NewsResponse response = newsService.updateNews(request.getNewsLink(), request);
-        
+
         return ResponseEntity.ok(response);
     }
 
@@ -138,7 +140,7 @@ public class NewsController {
             content = @Content(
                 mediaType = "application/json",
                 examples = @ExampleObject(
-                    value = "{\"timestamp\": \"2025-10-18T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"News not found for link: https://example.com\", \"path\": \"/api/v1/database/news\"}"
+                    value = "{\"timestamp\": \"2025-10-18T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"News not found for link: https://example.com\", \"path\": \"/api/v1/admin/news\"}"
                 )
             )
         )
@@ -148,7 +150,7 @@ public class NewsController {
             @Parameter(description = "News article URL", example = "https://www.usitc.gov/rice-report", required = true)
             @RequestParam @NotBlank String newsLink) {
 
-        logger.info("GET /api/v1/database/news - Getting news: {}", newsLink);
+        logger.info("GET /api/v1/admin/news - Getting news: {}", newsLink);
         NewsResponse response = newsService.getNews(newsLink);
         return ResponseEntity.ok(response);
     }
@@ -167,7 +169,7 @@ public class NewsController {
     @GetMapping("/all")
     public ResponseEntity<List<NewsResponse>> getAllNews() {
 
-        logger.info("GET /api/v1/news/all - Getting all news");
+        logger.info("GET /api/v1/admin/news/all - Getting all news");
         List<NewsResponse> response = newsService.getAllNews();
         return ResponseEntity.ok(response);
     }
@@ -187,7 +189,7 @@ public class NewsController {
             content = @Content(
                 mediaType = "application/json",
                 examples = @ExampleObject(
-                    value = "{\"timestamp\": \"2025-10-18T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"News not found for link: https://example.com\", \"path\": \"/api/v1/database/news\"}"
+                    value = "{\"timestamp\": \"2025-10-18T10:30:00\", \"status\": 404, \"error\": \"Not Found\", \"message\": \"News not found for link: https://example.com\", \"path\": \"/api/v1/admin/news\"}"
                 )
             )
         )
@@ -197,7 +199,7 @@ public class NewsController {
             @Parameter(description = "News article URL", example = "https://www.usitc.gov/rice-report", required = true)
             @RequestParam @NotBlank String newsLink) {
 
-        logger.info("DELETE /api/v1/database/news - Deleting: {}", newsLink);
+        logger.info("DELETE /api/v1/admin/news - Deleting: {}", newsLink);
 
         newsService.deleteNews(newsLink);
         return ResponseEntity.noContent().build();
@@ -234,7 +236,7 @@ public class NewsController {
             @Parameter(description = "Visibility status request body", required = true)
             @RequestBody @Valid VisibilityRequest request) {
 
-        logger.info("PUT /api/v1/news/visibility - Updating visibility for: {} to hidden={}", newsLink, request.isHidden());
+        logger.info("PUT /api/v1/admin/news/visibility - Updating visibility for: {} to hidden={}", newsLink, request.isHidden());
 
         NewsResponse response;
         if (request.isHidden()) {

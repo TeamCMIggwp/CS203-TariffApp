@@ -3,7 +3,6 @@ package scraper.controller;
 import jakarta.validation.constraints.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,11 +20,14 @@ import scraper.service.ScraperService;
 @RequestMapping("/api/v1/scrape")
 @CrossOrigin(origins = {"http://localhost:3000", "https://teamcmiggwp.duckdns.org"})
 public class ScraperController {
-    
+
     private static final Logger log = LoggerFactory.getLogger(ScraperController.class);
-    
-    @Autowired
-    private ScraperService scraperService;
+
+    private final ScraperService scraperService;
+
+    public ScraperController(ScraperService scraperService) {
+        this.scraperService = scraperService;
+    }
     
     /**
      * Execute a scrape job with query parameters

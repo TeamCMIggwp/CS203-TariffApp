@@ -12,6 +12,8 @@ import database.news.exception.NewsAlreadyExistsException;
 import database.news.exception.NewsNotFoundException;
 import database.tariffs.exception.TariffAlreadyExistsException;
 import database.tariffs.exception.TariffNotFoundException;
+import common.exception.ApiErrorResponse;
+import common.exception.ValidationErrorResponse;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,11 +29,11 @@ public class GlobalExceptionHandler {
     // Tariff Exception Handlers
     
     @ExceptionHandler(TariffAlreadyExistsException.class)
-    public ResponseEntity<ErrorResponse> handleTariffAlreadyExists(
+    public ResponseEntity<ApiErrorResponse> handleTariffAlreadyExists(
             TariffAlreadyExistsException ex, WebRequest request) {
         logger.warn("Tariff already exists: {}", ex.getMessage());
-        
-        ErrorResponse error = new ErrorResponse(
+
+        ApiErrorResponse error = new ApiErrorResponse(
             LocalDateTime.now(),
             HttpStatus.CONFLICT.value(),
             "Conflict",
@@ -42,11 +44,11 @@ public class GlobalExceptionHandler {
     }
     
     @ExceptionHandler(TariffNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleTariffNotFound(
+    public ResponseEntity<ApiErrorResponse> handleTariffNotFound(
             TariffNotFoundException ex, WebRequest request) {
         logger.warn("Tariff not found: {}", ex.getMessage());
-        
-        ErrorResponse error = new ErrorResponse(
+
+        ApiErrorResponse error = new ApiErrorResponse(
             LocalDateTime.now(),
             HttpStatus.NOT_FOUND.value(),
             "Not Found",
@@ -59,11 +61,11 @@ public class GlobalExceptionHandler {
     // News Exception Handlers
     
     @ExceptionHandler(NewsAlreadyExistsException.class)
-    public ResponseEntity<ErrorResponse> handleNewsAlreadyExists(
+    public ResponseEntity<ApiErrorResponse> handleNewsAlreadyExists(
             NewsAlreadyExistsException ex, WebRequest request) {
         logger.warn("News already exists: {}", ex.getMessage());
-        
-        ErrorResponse error = new ErrorResponse(
+
+        ApiErrorResponse error = new ApiErrorResponse(
             LocalDateTime.now(),
             HttpStatus.CONFLICT.value(),
             "Conflict",
@@ -74,11 +76,11 @@ public class GlobalExceptionHandler {
     }
     
     @ExceptionHandler(NewsNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleNewsNotFound(
+    public ResponseEntity<ApiErrorResponse> handleNewsNotFound(
             NewsNotFoundException ex, WebRequest request) {
         logger.warn("News not found: {}", ex.getMessage());
-        
-        ErrorResponse error = new ErrorResponse(
+
+        ApiErrorResponse error = new ApiErrorResponse(
             LocalDateTime.now(),
             HttpStatus.NOT_FOUND.value(),
             "Not Found",
@@ -113,11 +115,11 @@ public class GlobalExceptionHandler {
     }
     
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGlobalException(
+    public ResponseEntity<ApiErrorResponse> handleGlobalException(
             Exception ex, WebRequest request) {
         logger.error("Unexpected error: {}", ex.getMessage(), ex);
-        
-        ErrorResponse error = new ErrorResponse(
+
+        ApiErrorResponse error = new ApiErrorResponse(
             LocalDateTime.now(),
             HttpStatus.INTERNAL_SERVER_ERROR.value(),
             "Internal Server Error",
@@ -125,43 +127,5 @@ public class GlobalExceptionHandler {
             request.getDescription(false).replace("uri=", "")
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
-    }
-    
-    // Inner classes for error responses
-    public static class ErrorResponse {
-        private LocalDateTime timestamp;
-        private int status;
-        private String error;
-        private String message;
-        private String path;
-        
-        public ErrorResponse(LocalDateTime timestamp, int status, String error, 
-                           String message, String path) {
-            this.timestamp = timestamp;
-            this.status = status;
-            this.error = error;
-            this.message = message;
-            this.path = path;
-        }
-        
-        // Getters
-        public LocalDateTime getTimestamp() { return timestamp; }
-        public int getStatus() { return status; }
-        public String getError() { return error; }
-        public String getMessage() { return message; }
-        public String getPath() { return path; }
-    }
-    
-    public static class ValidationErrorResponse extends ErrorResponse {
-        private Map<String, String> validationErrors;
-        
-        public ValidationErrorResponse(LocalDateTime timestamp, int status, 
-                                     String error, Map<String, String> validationErrors, 
-                                     String path) {
-            super(timestamp, status, error, "Validation failed for one or more fields", path);
-            this.validationErrors = validationErrors;
-        }
-        
-        public Map<String, String> getValidationErrors() { return validationErrors; }
     }
 }

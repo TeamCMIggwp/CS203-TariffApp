@@ -11,7 +11,12 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 
-import scraper.dto.ErrorResponse;
+import common.exception.ApiErrorResponse;
+import common.exception.ValidationErrorResponse;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Exception handler specifically for scraper-related errors
@@ -27,44 +32,47 @@ public class ScraperExceptionHandler {
      * Handle validation errors
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidationException(
+    public ResponseEntity<ValidationErrorResponse> handleValidationException(
             MethodArgumentNotValidException ex,
             WebRequest request) {
-        
+
         log.warn("Validation error: {}", ex.getMessage());
-        
-        ErrorResponse errorResponse = new ErrorResponse(
+
+        Map<String, String> errors = new HashMap<>();
+        ex.getBindingResult().getAllErrors().forEach((error) -> {
+            String fieldName = ((FieldError) error).getField();
+            String errorMessage = error.getDefaultMessage();
+            errors.put(fieldName, errorMessage);
+        });
+
+        ValidationErrorResponse response = new ValidationErrorResponse(
+            LocalDateTime.now(),
             HttpStatus.BAD_REQUEST.value(),
             "Validation Failed",
-            "Invalid input parameters",
+            errors,
             request.getDescription(false).replace("uri=", "")
         );
-        
-        // Add field-specific validation errors
-        for (FieldError error : ex.getBindingResult().getFieldErrors()) {
-            errorResponse.addValidationError(error.getField(), error.getDefaultMessage());
-        }
-        
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+        return ResponseEntity.badRequest().body(response);
     }
     
     /**
      * Handle search failures
      */
     @ExceptionHandler(SearchFailedException.class)
-    public ResponseEntity<ErrorResponse> handleSearchFailedException(
+    public ResponseEntity<ApiErrorResponse> handleSearchFailedException(
             SearchFailedException ex,
             WebRequest request) {
-        
+
         log.error("Search failed: {}", ex.getMessage());
-        
-        ErrorResponse errorResponse = new ErrorResponse(
+
+        ApiErrorResponse errorResponse = new ApiErrorResponse(
+            LocalDateTime.now(),
             HttpStatus.BAD_GATEWAY.value(),
             "Search Failed",
             ex.getMessage(),
             request.getDescription(false).replace("uri=", "")
         );
-        
+
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_GATEWAY);
     }
     
@@ -72,19 +80,20 @@ public class ScraperExceptionHandler {
      * Handle scraping failures
      */
     @ExceptionHandler(ScrapingFailedException.class)
-    public ResponseEntity<ErrorResponse> handleScrapingFailedException(
+    public ResponseEntity<ApiErrorResponse> handleScrapingFailedException(
             ScrapingFailedException ex,
             WebRequest request) {
-        
+
         log.error("Scraping failed: {}", ex.getMessage());
-        
-        ErrorResponse errorResponse = new ErrorResponse(
+
+        ApiErrorResponse errorResponse = new ApiErrorResponse(
+            LocalDateTime.now(),
             HttpStatus.INTERNAL_SERVER_ERROR.value(),
             "Scraping Failed",
             ex.getMessage(),
             request.getDescription(false).replace("uri=", "")
         );
-        
+
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     
@@ -92,19 +101,20 @@ public class ScraperExceptionHandler {
      * Handle generic scraper exceptions
      */
     @ExceptionHandler(ScraperException.class)
-    public ResponseEntity<ErrorResponse> handleScraperException(
+    public ResponseEntity<ApiErrorResponse> handleScraperException(
             ScraperException ex,
             WebRequest request) {
-        
+
         log.error("Scraper error: {}", ex.getMessage());
-        
-        ErrorResponse errorResponse = new ErrorResponse(
+
+        ApiErrorResponse errorResponse = new ApiErrorResponse(
+            LocalDateTime.now(),
             HttpStatus.INTERNAL_SERVER_ERROR.value(),
             "Scraper Error",
             ex.getMessage(),
             request.getDescription(false).replace("uri=", "")
         );
-        
+
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
