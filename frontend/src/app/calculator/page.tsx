@@ -1,35 +1,17 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { motion, useMotionValue, AnimatePresence } from "framer-motion"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { motion, useMotionValue } from "framer-motion"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { countries, agriculturalProducts, currencies } from "@/lib/tariff-data"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, ScatterChart, Scatter, ZAxis, PieChart, Pie, Cell } from "recharts"
-import { BarChart3, Sparkles, Database, Globe, Plus, Trash2 } from "lucide-react"
+import { BarChart3, Database, Globe, Plus, Trash2 } from "lucide-react"
 import { getCurrencyCode, getCurrencyName, countryToCurrency } from "@/lib/fx"
 import { fetchFxQuote } from "@/lib/fxApi"
-import { ChevronDown } from "lucide-react"
-
-type MetricValue = string | number
-
-// Define the possible API response shape
-interface ExchangeApiResponse {
-  conversionRates?: Record<string, number>
-  rates?: Record<string, number>
-  rate?: number
-}
-
-type GeminiApiResponse = {
-  summary?: string
-  insights?: string[]
-  metrics?: Record<string, MetricValue>
-  recommendations?: string[]
-  confidence?: string
-} | string | null
 
 type ProductRow = {
   id: string
@@ -595,14 +577,6 @@ export default function CalculatorSection() {
     return { value, tariff, cost: value + tariff }
   }, [products, fxRates, displayCurrency])
 
-  const dummyChartData = [
-    { product: "Wheat", tariff: 5.2 },
-    { product: "Rice", tariff: 12.5 },
-    { product: "Corn", tariff: 8.1 },
-    { product: "Soybeans", tariff: 10.0 },
-    { product: "Barley", tariff: 6.3 },
-  ]
-
   // ===== Chart Data (A: Direct, B: Derived) =====
   const successfulProducts = useMemo(() => (
     products.filter(p => p.status === 'success' && p.tariffRate !== null)
@@ -1101,7 +1075,15 @@ export default function CalculatorSection() {
                           innerRadius={60}
                           outerRadius={110}
                           paddingAngle={2}
-                          label={(entry) => `${entry.name}: ${displayCurrency} ${entry.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+                          label={(props) => {
+                            const name = String(props.name ?? "");
+                            const value =
+                              typeof props.value === "number"
+                                ? props.value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                : "";
+
+                            return `${name}: ${displayCurrency} ${value}`;
+                          }}
                         >
                           {pieData.map((entry, index) => {
                             const palette = [
